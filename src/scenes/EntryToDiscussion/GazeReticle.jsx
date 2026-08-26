@@ -5,10 +5,11 @@ export default function GazeReticle({ position, dwellProgress = 0, visible = tru
 
   const scale = 1 + dwellProgress * 0.25;
   const fillOpacity = dwellProgress * 0.35;
+  const locked = position.locked;
 
   return (
     <div
-      className={styles.reticle}
+      className={`${styles.reticle} ${locked ? styles.reticleLocked : ''}`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,
       }}
@@ -18,7 +19,9 @@ export default function GazeReticle({ position, dwellProgress = 0, visible = tru
         className={`${styles.inner} ${styles.reticleInner}`}
         style={{
           transform: `scale(${scale})`,
-          backgroundColor: `rgba(76, 175, 109, ${fillOpacity})`,
+          backgroundColor: locked
+            ? `rgba(76, 175, 109, ${0.25 + dwellProgress * 0.25})`
+            : `rgba(76, 175, 109, ${fillOpacity})`,
         }}
       />
     </div>

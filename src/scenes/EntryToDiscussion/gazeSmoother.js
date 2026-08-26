@@ -1,20 +1,35 @@
-export const GAZE_FOLLOW_FACTOR = 0.2;
-export const GAZE_MAX_STEP_PX = 6;
-export const GAZE_DEAD_ZONE_PX = 1.5;
-export const GAZE_MEDIAN_WINDOW = 3;
-export const GAZE_OUTLIER_PX = 120;
+export const GAZE_MEDIAN_WINDOW = 9;
+export const GAZE_LOCK_SAMPLE_COUNT = 22;
+export const GAZE_LOCK_ENTER_SPREAD_PX = 16;
+export const GAZE_LOCK_BREAK_SPREAD_PX = 34;
+export const GAZE_LOCK_ENTER_FRAMES = 3;
+export const GAZE_LOCK_BREAK_FRAMES = 8;
+export const GAZE_LOCK_BREAK_DISTANCE_PX = 65;
+
+export const GAZE_ONE_EURO_MIN_CUTOFF = 0.38;
+export const GAZE_ONE_EURO_BETA = 0.007;
+export const GAZE_ONE_EURO_D_CUTOFF = 1.0;
+export const GAZE_MICRO_DEADZONE_PX = 12;
+export const GAZE_GLIDE_DEADZONE_PX = 5;
+export const GAZE_SACCADE_THRESHOLD_PX = 22;
+export const GAZE_GLIDE_FOLLOW_FAST = 0.32;
+export const GAZE_GLIDE_FOLLOW_SLOW = 0.19;
+export const GAZE_GLIDE_MAX_STEP_FAST = 10;
+export const GAZE_GLIDE_MAX_STEP_SLOW = 5;
+export const GAZE_DISPLAY_MAX_STEP = 1.6;
+export const GAZE_DISPLAY_MIN_STEP = 0.25;
+export const GAZE_DISPLAY_EASE = 0.055;
 
 export const CALIBRATION_POINTS = [
   { x: 0.1, y: 0.1 },
   { x: 0.9, y: 0.1 },
+  { x: 0.5, y: 0.5 },
   { x: 0.1, y: 0.9 },
   { x: 0.9, y: 0.9 },
 ];
 
-export const CALIBRATION_SAMPLE_COUNT = 10;
-export const CALIBRATION_SAMPLE_INTERVAL_MS = 50;
-export const CALIBRATION_MEASURE_COUNT = 6;
-export const CALIBRATION_MEASURE_INTERVAL_MS = 40;
+export const CALIBRATION_SAMPLE_COUNT = 12;
+export const CALIBRATION_SAMPLE_INTERVAL_MS = 45;
 export const MIN_CALIBRATION_POINTS = 4;
 
 export function sleep(ms) {
@@ -46,168 +61,274 @@ function medianPoint(points) {
   };
 }
 
-function averagePoints(points) {
-  if (!points.length) return null;
-  const sum = points.reduce(
-    (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
-    { x: 0, y: 0 }
-  );
-  return { x: sum.x / points.length, y: sum.y / points.length };
+function spreadFromCenter(points, center) {
+  if (!points.length || !center) return Infinity;
+  return Math.max(...points.map((p) => distance(p.x, p.y, center.x, center.y)));
 }
 
-function fitAxis(targets, raws) {
-  const n = targets.length;
-  if (n < 2) return { scale: 1, offset: 0 };
-
-  let sumR = 0;
-  let sumT = 0;
-  let sumRR = 0;
-  let sumRT = 0;
-
-  for (let i = 0; i < n; i += 1) {
-    sumR += raws[i];
-    sumT += targets[i];
-    sumRR += raws[i] * raws[i];
-    sumRT += raws[i] * targets[i];
+function moveTowardPoint(currentX, currentY, targetX, targetY, maxStep, minStep, ease) {
+  const errX = targetX - currentX;
+  const errY = targetY - currentY;
+  const errDist = Math.hypot(errX, errY);
+  if (errDist < 1) {
+    return { x: targetX, y: targetY };
   }
 
-  const denom = n * sumRR - sumR * sumR;
-  if (Math.abs(denom) < 1e-6) return { scale: 1, offset: 0 };
-
-  const scale = (n * sumRT - sumR * sumT) / denom;
-  const offset = (sumT - scale * sumR) / n;
+  const step = Math.min(maxStep, Math.max(minStep, errDist * ease));
+  const ratio = step / errDist;
   return {
-    scale: clamp(scale, 0.8, 1.25),
-    offset,
+    x: currentX + errX * ratio,
+    y: currentY + errY * ratio,
   };
 }
 
-export function buildAxisCorrection(pairs) {
-  if (pairs.length < 2) {
-    return (rawX, rawY) => ({ x: rawX, y: rawY });
-  }
+function createOneEuroAxis({ minCutoff, beta, dCutoff }) {
+  let value = null;
+  let derivative = 0;
+  let lastTime = null;
 
-  const xFit = fitAxis(
-    pairs.map((p) => p.targetX),
-    pairs.map((p) => p.rawX)
-  );
-  const yFit = fitAxis(
-    pairs.map((p) => p.targetY),
-    pairs.map((p) => p.rawY)
-  );
+  const alpha = (cutoff, dt) => {
+    const tau = 1 / (2 * Math.PI * cutoff);
+    return 1 / (1 + tau / dt);
+  };
 
-  return (rawX, rawY) => {
-    if (typeof window === 'undefined') {
-      return {
-        x: xFit.scale * rawX + xFit.offset,
-        y: yFit.scale * rawY + yFit.offset,
-      };
-    }
+  return {
+    reset(next) {
+      value = next;
+      derivative = 0;
+      lastTime = null;
+    },
+    filter(sample, timestampMs) {
+      if (value === null || !Number.isFinite(sample)) {
+        value = sample;
+        lastTime = timestampMs;
+        return sample;
+      }
 
-    return {
-      x: clamp(xFit.scale * rawX + xFit.offset, 0, window.innerWidth),
-      y: clamp(yFit.scale * rawY + yFit.offset, 0, window.innerHeight),
-    };
+      const dt = Math.max(0.001, (timestampMs - lastTime) / 1000);
+      lastTime = timestampMs;
+
+      const rawDerivative = (sample - value) / dt;
+      derivative += alpha(dCutoff, dt) * (rawDerivative - derivative);
+
+      const cutoff = minCutoff + beta * Math.abs(derivative);
+      value += alpha(cutoff, dt) * (sample - value);
+      return value;
+    },
   };
 }
 
 export function createGazePipeline({
-  followFactor = GAZE_FOLLOW_FACTOR,
-  maxStepPx = GAZE_MAX_STEP_PX,
-  deadZonePx = GAZE_DEAD_ZONE_PX,
   medianWindow = GAZE_MEDIAN_WINDOW,
-  outlierPx = GAZE_OUTLIER_PX,
-  correction = null,
+  lockSampleCount = GAZE_LOCK_SAMPLE_COUNT,
+  lockEnterSpreadPx = GAZE_LOCK_ENTER_SPREAD_PX,
+  lockBreakSpreadPx = GAZE_LOCK_BREAK_SPREAD_PX,
+  lockEnterFrames = GAZE_LOCK_ENTER_FRAMES,
+  lockBreakFrames = GAZE_LOCK_BREAK_FRAMES,
+  lockBreakDistancePx = GAZE_LOCK_BREAK_DISTANCE_PX,
+  minCutoff = GAZE_ONE_EURO_MIN_CUTOFF,
+  beta = GAZE_ONE_EURO_BETA,
+  dCutoff = GAZE_ONE_EURO_D_CUTOFF,
+  microDeadzonePx = GAZE_MICRO_DEADZONE_PX,
+  glideDeadzonePx = GAZE_GLIDE_DEADZONE_PX,
+  saccadeThresholdPx = GAZE_SACCADE_THRESHOLD_PX,
+  glideFollowFast = GAZE_GLIDE_FOLLOW_FAST,
+  glideFollowSlow = GAZE_GLIDE_FOLLOW_SLOW,
+  glideMaxStepFast = GAZE_GLIDE_MAX_STEP_FAST,
+  glideMaxStepSlow = GAZE_GLIDE_MAX_STEP_SLOW,
+  displayMaxStep = GAZE_DISPLAY_MAX_STEP,
+  displayMinStep = GAZE_DISPLAY_MIN_STEP,
+  displayEase = GAZE_DISPLAY_EASE,
 } = {}) {
   let displayX = null;
   let displayY = null;
-  let targetX = null;
-  let targetY = null;
-  let correctionFn = correction;
+  let glideTargetX = null;
+  let glideTargetY = null;
+  let latestGazeX = null;
+  let latestGazeY = null;
+  let stableFrameCount = 0;
+  let breakFrameCount = 0;
+  let isLocked = false;
+  let lockPoint = null;
   const rawBuffer = [];
+  const smoothBuffer = [];
 
-  const applyCorrection = (rawX, rawY) => {
-    if (!correctionFn) return { x: rawX, y: rawY };
-    return correctionFn(rawX, rawY);
-  };
+  const filterX = createOneEuroAxis({ minCutoff, beta, dCutoff });
+  const filterY = createOneEuroAxis({ minCutoff, beta, dCutoff });
 
-  const stepAxis = (display, target) => {
+  const stepAxis = (display, target, follow, maxStep) => {
     const delta = target - display;
-    const absDelta = Math.abs(delta);
-    if (absDelta < deadZonePx) return display;
+    if (Math.abs(delta) < 0.5) return display;
 
-    let step = delta * followFactor;
-    if (step > maxStepPx) step = maxStepPx;
-    if (step < -maxStepPx) step = -maxStepPx;
+    let step = delta * follow;
+    if (step > maxStep) step = maxStep;
+    if (step < -maxStep) step = -maxStep;
 
     return display + step;
   };
 
+  const updateGlideTarget = (targetX, targetY) => {
+    if (glideTargetX === null || glideTargetY === null) {
+      glideTargetX = targetX;
+      glideTargetY = targetY;
+      return;
+    }
+
+    const glideDrift = distance(glideTargetX, glideTargetY, targetX, targetY);
+    if (glideDrift < glideDeadzonePx) return;
+
+    const isSaccade = glideDrift >= saccadeThresholdPx;
+    const follow = isSaccade ? glideFollowFast : glideFollowSlow;
+    const maxStep = isSaccade ? glideMaxStepFast : glideMaxStepSlow;
+
+    glideTargetX = stepAxis(glideTargetX, targetX, follow, maxStep);
+    glideTargetY = stepAxis(glideTargetY, targetY, follow, maxStep);
+  };
+
+  const breakLock = () => {
+    stableFrameCount = 0;
+    breakFrameCount = 0;
+    isLocked = false;
+    lockPoint = null;
+  };
+
+  const computeLockPoint = () => {
+    const point = medianPoint(rawBuffer.slice(-lockSampleCount));
+    if (!point) return null;
+    return { x: Math.round(point.x), y: Math.round(point.y) };
+  };
+
+  const pushSmoothedSample = (point, timestampMs) => {
+    const filtered = {
+      x: filterX.filter(point.x, timestampMs),
+      y: filterY.filter(point.y, timestampMs),
+    };
+
+    smoothBuffer.push(filtered);
+    if (smoothBuffer.length > medianWindow) {
+      smoothBuffer.shift();
+    }
+  };
+
   return {
-    setCorrection(nextCorrection) {
-      correctionFn = nextCorrection || null;
+    getIsLocked() {
+      return isLocked;
     },
     reset(x, y) {
       rawBuffer.length = 0;
+      smoothBuffer.length = 0;
       rawBuffer.push({ x, y });
-
-      const corrected = applyCorrection(x, y);
-      displayX = corrected.x;
-      displayY = corrected.y;
-      targetX = corrected.x;
-      targetY = corrected.y;
+      breakLock();
+      filterX.reset(x);
+      filterY.reset(y);
+      displayX = x;
+      displayY = y;
+      glideTargetX = x;
+      glideTargetY = y;
+      latestGazeX = x;
+      latestGazeY = y;
     },
-    pushRaw(rawX, rawY) {
+    pushRaw(rawX, rawY, timestampMs = Date.now()) {
       if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return;
 
       rawBuffer.push({ x: rawX, y: rawY });
-      if (rawBuffer.length > medianWindow) {
+      if (rawBuffer.length > lockSampleCount + 8) {
         rawBuffer.shift();
       }
 
-      const filtered = medianPoint(rawBuffer);
-      if (!filtered) return;
+      const preFiltered = medianPoint(rawBuffer.slice(-medianWindow));
+      if (!preFiltered) return;
 
-      const corrected = applyCorrection(filtered.x, filtered.y);
-      const isFirstSample = displayX === null || displayY === null;
+      latestGazeX = preFiltered.x;
+      latestGazeY = preFiltered.y;
 
-      if (!isFirstSample && targetX != null && targetY != null) {
-        const jump = distance(corrected.x, corrected.y, targetX, targetY);
-        if (jump > outlierPx) return;
+      pushSmoothedSample(preFiltered, timestampMs);
+      updateGlideTarget(preFiltered.x, preFiltered.y);
+
+      if (isLocked) {
+        const checkSamples = rawBuffer.slice(-8);
+        const spread = spreadFromCenter(checkSamples, lockPoint);
+        const drift = distance(preFiltered.x, preFiltered.y, lockPoint.x, lockPoint.y);
+
+        if (spread > lockBreakSpreadPx && drift > lockBreakDistancePx) {
+          breakFrameCount += 1;
+        } else {
+          breakFrameCount = 0;
+        }
+
+        if (breakFrameCount >= lockBreakFrames) {
+          breakLock();
+        }
+        return;
       }
 
-      targetX = corrected.x;
-      targetY = corrected.y;
+      const stableSamples = rawBuffer.slice(-8);
+      const stableCenter = medianPoint(stableSamples);
+      const spread =
+        stableSamples.length >= 5 ? spreadFromCenter(stableSamples, stableCenter) : Infinity;
 
-      if (isFirstSample) {
-        displayX = targetX;
-        displayY = targetY;
+      if (stableSamples.length >= 5 && spread <= lockEnterSpreadPx) {
+        stableFrameCount += 1;
+      } else {
+        stableFrameCount = 0;
+      }
+
+      if (stableFrameCount >= lockEnterFrames) {
+        const nextLock = computeLockPoint();
+        if (nextLock) {
+          isLocked = true;
+          lockPoint = nextLock;
+          displayX = lockPoint.x;
+          displayY = lockPoint.y;
+          glideTargetX = lockPoint.x;
+          glideTargetY = lockPoint.y;
+          filterX.reset(lockPoint.x);
+          filterY.reset(lockPoint.y);
+          breakFrameCount = 0;
+        }
       }
     },
     step() {
-      if (displayX === null || displayY === null || targetX === null || targetY === null) {
+      if (displayX === null || displayY === null) {
         return null;
       }
 
-      displayX = stepAxis(displayX, targetX);
-      displayY = stepAxis(displayY, targetY);
+      if (isLocked && lockPoint) {
+        displayX = lockPoint.x;
+        displayY = lockPoint.y;
+      } else if (latestGazeX !== null && latestGazeY !== null) {
+        const errDist = distance(displayX, displayY, latestGazeX, latestGazeY);
+
+        if (errDist >= microDeadzonePx) {
+          const next = moveTowardPoint(
+            displayX,
+            displayY,
+            latestGazeX,
+            latestGazeY,
+            displayMaxStep,
+            displayMinStep,
+            displayEase
+          );
+          displayX = next.x;
+          displayY = next.y;
+        }
+      }
 
       if (typeof window !== 'undefined') {
         displayX = clamp(displayX, 0, window.innerWidth);
         displayY = clamp(displayY, 0, window.innerHeight);
       }
 
-      return { x: displayX, y: displayY };
+      return {
+        x: Math.round(displayX),
+        y: Math.round(displayY),
+        locked: isLocked,
+      };
     },
   };
 }
 
-export async function recordCalibrationPoint({
-  webgazer,
-  point,
-  hasFaceLandmarks,
-  getLastRawGaze,
-}) {
+export async function recordCalibrationPoint({ webgazer, point, hasFaceLandmarks }) {
   const screenX = point.x * window.innerWidth;
   const screenY = point.y * window.innerHeight;
 
@@ -227,27 +348,5 @@ export async function recordCalibrationPoint({
     await sleep(CALIBRATION_SAMPLE_INTERVAL_MS);
   }
 
-  await sleep(180);
-
-  const rawSamples = [];
-  for (let i = 0; i < CALIBRATION_MEASURE_COUNT; i += 1) {
-    const raw = getLastRawGaze();
-    if (raw) rawSamples.push(raw);
-    await sleep(CALIBRATION_MEASURE_INTERVAL_MS);
-  }
-
-  const avgRaw = averagePoints(rawSamples);
-  if (!avgRaw) {
-    return { ok: false, reason: 'measure' };
-  }
-
-  return {
-    ok: true,
-    pair: {
-      targetX: screenX,
-      targetY: screenY,
-      rawX: avgRaw.x,
-      rawY: avgRaw.y,
-    },
-  };
+  return { ok: true };
 }

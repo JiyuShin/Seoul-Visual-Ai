@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DreamyBackground from './DreamyBackground';
 import GazeReticle from './GazeReticle';
 import DiscussionStep from './DiscussionStep';
@@ -9,6 +9,14 @@ import styles from './EntryToDiscussion.module.css';
 
 const STEPS = ['vote', 'reveal', 'discussion', 'done'];
 
+function clampGazeToRect(x, y, rect) {
+  if (!rect) return { x, y };
+  return {
+    x: Math.max(rect.left, Math.min(rect.right, x)),
+    y: Math.max(rect.top, Math.min(rect.bottom, y)),
+  };
+}
+
 export default function EntryToDiscussion({ onDiscussionComplete }) {
   const [step, setStep] = useState('vote');
   const [winnerCard, setWinnerCard] = useState(null);
@@ -17,8 +25,21 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
 
   const stepRef = useRef('vote');
   const gazeHandlersRef = useRef({});
+  const gazeClipRef = useRef(null);
+  const [gazeClip, setGazeClip] = useState(null);
 
   stepRef.current = step;
+  gazeClipRef.current = gazeClip;
+
+  const handleGazeClipChange = useCallback((clip) => {
+    setGazeClip(clip);
+  }, []);
+
+  useEffect(() => {
+    if (step !== 'discussion') {
+      setGazeClip(null);
+    }
+  }, [step]);
 
   const registerGazeHandler = useCallback((phase, handler) => {
     if (handler) {
@@ -33,7 +54,9 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
     const handler = gazeHandlersRef.current[currentStep];
     if (!handler) return;
 
-    const result = handler(viewerId, x, y);
+    const clip = gazeClipRef.current;
+    const sample = clip ? clampGazeToRect(x, y, clip) : { x, y };
+    const result = handler(viewerId, sample.x, sample.y);
     if (result?.dwellProgress != null) {
       setDwellProgress(result.dwellProgress);
     }
@@ -80,6 +103,13 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
     [onDiscussionComplete]
   );
 
+  const reticlePosition = useMemo(() => {
+    if (!gazePosition) return null;
+    if (step !== 'discussion' || !gazeClip) return gazePosition;
+    const clamped = clampGazeToRect(gazePosition.x, gazePosition.y, gazeClip);
+    return { ...gazePosition, x: clamped.x, y: clamped.y };
+  }, [gazePosition, gazeClip, step]);
+
   return (
     <div className={styles.root}>
       <DreamyBackground />
@@ -94,8 +124,8 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
               {calibrationTotal})
             </p>
             <p className={styles.calibrationDescSub}>
-              화면 네 모서리 점을 순서대로 맞춥니다. 고개는 고정하고 <strong>눈만</strong>{' '}
-              움직이세요.
+              화면 모서리와 중앙 점을 순서대로 맞춥니다. 고개는 고정하고 <strong>눈만</strong>{' '}
+              움직이세요. (4점 이상 완료 후 시작 가능)
             </p>
             <p className={`${styles.faceStatus} ${faceDetected ? styles.faceOk : styles.faceWarn}`}>
               {faceDetected
@@ -163,6 +193,7 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
           onComplete={handleDiscussionComplete}
           registerGazeHandler={registerGazeHandler}
           gazePosition={gazePosition}
+          onGazeClipChange={handleGazeClipChange}
         />
       )}
 
@@ -183,7 +214,7 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
       )}
 
       <GazeReticle
-        position={gazePosition}
+        position={reticlePosition}
         dwellProgress={dwellProgress}
         visible={isReady && step !== 'done'}
       />

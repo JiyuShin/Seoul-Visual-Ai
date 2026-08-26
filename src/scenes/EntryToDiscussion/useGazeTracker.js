@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadWebGazerScript } from '../../lib/loadWebGazer';
 import {
-  buildAxisCorrection,
   CALIBRATION_POINTS,
   createGazePipeline,
   MIN_CALIBRATION_POINTS,
@@ -30,7 +29,6 @@ export function useGazeTracker(onGazeSample) {
   const onGazeSampleRef = useRef(onGazeSample);
   const isCalibratingRef = useRef(true);
   const gazePipelineRef = useRef(createGazePipeline());
-  const calibrationPairsRef = useRef([]);
   const lastRawGazeRef = useRef(null);
   const lastFaceSeenRef = useRef(0);
   const facePollRef = useRef(null);
@@ -41,15 +39,6 @@ export function useGazeTracker(onGazeSample) {
   useEffect(() => {
     onGazeSampleRef.current = onGazeSample;
   }, [onGazeSample]);
-
-  const applyTrackingCorrection = useCallback(() => {
-    const correction = buildAxisCorrection(calibrationPairsRef.current);
-    gazePipelineRef.current.setCorrection(correction);
-
-    if (lastRawGazeRef.current) {
-      gazePipelineRef.current.reset(lastRawGazeRef.current.x, lastRawGazeRef.current.y);
-    }
-  }, []);
 
   const finishCalibration = useCallback(() => {
     isCalibratingRef.current = false;
@@ -64,8 +53,10 @@ export function useGazeTracker(onGazeSample) {
       webgazerRef.current.showPredictionPoints(false);
     }
 
-    applyTrackingCorrection();
-  }, [applyTrackingCorrection]);
+    if (lastRawGazeRef.current) {
+      gazePipelineRef.current.reset(lastRawGazeRef.current.x, lastRawGazeRef.current.y);
+    }
+  }, []);
 
   const advanceCalibration = useCallback(() => {
     setCalibrationIndex((current) => {
@@ -100,19 +91,13 @@ export function useGazeTracker(onGazeSample) {
         webgazer,
         point,
         hasFaceLandmarks,
-        getLastRawGaze: () => lastRawGazeRef.current,
       });
 
       if (!result.ok) {
-        if (result.reason === 'face') {
-          setCalibrationHint('얼굴이 카메라에 보일 때, 점을 응시한 채 다시 눌러주세요.');
-        } else {
-          setCalibrationHint('시선 측정에 실패했습니다. 점을 응시한 채 다시 눌러주세요.');
-        }
+        setCalibrationHint('얼굴이 카메라에 보일 때, 점을 응시한 채 다시 눌러주세요.');
         return false;
       }
 
-      calibrationPairsRef.current.push(result.pair);
       setRecordedPoints((count) => count + 1);
       advanceCalibration();
       return true;
@@ -122,11 +107,7 @@ export function useGazeTracker(onGazeSample) {
     } finally {
       setIsRecordingCalibration(false);
     }
-  }, [
-    advanceCalibration,
-    calibrationIndex,
-    isRecordingCalibration,
-  ]);
+  }, [advanceCalibration, calibrationIndex, isRecordingCalibration]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -142,13 +123,12 @@ export function useGazeTracker(onGazeSample) {
         webgazer.params.faceMeshSolutionPath = '/mediapipe/face_mesh';
 
         await webgazer.clearData();
-        calibrationPairsRef.current = [];
 
         webgazer
           .setRegression('ridge')
           .setTracker('TFFacemesh')
           .saveDataAcrossSessions(false)
-          .applyKalmanFilter(true)
+          .applyKalmanFilter(false)
           .setGazeListener((data) => {
             if (cancelled || !data) return;
 
@@ -170,14 +150,14 @@ export function useGazeTracker(onGazeSample) {
         webgazer.removeMouseEventListeners();
 
         webgazer.showVideoPreview(true);
-        webgazer.showPredictionPoints(true);
+        webgazer.showPredictionPoints(false);
         webgazer.showFaceOverlay(false);
         webgazer.showFaceFeedbackBox(false);
         webgazer.setVideoViewerSize(160, 120);
 
         document.body.classList.add('calibrating-gaze');
         setCalibrationHint(
-          '초록 점을 눈동자로 맞춘 뒤 스페이스바 또는 버튼을 누르세요. 첫 보정 후 초록 커서가 나타납니다.'
+          '초록 점을 눈동자로 맞춘 뒤 스페이스바 또는 버튼을 누르세요. 첫 보정 후 커서가 나타납니다.'
         );
 
         if (!cancelled) setIsReady(true);
@@ -209,20 +189,12 @@ export function useGazeTracker(onGazeSample) {
     if (!isReady) return undefined;
 
     const tick = () => {
-      let position = gazePipelineRef.current.step();
+      const result = gazePipelineRef.current.step();
 
-      if (!position && lastRawGazeRef.current) {
-        gazePipelineRef.current.pushRaw(
-          lastRawGazeRef.current.x,
-          lastRawGazeRef.current.y
-        );
-        position = gazePipelineRef.current.step();
-      }
-
-      if (position) {
-        setGazePosition(position);
+      if (result) {
+        setGazePosition({ x: result.x, y: result.y, locked: result.locked });
         if (!isCalibratingRef.current) {
-          onGazeSampleRef.current?.('viewer-1', position.x, position.y);
+          onGazeSampleRef.current?.('viewer-1', result.x, result.y);
         }
       }
 

@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DISCUSSION_PHASE_MAX_MS } from '../gazeConfig';
+import {
+  DISCUSSION_GAZE_HINT,
+  DISCUSSION_PHASE_MAX_MS,
+  DISCUSSION_PROMPT,
+  DISCUSSION_VOICE_PROMPT,
+} from '../gazeConfig';
 import { useSpeechInput } from '../useSpeechInput';
 import StreetCanvas from './StreetCanvas';
 import styles from './DiscussionStep.module.css';
+
+const STEP_PHASES = {
+  PROMPT: 'prompt',
+  GAZE: 'gaze',
+  VOICE: 'voice',
+};
 
 export default function DiscussionStep({
   winnerCard,
@@ -11,61 +22,36 @@ export default function DiscussionStep({
   onComplete,
   registerGazeHandler,
   gazePosition,
+  onGazeClipChange,
 }) {
   const manualInputRef = useRef(null);
   const streetCanvasRef = useRef(null);
   const pinsRef = useRef(pins);
-  const gazePositionRef = useRef(gazePosition);
+  const stepPhaseRef = useRef(STEP_PHASES.PROMPT);
+  const activeTagRef = useRef(null);
+  const canvasRectRef = useRef(null);
+  const [stepPhase, setStepPhase] = useState(STEP_PHASES.PROMPT);
+  const [activeTag, setActiveTag] = useState(null);
   const [submitHint, setSubmitHint] = useState('');
 
   pinsRef.current = pins;
-  gazePositionRef.current = gazePosition;
+  stepPhaseRef.current = stepPhase;
+  activeTagRef.current = activeTag;
 
-  const handleFinalSpeech = useCallback((text) => {
-    streetCanvasRef.current?.placePinWithText(
-      text,
-      gazePositionRef.current?.x,
-      gazePositionRef.current?.y
-    );
-  }, []);
-
-  const speech = useSpeechInput({ onFinalTranscript: handleFinalSpeech });
-
-  useEffect(() => {
-    onPinsChange?.((prev) => {
-      if (prev.length > 0) return prev;
-      return [
-        {
-          id: 'demo-pin',
-          x: 0.62,
-          y: 0.58,
-          text: '이곳에 그늘 나무가 필요해요',
-          authorViewerId: 'viewer-demo',
-          likeCount: 0,
-          likedBy: new Set(),
-        },
-      ];
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    speech.startListening();
-    return () => speech.stopListening();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      onComplete?.(pinsRef.current);
-    }, DISCUSSION_PHASE_MAX_MS);
-    return () => clearTimeout(timeoutId);
-  }, [onComplete]);
+  const speech = useSpeechInput({
+    onFinalTranscript: (text) => {
+      if (stepPhaseRef.current === STEP_PHASES.VOICE && activeTagRef.current) {
+        streetCanvasRef.current?.placePinWithText(text);
+      }
+    },
+  });
 
   const handleAddPin = useCallback(
     (pin) => {
       onPinsChange?.((prev) => [...prev, pin]);
       speech.clearTranscript();
+      setActiveTag(null);
+      setStepPhase(STEP_PHASES.GAZE);
       setSubmitHint('');
     },
     [onPinsChange, speech]
@@ -86,96 +72,155 @@ export default function DiscussionStep({
     [onPinsChange]
   );
 
+  const handleTagLocked = useCallback((coords) => {
+    setActiveTag(coords);
+    setStepPhase(STEP_PHASES.VOICE);
+    setSubmitHint('');
+  }, []);
+
+  useEffect(() => {
+    if (stepPhase === STEP_PHASES.VOICE) {
+      speech.startListening();
+      speech.clearTranscript();
+    } else {
+      speech.stopListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepPhase]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      onComplete?.(pinsRef.current);
+    }, DISCUSSION_PHASE_MAX_MS);
+    return () => clearTimeout(timeoutId);
+  }, [onComplete]);
+
   const handleManualSubmit = useCallback(() => {
     const text = manualInputRef.current?.value?.trim();
     if (!text) return;
 
-    const placed = streetCanvasRef.current?.placePinWithText(
-      text,
-      gazePosition?.x,
-      gazePosition?.y
-    );
+    if (stepPhase !== STEP_PHASES.VOICE || !activeTag) {
+      setSubmitHint('먼저 이미지 위 지점을 시선으로 선택해 주세요.');
+      return;
+    }
 
+    const placed = streetCanvasRef.current?.placePinWithText(text);
     if (!placed) {
-      setSubmitHint('이미지 위 지점을 1.2초간 응시한 뒤 입력해 주세요.');
+      setSubmitHint('의견을 입력해 주세요.');
     } else {
+      speech.clearTranscript();
       setSubmitHint('');
     }
 
     manualInputRef.current.value = '';
-  }, [gazePosition]);
+  }, [stepPhase, activeTag, speech]);
 
   const combinedSpeech = speech.getCombinedText();
 
+  const handleStartGaze = useCallback(() => {
+    setStepPhase(STEP_PHASES.GAZE);
+  }, []);
+
+  const handleCanvasRect = useCallback((rect) => {
+    canvasRectRef.current = rect;
+    if (stepPhaseRef.current === STEP_PHASES.GAZE && rect) {
+      onGazeClipChange?.(rect);
+    }
+  }, [onGazeClipChange]);
+
   useEffect(() => {
-    if (pins.length === 0) return;
-    const sorted = [...pins].sort((a, b) => b.likeCount - a.likeCount);
-    const density = pins.reduce(
-      (acc, pin) => {
-        const key = `${Math.round(pin.x * 10)}-${Math.round(pin.y * 10)}`;
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
-    console.log('[AI Agent] Top pins:', sorted.slice(0, 3));
-    console.log('[AI Agent] Opinion density map:', density);
-  }, [pins]);
+    if (stepPhase === STEP_PHASES.GAZE && canvasRectRef.current) {
+      onGazeClipChange?.(canvasRectRef.current);
+      return undefined;
+    }
+
+    onGazeClipChange?.(null);
+    return undefined;
+  }, [stepPhase, onGazeClipChange]);
+
+  const phaseHint =
+    stepPhase === STEP_PHASES.PROMPT
+      ? DISCUSSION_PROMPT
+      : stepPhase === STEP_PHASES.GAZE
+        ? DISCUSSION_GAZE_HINT
+        : DISCUSSION_VOICE_PROMPT;
 
   return (
     <section className={styles.discussionStep}>
       <div className={styles.header}>
         <p className={styles.subtitle}>선택된 비전 · {winnerCard.shortLabel}</p>
-        <h2 className={styles.title}>거리의 어느 지점을 바꿀까요?</h2>
-        <p className={styles.hint}>
-          이미지 위 지점을 1.2초간 응시한 뒤 말하세요. 위치가 고정되면 말한 내용이 그 자리에
-          붙습니다. 다른 핀을 2초간 응시하면 공감(♥)이 붙습니다.
-        </p>
+        <h2 className={styles.title}>
+          {stepPhase === STEP_PHASES.PROMPT
+            ? '어디에 식물을 심을까요?'
+            : stepPhase === STEP_PHASES.GAZE
+              ? '시선으로 위치를 선택하세요'
+              : '의견을 말해 주세요'}
+        </h2>
+        <p className={styles.hint}>{phaseHint}</p>
       </div>
 
-      <StreetCanvas
-        ref={streetCanvasRef}
-        pins={pins}
-        onAddPin={handleAddPin}
-        onLikePin={handleLikePin}
-        registerGazeHandler={registerGazeHandler}
-        pendingSpeechText={combinedSpeech}
-        onPlacementStateChange={() => setSubmitHint('')}
-      />
-
-      <div className={styles.inputArea}>
-        <div className={styles.speechStatus}>
-          {speech.isListening ? (
-            <span className={styles.listening}>● 음성 인식 중</span>
-          ) : speech.isSupported ? (
-            <span className={styles.paused}>음성 인식 일시 중지</span>
-          ) : (
-            <span className={styles.fallback}>음성 인식 미지원 — 텍스트 입력을 사용하세요</span>
-          )}
-          {(combinedSpeech || speech.interimTranscript) && (
-            <p className={styles.liveTranscript}>{combinedSpeech || speech.interimTranscript}</p>
-          )}
-          {submitHint && <p className={styles.submitHint}>{submitHint}</p>}
-        </div>
-
-        <div className={styles.manualRow}>
-          <input
-            ref={manualInputRef}
-            type="text"
-            className={styles.textInput}
-            placeholder="의견을 입력하세요 (예: 이곳에 넓은 잔디가 필요해요)"
-            onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-          />
-          <button type="button" className={styles.submitBtn} onClick={handleManualSubmit}>
-            입력
-          </button>
-          {!speech.isListening && speech.isSupported && (
-            <button type="button" className={styles.micBtn} onClick={speech.startListening}>
-              🎤
+      <div className={styles.canvasArea}>
+        {stepPhase === STEP_PHASES.PROMPT && (
+          <div className={styles.promptOverlay}>
+            <p className={styles.promptText}>{DISCUSSION_PROMPT}</p>
+            <button type="button" className={styles.promptBtn} onClick={handleStartGaze}>
+              시선으로 선택하기
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        <StreetCanvas
+          ref={streetCanvasRef}
+          pins={pins}
+          onAddPin={handleAddPin}
+          onLikePin={handleLikePin}
+          registerGazeHandler={registerGazeHandler}
+          phase={stepPhase === STEP_PHASES.PROMPT ? 'idle' : stepPhase}
+          activeTag={activeTag}
+          onTagLocked={handleTagLocked}
+          onCanvasRect={handleCanvasRect}
+        />
       </div>
+
+      {stepPhase === STEP_PHASES.VOICE && (
+        <div className={styles.inputArea}>
+          <div className={styles.speechStatus}>
+            {speech.isListening ? (
+              <span className={styles.listening}>● 음성 인식 중 — 선택한 태그 위치에 붙습니다</span>
+            ) : speech.isSupported ? (
+              <span className={styles.paused}>음성 인식 일시 중지</span>
+            ) : (
+              <span className={styles.fallback}>음성 인식 미지원 — 텍스트 입력을 사용하세요</span>
+            )}
+            {(combinedSpeech || speech.interimTranscript) && (
+              <p className={styles.liveTranscript}>{combinedSpeech || speech.interimTranscript}</p>
+            )}
+            {submitHint && <p className={styles.submitHint}>{submitHint}</p>}
+          </div>
+
+          <div className={styles.manualRow}>
+            <input
+              ref={manualInputRef}
+              type="text"
+              className={styles.textInput}
+              placeholder="의견을 입력하세요 (예: 이곳에 화분 나무를 심고 싶어요)"
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
+            />
+            <button type="button" className={styles.submitBtn} onClick={handleManualSubmit}>
+              입력
+            </button>
+            {!speech.isListening && speech.isSupported && (
+              <button type="button" className={styles.micBtn} onClick={speech.startListening}>
+                🎤
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stepPhase === STEP_PHASES.GAZE && pins.length > 0 && (
+        <p className={styles.secondaryHint}>다른 위치도 같은 방식으로 선택할 수 있습니다.</p>
+      )}
 
       <button type="button" className={styles.nextBtn} onClick={() => onComplete?.(pins)}>
         다음 단계로

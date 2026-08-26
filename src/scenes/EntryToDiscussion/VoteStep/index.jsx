@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CARD_HIT_PADDING_PX,
+  GAZE_VOTE_DWELL_GRACE_MS,
   GAZE_VOTE_DWELL_MS,
   GAZE_VOTE_HOVER_MS,
   GAZE_VOTE_PHASE_MAX_MS,
@@ -45,7 +46,12 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
       return acc;
     }, {})
   );
-  const activeDwellRef = useRef({ viewerId: null, cardId: null, since: 0 });
+  const dwellRef = useRef({
+    viewerId: null,
+    cardId: null,
+    since: 0,
+    lastOnCardAt: 0,
+  });
   const lastTickRef = useRef(Date.now());
   const completedRef = useRef(false);
   const forceUpdateRef = useRef(null);
@@ -55,6 +61,17 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
     forceUpdateRef.current?.((v) => v + 1);
   }, []);
 
+  const getActiveCardId = useCallback((now) => {
+    const dwell = dwellRef.current;
+    if (!dwell.cardId) return null;
+
+    if (now - dwell.lastOnCardAt <= GAZE_VOTE_DWELL_GRACE_MS) {
+      return dwell.cardId;
+    }
+
+    return null;
+  }, []);
+
   useEffect(() => {
     let rafId;
     const tick = () => {
@@ -62,17 +79,19 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
       const delta = now - lastTickRef.current;
       lastTickRef.current = now;
 
-      const { viewerId, cardId, since } = activeDwellRef.current;
-      if (viewerId && cardId) {
-        const state = cardStatesRef.current[cardId];
+      const dwell = dwellRef.current;
+      const activeCardId = getActiveCardId(now);
+
+      if (dwell.viewerId && activeCardId) {
+        const state = cardStatesRef.current[activeCardId];
         if (state) {
           state.dwellMs += delta;
-          state.viewers.add(viewerId);
+          state.viewers.add(dwell.viewerId);
         }
 
-        const elapsed = now - since;
+        const elapsed = now - dwell.since;
         if (elapsed >= GAZE_VOTE_HOVER_MS) {
-          setHoveredCardId((prev) => (prev === cardId ? prev : cardId));
+          setHoveredCardId((prev) => (prev === activeCardId ? prev : activeCardId));
         }
       } else {
         setHoveredCardId(null);
@@ -83,7 +102,7 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [triggerUpdate]);
+  }, [getActiveCardId, triggerUpdate]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -121,13 +140,16 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
     (viewerId, x, y) => {
       if (completedRef.current) return { dwellProgress: 0 };
 
+      const now = Date.now();
       const cardRects = getCardRects();
       const hitCardId = hitTestCard(x, y, cardRects);
-      const active = activeDwellRef.current;
+      const dwell = dwellRef.current;
 
       if (hitCardId) {
-        if (active.viewerId === viewerId && active.cardId === hitCardId) {
-          const elapsed = Date.now() - active.since;
+        dwell.lastOnCardAt = now;
+
+        if (dwell.viewerId === viewerId && dwell.cardId === hitCardId) {
+          const elapsed = now - dwell.since;
           const progress = Math.min(1, elapsed / GAZE_VOTE_DWELL_MS);
 
           if (elapsed >= GAZE_VOTE_DWELL_MS) {
@@ -137,16 +159,33 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
           return { dwellProgress: progress, hitCardId };
         }
 
-        activeDwellRef.current = { viewerId, cardId: hitCardId, since: Date.now() };
+        dwellRef.current = {
+          viewerId,
+          cardId: hitCardId,
+          since: now,
+          lastOnCardAt: now,
+        };
         setHoveredCardId(null);
         return { dwellProgress: 0, hitCardId };
       }
 
-      activeDwellRef.current = { viewerId: null, cardId: null, since: 0 };
+      const activeCardId = getActiveCardId(now);
+      if (activeCardId && dwell.viewerId === viewerId) {
+        const elapsed = now - dwell.since;
+        const progress = Math.min(1, elapsed / GAZE_VOTE_DWELL_MS);
+
+        if (elapsed >= GAZE_VOTE_DWELL_MS) {
+          pickWinner('dwell');
+        }
+
+        return { dwellProgress: progress, hitCardId: activeCardId };
+      }
+
+      dwellRef.current = { viewerId: null, cardId: null, since: 0, lastOnCardAt: 0 };
       setHoveredCardId(null);
       return { dwellProgress: 0, hitCardId: null };
     },
-    [pickWinner]
+    [getActiveCardId, pickWinner]
   );
 
   useEffect(() => {
@@ -163,9 +202,10 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
   };
 
   const getHoverProgress = (cardId) => {
-    const active = activeDwellRef.current;
-    if (active.cardId !== cardId) return 0;
-    const elapsed = Date.now() - active.since;
+    const dwell = dwellRef.current;
+    const activeCardId = getActiveCardId(Date.now());
+    if (activeCardId !== cardId) return 0;
+    const elapsed = Date.now() - dwell.since;
     if (elapsed < GAZE_VOTE_HOVER_MS) return 0;
     return Math.min(1, (elapsed - GAZE_VOTE_HOVER_MS) / (GAZE_VOTE_DWELL_MS - GAZE_VOTE_HOVER_MS));
   };
@@ -176,7 +216,9 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
   return (
     <section className={styles.voteStep}>
       <h1 className={styles.question}>{VOTE_QUESTION}</h1>
-      <p className={styles.hint}>카드를 4초간 응시하면 선택됩니다</p>
+      <p className={styles.hint}>
+        카드 위에서 3초간 머물면 선택됩니다. 커서가 조금 움직여도 괜찮아요.
+      </p>
       <div className={styles.cardRow}>
         {VISION_CARDS.map((card) => (
           <VisionCard

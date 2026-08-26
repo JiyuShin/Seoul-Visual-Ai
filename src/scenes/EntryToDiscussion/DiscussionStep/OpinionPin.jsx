@@ -17,6 +17,8 @@ export default function OpinionPin({ pin, onRef }) {
 
   const glowIntensity = Math.min(1, pin.likeCount / 5);
 
+  const displayText = pin.text.replace(/[\r\n]+/g, '').replace(/\s+/g, ' ').trim();
+
   return (
     <div
       ref={onRef}
@@ -29,7 +31,7 @@ export default function OpinionPin({ pin, onRef }) {
         borderColor: `rgba(102,187,122,${0.2 + glowIntensity * 0.6})`,
       }}
     >
-      <p className={styles.text}>{pin.text}</p>
+      <p className={styles.text}>{displayText}</p>
       <div className={styles.likeRow}>
         {showHeartAnim && <span className={styles.heartPop}>♥</span>}
         <span className={styles.heartIcon}>♥</span>

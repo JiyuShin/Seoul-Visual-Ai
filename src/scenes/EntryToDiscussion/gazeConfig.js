@@ -1,17 +1,20 @@
 export const MAX_EXPECTED_VIEWERS = 5;
 
-export const GAZE_VOTE_HOVER_MS = 4000;
-export const GAZE_VOTE_DWELL_MS = 5000;
+export const GAZE_VOTE_HOVER_MS = 1000;
+export const GAZE_VOTE_DWELL_MS = 3000;
+export const GAZE_VOTE_DWELL_GRACE_MS = 700;
 export const GAZE_VOTE_PHASE_MAX_MS = 45000;
 
-export const GAZE_PIN_DURATION_MS = 1200;
+export const GAZE_PIN_DURATION_MS = 1000;
+export const GAZE_TAG_DWELL_TOLERANCE = 0.2;
+export const GAZE_TAG_DWELL_GRACE_MS = 1200;
 export const GAZE_LIKE_DURATION_MS = 2000;
 
 export const REVEAL_AGENT_DIALOGUE_MS = 5000;
 export const DISCUSSION_PHASE_MAX_MS = 120000;
 
 export const PIN_HIT_RADIUS_PX = 48;
-export const CARD_HIT_PADDING_PX = 8;
+export const CARD_HIT_PADDING_PX = 36;
 
 export const VISION_CARDS = [
   {
@@ -57,3 +60,12 @@ export const ENV_OVERLAY_TEXT =
 
 export const VOTE_QUESTION =
   '여러분이 그리는 앞으로의 푸른 서울은 어떤 모습일까요?';
+
+export const DISCUSSION_PROMPT =
+  '이 서울의 광경에서, 당신만의 식물을 심어 개선하고 싶은 곳을 시선으로 선택해 주세요.';
+
+export const DISCUSSION_GAZE_HINT =
+  '개선하고 싶은 곳을 1초간 바라보세요. 넓은 범위 안이면 태그가 바로 붙습니다.';
+
+export const DISCUSSION_VOICE_PROMPT =
+  '선택한 위치에 대한 의견을 말하거나 입력해 주세요. 말한 내용이 태그 위치에 붙습니다.';

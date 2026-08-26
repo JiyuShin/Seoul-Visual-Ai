@@ -2,19 +2,26 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import {
   GAZE_LIKE_DURATION_MS,
   GAZE_PIN_DURATION_MS,
+  GAZE_TAG_DWELL_GRACE_MS,
+  GAZE_TAG_DWELL_TOLERANCE,
   PIN_HIT_RADIUS_PX,
   STREET_IMAGE,
 } from '../gazeConfig';
+import LocationTag from './LocationTag';
 import OpinionPin from './OpinionPin';
 import styles from './StreetCanvas.module.css';
 
-const ANCHOR_TTL_MS = 15000;
+function normalizePinText(text) {
+  return text
+    .trim()
+    .replace(/[\r\n]+/g, '')
+    .replace(/\s+/g, ' ');
+}
 
 function summarizeText(text) {
-  const trimmed = text.trim();
-  if (!trimmed) return '';
-  if (trimmed.length <= 48) return trimmed;
-  return `${trimmed.slice(0, 46)}…`;
+  const normalized = normalizePinText(text);
+  if (!normalized) return '';
+  return normalized;
 }
 
 function distance(x1, y1, x2, y2) {
@@ -27,22 +34,25 @@ export default forwardRef(function StreetCanvas(
     onAddPin,
     onLikePin,
     registerGazeHandler,
-    pendingSpeechText,
+    phase = 'idle',
+    activeTag = null,
+    onTagLocked,
+    onCanvasRect,
     currentViewerId = 'viewer-1',
-    onPlacementStateChange,
   },
   ref
 ) {
   const canvasRef = useRef(null);
   const pinRefs = useRef({});
   const pendingPinRef = useRef(null);
-  const confirmedAnchorRef = useRef(null);
   const likeDwellRef = useRef({ pinId: null, since: 0 });
-  const pendingSpeechRef = useRef('');
+  const phaseRef = useRef(phase);
+  const activeTagRef = useRef(activeTag);
   const [pendingCircle, setPendingCircle] = useState(null);
   const [, setTick] = useState(0);
 
-  pendingSpeechRef.current = pendingSpeechText;
+  phaseRef.current = phase;
+  activeTagRef.current = activeTag;
 
   const screenToNormalized = useCallback((x, y) => {
     const canvas = canvasRef.current;
@@ -74,24 +84,14 @@ export default forwardRef(function StreetCanvas(
     [pins]
   );
 
-  const clearPlacementState = useCallback(() => {
+  const clearPendingCircle = useCallback(() => {
     pendingPinRef.current = null;
-    confirmedAnchorRef.current = null;
     setPendingCircle(null);
-    onPlacementStateChange?.({ hasAnchor: false, waitingForSpeech: false });
-  }, [onPlacementStateChange]);
-
-  const showConfirmedCircle = useCallback(
-    (coords) => {
-      setPendingCircle({ x: coords.x, y: coords.y, progress: 1, locked: true });
-      onPlacementStateChange?.({ hasAnchor: true, waitingForSpeech: true });
-    },
-    [onPlacementStateChange]
-  );
+  }, []);
 
   const finalizePin = useCallback(
     (normCoords, text) => {
-      const summary = summarizeText(text || pendingSpeechRef.current || '');
+      const summary = summarizeText(text);
       if (!summary) return false;
 
       onAddPin?.({
@@ -104,58 +104,19 @@ export default forwardRef(function StreetCanvas(
         likedBy: new Set(),
       });
 
-      clearPlacementState();
+      clearPendingCircle();
       return true;
     },
-    [onAddPin, currentViewerId, clearPlacementState]
+    [onAddPin, currentViewerId, clearPendingCircle]
   );
 
-  const getActiveAnchor = useCallback(() => {
-    const confirmed = confirmedAnchorRef.current;
-    if (confirmed && Date.now() <= confirmed.until) {
-      return { x: confirmed.x, y: confirmed.y };
-    }
-    if (confirmed) {
-      confirmedAnchorRef.current = null;
-    }
-
-    const pending = pendingPinRef.current;
-    if (pending) {
-      return { x: pending.x, y: pending.y };
-    }
-
-    return null;
-  }, []);
-
-  const tryPlacePin = useCallback(
-    (text, gazeX, gazeY) => {
-      const summary = summarizeText(text || pendingSpeechRef.current || '');
-      if (!summary) return false;
-
-      let coords = getActiveAnchor();
-
-      if (!coords && gazeX != null && gazeY != null) {
-        coords = screenToNormalized(gazeX, gazeY);
-      }
-
-      if (!coords) return false;
-
-      return finalizePin(coords, summary);
+  const placeAtActiveTag = useCallback(
+    (text) => {
+      const tag = activeTagRef.current;
+      if (!tag || phaseRef.current !== 'voice') return false;
+      return finalizePin({ x: tag.x, y: tag.y }, text);
     },
-    [finalizePin, getActiveAnchor, screenToNormalized]
-  );
-
-  const lockAnchor = useCallback(
-    (norm) => {
-      confirmedAnchorRef.current = {
-        x: norm.x,
-        y: norm.y,
-        until: Date.now() + ANCHOR_TTL_MS,
-      };
-      showConfirmedCircle(norm);
-      tryPlacePin(pendingSpeechRef.current);
-    },
-    [showConfirmedCircle, tryPlacePin]
+    [finalizePin]
   );
 
   const handleGaze = useCallback(
@@ -164,10 +125,7 @@ export default forwardRef(function StreetCanvas(
 
       const hitPin = findPinAtScreen(x, y);
       if (hitPin) {
-        pendingPinRef.current = null;
-        if (!confirmedAnchorRef.current) {
-          setPendingCircle(null);
-        }
+        clearPendingCircle();
 
         if (hitPin.authorViewerId !== viewerId && !hitPin.likedBy.has(viewerId)) {
           const likeActive = likeDwellRef.current;
@@ -190,101 +148,131 @@ export default forwardRef(function StreetCanvas(
 
       likeDwellRef.current = { pinId: null, since: 0 };
 
-      const confirmed = confirmedAnchorRef.current;
-      if (confirmed && Date.now() <= confirmed.until) {
-        showConfirmedCircle(confirmed);
+      if (phaseRef.current !== 'gaze') {
+        clearPendingCircle();
+        return { dwellProgress: 0, target: null };
       }
 
       const norm = screenToNormalized(x, y);
       if (!norm) {
-        if (confirmed && Date.now() <= confirmed.until) {
-          return { dwellProgress: 1, target: 'canvas-waiting' };
-        }
-        pendingPinRef.current = null;
-        setPendingCircle(null);
+        clearPendingCircle();
         return { dwellProgress: 0, target: null };
       }
 
       const pending = pendingPinRef.current;
-      if (pending && distance(pending.x, pending.y, norm.x, norm.y) < 0.04) {
-        const elapsed = Date.now() - pending.since;
+      const now = Date.now();
+
+      const isInZone = (anchor) =>
+        distance(anchor.anchorX, anchor.anchorY, norm.x, norm.y) < GAZE_TAG_DWELL_TOLERANCE;
+
+      if (pending && isInZone(pending)) {
+        pending.lastInZoneAt = now;
+      }
+
+      const stillInZone =
+        pending &&
+        (isInZone(pending) || now - pending.lastInZoneAt <= GAZE_TAG_DWELL_GRACE_MS);
+
+      if (stillInZone) {
+        const elapsed = now - pending.since;
         dwellProgress = Math.min(1, elapsed / GAZE_PIN_DURATION_MS);
-        setPendingCircle({ x: norm.x, y: norm.y, progress: dwellProgress, locked: false });
-        onPlacementStateChange?.({ hasAnchor: false, waitingForSpeech: false });
+        setPendingCircle({
+          x: pending.anchorX,
+          y: pending.anchorY,
+          progress: dwellProgress,
+          locked: false,
+        });
 
         if (elapsed >= GAZE_PIN_DURATION_MS) {
-          lockAnchor(norm);
+          clearPendingCircle();
+          onTagLocked?.({ x: pending.anchorX, y: pending.anchorY });
         }
       } else {
-        pendingPinRef.current = { x: norm.x, y: norm.y, since: Date.now() };
-        if (!confirmed || Date.now() > confirmed.until) {
-          setPendingCircle({ x: norm.x, y: norm.y, progress: 0, locked: false });
-          onPlacementStateChange?.({ hasAnchor: false, waitingForSpeech: false });
-        }
+        pendingPinRef.current = {
+          anchorX: norm.x,
+          anchorY: norm.y,
+          since: now,
+          lastInZoneAt: now,
+        };
+        setPendingCircle({ x: norm.x, y: norm.y, progress: 0, locked: false });
       }
 
       return { dwellProgress, target: 'canvas' };
     },
-    [
-      findPinAtScreen,
-      screenToNormalized,
-      onLikePin,
-      lockAnchor,
-      showConfirmedCircle,
-      onPlacementStateChange,
-    ]
+    [findPinAtScreen, screenToNormalized, onLikePin, onTagLocked, clearPendingCircle]
   );
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !onCanvasRect) return undefined;
+
+    const publishRect = () => {
+      onCanvasRect(canvas.getBoundingClientRect());
+    };
+
+    publishRect();
+    window.addEventListener('resize', publishRect);
+    window.addEventListener('scroll', publishRect, true);
+
+    const observer = new ResizeObserver(publishRect);
+    observer.observe(canvas);
+
+    return () => {
+      window.removeEventListener('resize', publishRect);
+      window.removeEventListener('scroll', publishRect, true);
+      observer.disconnect();
+    };
+  }, [onCanvasRect]);
+
+  useEffect(() => {
+    if (phase === 'idle') {
+      registerGazeHandler?.('discussion', null);
+      return undefined;
+    }
     registerGazeHandler?.('discussion', handleGaze);
     return () => registerGazeHandler?.('discussion', null);
-  }, [handleGaze, registerGazeHandler]);
+  }, [handleGaze, registerGazeHandler, phase]);
+
+  useEffect(() => {
+    if (phase !== 'gaze') {
+      clearPendingCircle();
+    }
+  }, [phase, clearPendingCircle]);
 
   useEffect(() => {
     const interval = setInterval(() => setTick((v) => v + 1), 100);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!pendingSpeechText?.trim()) return;
-    tryPlacePin(pendingSpeechText);
-  }, [pendingSpeechText, tryPlacePin]);
-
   useImperativeHandle(
     ref,
     () => ({
-      placePinWithText(text, gazeX, gazeY) {
-        return tryPlacePin(text, gazeX, gazeY);
-      },
-      submitManualAtPending(text, gazeX, gazeY) {
-        return tryPlacePin(text, gazeX, gazeY);
+      placePinWithText(text) {
+        return placeAtActiveTag(text);
       },
     }),
-    [tryPlacePin]
+    [placeAtActiveTag]
   );
-
-  const waitingForSpeech =
-    Boolean(confirmedAnchorRef.current) &&
-    Date.now() <= (confirmedAnchorRef.current?.until ?? 0) &&
-    !summarizeText(pendingSpeechRef.current);
 
   return (
     <div className={styles.canvasWrapper}>
       <div className={styles.canvas} ref={canvasRef}>
-        <img src={STREET_IMAGE} alt="토론 대상 거리" className={styles.image} draggable={false} />
-        {pendingCircle && (
+        <div className={styles.imageFrame}>
+          <img src={STREET_IMAGE} alt="토론 대상 거리" className={styles.image} draggable={false} />
+        </div>
+        {pendingCircle && phase === 'gaze' && (
           <div
-            className={`${styles.pendingCircle} ${pendingCircle.locked ? styles.pendingCircleLocked : ''}`}
+            className={styles.pendingCircle}
             style={{
               left: `${pendingCircle.x * 100}%`,
               top: `${pendingCircle.y * 100}%`,
-              opacity: pendingCircle.locked ? 1 : 0.4 + pendingCircle.progress * 0.6,
-              transform: `translate(-50%, -50%) scale(${pendingCircle.locked ? 1.2 : 1 + pendingCircle.progress * 0.3})`,
+              opacity: 0.4 + pendingCircle.progress * 0.6,
+              transform: `translate(-50%, -50%) scale(${1 + pendingCircle.progress * 0.3})`,
             }}
           />
         )}
-        {waitingForSpeech && (
-          <p className={styles.waitingHint}>위치가 고정됐어요 — 말하거나 입력해 주세요</p>
+        {phase === 'voice' && activeTag && (
+          <LocationTag x={activeTag.x} y={activeTag.y} label="선택됨" />
         )}
         {pins.map((pin) => (
           <OpinionPin
