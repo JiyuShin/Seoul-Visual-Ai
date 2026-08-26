@@ -22,8 +22,9 @@ export function useSpeechOutput() {
   }, []);
 
   const speak = useCallback(
-    (text) => {
+    (text, onEnd) => {
       if (typeof window === 'undefined' || !window.speechSynthesis || !text?.trim()) {
+        onEnd?.();
         return false;
       }
 
@@ -34,12 +35,40 @@ export function useSpeechOutput() {
       utterance.rate = 0.92;
       utterance.pitch = 1;
 
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      let finished = false;
+      let resumeTimer = null;
+      let hasStartedSpeaking = false;
+
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (resumeTimer) clearInterval(resumeTimer);
+        setIsSpeaking(false);
+        onEnd?.();
+      };
+
+      utterance.onstart = () => {
+        hasStartedSpeaking = true;
+        setIsSpeaking(true);
+      };
+      utterance.onend = finish;
+      utterance.onerror = finish;
 
       utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
+
+      resumeTimer = setInterval(() => {
+        if (finished) return;
+        if (hasStartedSpeaking && !window.speechSynthesis.speaking) {
+          finish();
+          return;
+        }
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 250);
+
       return true;
     },
     [stopSpeaking]

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export function useSpeechInput({ onFinalTranscript } = {}) {
+export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -9,10 +9,23 @@ export function useSpeechInput({ onFinalTranscript } = {}) {
   const recognitionRef = useRef(null);
   const shouldListenRef = useRef(false);
   const onFinalRef = useRef(onFinalTranscript);
+  const onUpdateRef = useRef(onTranscriptUpdate);
+  const transcriptRef = useRef('');
+  const interimRef = useRef('');
+  const isListeningRef = useRef(false);
 
   useEffect(() => {
     onFinalRef.current = onFinalTranscript;
   }, [onFinalTranscript]);
+
+  useEffect(() => {
+    onUpdateRef.current = onTranscriptUpdate;
+  }, [onTranscriptUpdate]);
+
+  const emitTranscriptUpdate = useCallback(() => {
+    const combined = `${transcriptRef.current} ${interimRef.current}`.trim();
+    onUpdateRef.current?.(combined, transcriptRef.current, interimRef.current);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -44,13 +57,14 @@ export function useSpeechInput({ onFinalTranscript } = {}) {
       }
 
       if (finalText) {
-        setTranscript((prev) => {
-          const updated = `${prev}${finalText}`.trim();
-          onFinalRef.current?.(updated, finalText.trim());
-          return updated;
-        });
+        transcriptRef.current = `${transcriptRef.current}${finalText}`.trim();
+        setTranscript(transcriptRef.current);
+        onFinalRef.current?.(transcriptRef.current, finalText.trim());
       }
+
+      interimRef.current = interimText;
       setInterimTranscript(interimText);
+      emitTranscriptUpdate();
     };
 
     recognition.onerror = (event) => {
@@ -61,15 +75,21 @@ export function useSpeechInput({ onFinalTranscript } = {}) {
 
     recognition.onend = () => {
       if (shouldListenRef.current && recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-          setIsListening(true);
-          return;
-        } catch {
-          // start() can throw if called too quickly after stop()
-        }
+        window.setTimeout(() => {
+          if (!shouldListenRef.current || !recognitionRef.current) return;
+          try {
+            recognitionRef.current.start();
+            isListeningRef.current = true;
+            setIsListening(true);
+          } catch {
+            isListeningRef.current = false;
+            setIsListening(false);
+          }
+        }, 180);
+        return;
       }
       setIsListening(false);
+      isListeningRef.current = false;
     };
 
     recognitionRef.current = recognition;
@@ -78,40 +98,65 @@ export function useSpeechInput({ onFinalTranscript } = {}) {
       shouldListenRef.current = false;
       recognition.stop();
     };
-  }, []);
+  }, [emitTranscriptUpdate]);
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
-    if (!recognition) return;
+    if (!recognition) return false;
     setError(null);
     shouldListenRef.current = true;
-    try {
-      recognition.start();
-      setIsListening(true);
-    } catch {
-      setIsListening(false);
-    }
+
+    const tryStart = (attempt = 0) => {
+      try {
+        recognition.start();
+        isListeningRef.current = true;
+        setIsListening(true);
+        return true;
+      } catch {
+        if (attempt >= 6) {
+          isListeningRef.current = false;
+          setIsListening(false);
+          return false;
+        }
+        window.setTimeout(() => tryStart(attempt + 1), 200 * (attempt + 1));
+        return false;
+      }
+    };
+
+    return tryStart();
   }, []);
 
   const stopListening = useCallback(() => {
     shouldListenRef.current = false;
     recognitionRef.current?.stop();
+    isListeningRef.current = false;
     setIsListening(false);
   }, []);
 
+  const getIsListening = useCallback(() => isListeningRef.current, []);
+
   const clearTranscript = useCallback(() => {
+    transcriptRef.current = '';
+    interimRef.current = '';
     setTranscript('');
     setInterimTranscript('');
-  }, []);
+    emitTranscriptUpdate();
+  }, [emitTranscriptUpdate]);
 
-  const setManualText = useCallback((text) => {
-    setTranscript(text);
-    setInterimTranscript('');
-  }, []);
+  const setManualText = useCallback(
+    (text) => {
+      transcriptRef.current = text;
+      interimRef.current = '';
+      setTranscript(text);
+      setInterimTranscript('');
+      emitTranscriptUpdate();
+    },
+    [emitTranscriptUpdate]
+  );
 
   const getCombinedText = useCallback(() => {
-    return `${transcript} ${interimTranscript}`.trim();
-  }, [transcript, interimTranscript]);
+    return `${transcriptRef.current} ${interimRef.current}`.trim();
+  }, []);
 
   return {
     transcript,
@@ -124,5 +169,6 @@ export function useSpeechInput({ onFinalTranscript } = {}) {
     clearTranscript,
     setManualText,
     getCombinedText,
+    getIsListening,
   };
 }

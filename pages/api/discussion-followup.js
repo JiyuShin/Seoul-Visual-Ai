@@ -16,7 +16,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'opinion is required' });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const model =
+    process.env.OPENAI_MODEL?.trim() ||
+    process.env.OPENAI_MODEL_FAST?.trim() ||
+    'gpt-4o-mini';
 
   if (apiKey) {
     try {
@@ -27,7 +31,7 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model,
           temperature: 0.9,
           max_tokens: 180,
           messages: [
@@ -48,16 +52,24 @@ export default async function handler(req, res) {
         const data = await response.json();
         const question = data?.choices?.[0]?.message?.content?.trim();
         if (question) {
-          return res.status(200).json({ question, source: 'openai' });
+          return res.status(200).json({ question, source: 'openai', model });
         }
+      } else {
+        const errBody = await response.text();
+        console.error('[discussion-followup] OpenAI error:', response.status, errBody.slice(0, 200));
       }
-    } catch {
-      // fall through to local generator
+    } catch (err) {
+      console.error('[discussion-followup] OpenAI request failed:', err?.message || err);
     }
+  } else {
+    console.warn('[discussion-followup] OPENAI_API_KEY not set — using local questions');
   }
 
   return res.status(200).json({
     question: buildFollowUpQuestion(trimmedOpinion, visionLabel || ''),
     source: 'local',
+    ...(process.env.NODE_ENV === 'development' && {
+      debug: { openaiConfigured: Boolean(apiKey) },
+    }),
   });
 }

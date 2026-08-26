@@ -5,7 +5,7 @@ export const GAZE_VOTE_DWELL_MS = 3000;
 export const GAZE_VOTE_DWELL_GRACE_MS = 700;
 export const GAZE_VOTE_PHASE_MAX_MS = 45000;
 
-export const GAZE_PIN_DURATION_MS = 1000;
+export const GAZE_PIN_DURATION_MS = 3000;
 export const GAZE_TAG_DWELL_TOLERANCE = 0.2;
 export const GAZE_TAG_DWELL_GRACE_MS = 1200;
 export const GAZE_LIKE_DURATION_MS = 2000;
@@ -65,12 +65,12 @@ export const DISCUSSION_PROMPT =
   '이 서울의 광경에서, 당신만의 식물을 심어 개선하고 싶은 곳을 시선으로 선택해 주세요.';
 
 export const DISCUSSION_GAZE_HINT =
-  '개선하고 싶은 곳을 1초간 바라보세요. 넓은 범위 안이면 태그가 바로 붙습니다.';
+  '개선하고 싶은 곳을 약 3초간 바라보세요. 원하는 위치를 찾을 때까지 시선을 유지하면 태그가 붙습니다.';
 
 export const DISCUSSION_VOICE_PROMPT =
   '선택한 위치에 대한 의견을 말하거나 입력해 주세요. 말한 내용이 태그 위치에 붙습니다.';
 
 export const DISCUSSION_FOLLOWUP_TITLE = 'AI가 조금 더 구체적으로 여쭤볼게요';
 export const DISCUSSION_FOLLOWUP_HINT =
-  '질문을 듣고, 떠오르는 장면이나 디테일을 말하거나 입력해 주세요. 답변은 태그에 함께 남습니다.';
+  '질문을 듣고 바로 답변을 말해 주세요. AI 질문이 끝나면 마이크가 자동으로 켜집니다.';
 export const DISCUSSION_FOLLOWUP_LOADING = '당신의 의견을 바탕으로 질문을 준비하고 있어요…';

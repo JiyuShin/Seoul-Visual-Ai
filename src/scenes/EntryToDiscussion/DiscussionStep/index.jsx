@@ -37,6 +37,15 @@ export default function DiscussionStep({
   const activeTagRef = useRef(null);
   const canvasRectRef = useRef(null);
   const placedForTagRef = useRef(false);
+  const followUpRef = useRef(null);
+  const followUpSubmittedRef = useRef(false);
+  const followUpSubmitTimerRef = useRef(null);
+  const submitFollowUpAnswerRef = useRef(null);
+  const followUpMicTimerRef = useRef(null);
+  const followUpTtsStartedRef = useRef(false);
+  const speechRef = useRef(null);
+  const speechOutputRef = useRef(null);
+  const startFollowUpListeningRef = useRef(null);
   const [stepPhase, setStepPhase] = useState(STEP_PHASES.PROMPT);
   const [activeTag, setActiveTag] = useState(null);
   const [submitHint, setSubmitHint] = useState('');
@@ -45,22 +54,56 @@ export default function DiscussionStep({
   pinsRef.current = pins;
   stepPhaseRef.current = stepPhase;
   activeTagRef.current = activeTag;
+  followUpRef.current = followUp;
 
   const speechOutput = useSpeechOutput();
 
+  const syncFollowUpInput = useCallback((combined) => {
+    if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || !combined || !followUpInputRef.current) {
+      return;
+    }
+    followUpInputRef.current.value = combined;
+  }, []);
+
   const speech = useSpeechInput({
     onFinalTranscript: (fullText) => {
-      if (stepPhaseRef.current !== STEP_PHASES.VOICE || !activeTagRef.current) return;
-      if (!fullText.trim() || placedForTagRef.current) return;
+      if (stepPhaseRef.current === STEP_PHASES.VOICE && activeTagRef.current) {
+        if (!fullText.trim() || placedForTagRef.current) return;
 
-      const placed = streetCanvasRef.current?.placePinWithText(fullText);
-      if (placed) {
-        placedForTagRef.current = true;
+        const placed = streetCanvasRef.current?.placePinWithText(fullText);
+        if (placed) {
+          placedForTagRef.current = true;
+        }
+        return;
+      }
+
+      if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || !followUpRef.current?.pinId) {
+        return;
+      }
+
+      const trimmed = fullText.trim();
+      if (!trimmed || followUpSubmittedRef.current) return;
+
+      syncFollowUpInput(trimmed);
+
+      clearTimeout(followUpSubmitTimerRef.current);
+      followUpSubmitTimerRef.current = setTimeout(() => {
+        if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || followUpSubmittedRef.current) return;
+        submitFollowUpAnswerRef.current?.(trimmed);
+      }, 900);
+    },
+    onTranscriptUpdate: (combined) => {
+      if (stepPhaseRef.current === STEP_PHASES.FOLLOWUP) {
+        syncFollowUpInput(combined);
       }
     },
   });
 
   const finishFollowUp = useCallback(() => {
+    clearTimeout(followUpSubmitTimerRef.current);
+    followUpSubmitTimerRef.current = null;
+    clearTimeout(followUpMicTimerRef.current);
+    followUpMicTimerRef.current = null;
     speechOutput.stopSpeaking();
     speech.stopListening();
     speech.clearTranscript();
@@ -70,8 +113,58 @@ export default function DiscussionStep({
     setStepPhase(STEP_PHASES.GAZE);
   }, [speech, speechOutput]);
 
+  const submitFollowUpAnswer = useCallback(
+    (answer) => {
+      const currentFollowUp = followUpRef.current;
+      const trimmed = answer?.trim();
+      if (!currentFollowUp?.pinId || !trimmed) return false;
+      if (followUpSubmittedRef.current) return false;
+
+      followUpSubmittedRef.current = true;
+      clearTimeout(followUpSubmitTimerRef.current);
+      followUpSubmitTimerRef.current = null;
+
+      onPinsChange?.((prev) =>
+        prev.map((pin) => {
+          if (pin.id !== currentFollowUp.pinId) return pin;
+          return {
+            ...pin,
+            followUpQuestion: currentFollowUp.question,
+            followUpAnswer: trimmed,
+          };
+        })
+      );
+
+      finishFollowUp();
+      return true;
+    },
+    [finishFollowUp, onPinsChange]
+  );
+
+  submitFollowUpAnswerRef.current = submitFollowUpAnswer;
+  speechRef.current = speech;
+  speechOutputRef.current = speechOutput;
+
+  const startFollowUpListening = useCallback((immediate = false) => {
+    if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || followUpSubmittedRef.current) return;
+    clearTimeout(followUpMicTimerRef.current);
+
+    const launchMic = () => {
+      if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || followUpSubmittedRef.current) return;
+      speechOutputRef.current?.stopSpeaking();
+      speechRef.current?.startListening();
+    };
+
+    followUpMicTimerRef.current = window.setTimeout(launchMic, immediate ? 300 : 500);
+  }, []);
+
+  startFollowUpListeningRef.current = startFollowUpListening;
+
   const beginFollowUp = useCallback(
     async (pin) => {
+      followUpSubmittedRef.current = false;
+      clearTimeout(followUpSubmitTimerRef.current);
+      followUpSubmitTimerRef.current = null;
       setStepPhase(STEP_PHASES.FOLLOWUP);
       setFollowUp({ pinId: pin.id, question: '', loading: true, error: null });
       speech.stopListening();
@@ -128,24 +221,97 @@ export default function DiscussionStep({
 
   useEffect(() => {
     if (stepPhase === STEP_PHASES.VOICE) {
-      speech.startListening();
-      speech.clearTranscript();
-    } else if (stepPhase === STEP_PHASES.FOLLOWUP && followUp?.question && !followUp.loading) {
-      speech.startListening();
-    } else if (stepPhase !== STEP_PHASES.FOLLOWUP || followUp?.loading) {
-      speech.stopListening();
+      speechRef.current?.startListening();
+      speechRef.current?.clearTranscript();
+    } else if (stepPhase !== STEP_PHASES.FOLLOWUP) {
+      speechRef.current?.stopListening();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepPhase, followUp?.question, followUp?.loading]);
+  }, [stepPhase]);
 
   useEffect(() => {
     if (stepPhase !== STEP_PHASES.FOLLOWUP || !followUp?.question || followUp.loading) {
+      followUpTtsStartedRef.current = false;
       return undefined;
     }
 
-    speechOutput.speak(followUp.question);
-    return () => speechOutput.stopSpeaking();
-  }, [stepPhase, followUp?.question, followUp?.loading, speechOutput]);
+    speechRef.current?.stopListening();
+    speechRef.current?.clearTranscript();
+    followUpSubmittedRef.current = false;
+    followUpTtsStartedRef.current = false;
+
+    const output = speechOutputRef.current;
+    const openMic = () => startFollowUpListeningRef.current?.(true);
+
+    if (!output?.isSupported) {
+      openMic();
+      return undefined;
+    }
+
+    const spoke = output.speak(followUp.question, openMic);
+    if (!spoke) {
+      openMic();
+    }
+
+    return () => {
+      output?.stopSpeaking();
+      followUpTtsStartedRef.current = false;
+    };
+  }, [stepPhase, followUp?.question, followUp?.loading]);
+
+  useEffect(() => {
+    if (stepPhase !== STEP_PHASES.FOLLOWUP || followUp?.loading || !followUp?.question) {
+      return undefined;
+    }
+
+    if (speechOutput.isSpeaking) {
+      followUpTtsStartedRef.current = true;
+      return undefined;
+    }
+
+    if (followUpTtsStartedRef.current && !followUpSubmittedRef.current) {
+      followUpTtsStartedRef.current = false;
+      startFollowUpListeningRef.current?.(true);
+    }
+
+    return undefined;
+  }, [speechOutput.isSpeaking, stepPhase, followUp?.loading, followUp?.question]);
+
+  useEffect(() => {
+    if (stepPhase !== STEP_PHASES.FOLLOWUP || followUp?.loading || !followUp?.question) {
+      return undefined;
+    }
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || followUpSubmittedRef.current) return;
+      if (speechOutputRef.current?.isSpeaking) return;
+      if (speechRef.current?.getIsListening?.()) return;
+      startFollowUpListeningRef.current?.(true);
+    }, 4500);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [stepPhase, followUp?.loading, followUp?.question]);
+
+  useEffect(() => {
+    if (
+      stepPhase !== STEP_PHASES.FOLLOWUP ||
+      followUp?.loading ||
+      followUpSubmittedRef.current
+    ) {
+      return undefined;
+    }
+
+    const combined = `${speech.transcript} ${speech.interimTranscript}`.trim();
+    if (!combined) return undefined;
+
+    const timer = setTimeout(() => {
+      if (stepPhaseRef.current !== STEP_PHASES.FOLLOWUP || followUpSubmittedRef.current) return;
+      const latest = speechRef.current?.getCombinedText().trim();
+      if (!latest) return;
+      submitFollowUpAnswerRef.current?.(latest);
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [stepPhase, followUp?.loading, speech.transcript, speech.interimTranscript]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -180,27 +346,15 @@ export default function DiscussionStep({
     const spoken = speech.getCombinedText().trim();
     const answer = typed || spoken;
 
-    if (!followUp?.pinId) return;
+    if (!followUpRef.current?.pinId) return;
 
     if (!answer) {
       setSubmitHint('답변을 말하거나 입력해 주세요.');
       return;
     }
 
-    onPinsChange?.((prev) =>
-      prev.map((pin) => {
-        if (pin.id !== followUp.pinId) return pin;
-        return {
-          ...pin,
-          followUpQuestion: followUp.question,
-          followUpAnswer: answer,
-          text: `${pin.text} — ${answer}`,
-        };
-      })
-    );
-
-    finishFollowUp();
-  }, [finishFollowUp, followUp, onPinsChange, speech]);
+    submitFollowUpAnswer(answer);
+  }, [submitFollowUpAnswer, speech]);
 
   const handleFollowUpSkip = useCallback(() => {
     if (followUp?.pinId && followUp.question) {
@@ -350,7 +504,18 @@ export default function DiscussionStep({
               <button
                 type="button"
                 className={styles.replayBtn}
-                onClick={() => speechOutput.speak(followUp?.question)}
+                onClick={() => {
+                  speechRef.current?.stopListening();
+                  followUpTtsStartedRef.current = false;
+                  const output = speechOutputRef.current;
+                  if (!output?.isSupported) {
+                    startFollowUpListening(true);
+                    return;
+                  }
+                  output.speak(followUp?.question, () => {
+                    startFollowUpListeningRef.current?.(true);
+                  });
+                }}
               >
                 다시 듣기
               </button>
@@ -361,9 +526,13 @@ export default function DiscussionStep({
             <>
               <div className={styles.speechStatus}>
                 {speech.isListening ? (
-                  <span className={styles.listening}>● 답변을 말씀해 주세요</span>
+                  <span className={styles.listening}>● 음성 인식 중 — 말한 내용이 자동으로 등록됩니다</span>
+                ) : speechOutput.isSpeaking ? (
+                  <span className={styles.paused}>질문을 듣는 중…</span>
+                ) : speech.isSupported ? (
+                  <span className={styles.paused}>마이크를 켜는 중…</span>
                 ) : (
-                  <span className={styles.paused}>음성 인식 대기 중</span>
+                  <span className={styles.fallback}>음성 인식 미지원 — 텍스트 입력을 사용하세요</span>
                 )}
                 {(combinedSpeech || speech.interimTranscript) && (
                   <p className={styles.liveTranscript}>{combinedSpeech || speech.interimTranscript}</p>
@@ -376,12 +545,17 @@ export default function DiscussionStep({
                   ref={followUpInputRef}
                   type="text"
                   className={styles.textInput}
-                  placeholder="떠오르는 장면이나 디테일을 입력해 주세요"
+                  placeholder="말하면 여기에 표시됩니다 (직접 입력도 가능)"
                   onKeyDown={(e) => e.key === 'Enter' && handleFollowUpSubmit()}
                 />
                 <button type="button" className={styles.submitBtn} onClick={handleFollowUpSubmit}>
                   답변 등록
                 </button>
+                {!speech.isListening && speech.isSupported && !speechOutput.isSpeaking && (
+                  <button type="button" className={styles.micBtn} onClick={() => startFollowUpListening(true)}>
+                    🎤
+                  </button>
+                )}
                 <button type="button" className={styles.skipBtn} onClick={handleFollowUpSkip}>
                   건너뛰기
                 </button>
