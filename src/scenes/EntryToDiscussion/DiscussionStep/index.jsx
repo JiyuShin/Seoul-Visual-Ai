@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchFollowUpQuestion } from '../../../lib/fetchFollowUpQuestion';
 import {
+  DISCUSSION_FOLLOWUP_HINT,
+  DISCUSSION_FOLLOWUP_LOADING,
+  DISCUSSION_FOLLOWUP_TITLE,
   DISCUSSION_GAZE_HINT,
   DISCUSSION_PHASE_MAX_MS,
   DISCUSSION_PROMPT,
   DISCUSSION_VOICE_PROMPT,
 } from '../gazeConfig';
 import { useSpeechInput } from '../useSpeechInput';
+import { useSpeechOutput } from '../useSpeechOutput';
 import StreetCanvas from './StreetCanvas';
 import styles from './DiscussionStep.module.css';
 
@@ -13,6 +18,7 @@ const STEP_PHASES = {
   PROMPT: 'prompt',
   GAZE: 'gaze',
   VOICE: 'voice',
+  FOLLOWUP: 'followup',
 };
 
 export default function DiscussionStep({
@@ -21,40 +27,81 @@ export default function DiscussionStep({
   onPinsChange,
   onComplete,
   registerGazeHandler,
-  gazePosition,
   onGazeClipChange,
 }) {
   const manualInputRef = useRef(null);
+  const followUpInputRef = useRef(null);
   const streetCanvasRef = useRef(null);
   const pinsRef = useRef(pins);
   const stepPhaseRef = useRef(STEP_PHASES.PROMPT);
   const activeTagRef = useRef(null);
   const canvasRectRef = useRef(null);
+  const placedForTagRef = useRef(false);
   const [stepPhase, setStepPhase] = useState(STEP_PHASES.PROMPT);
   const [activeTag, setActiveTag] = useState(null);
   const [submitHint, setSubmitHint] = useState('');
+  const [followUp, setFollowUp] = useState(null);
 
   pinsRef.current = pins;
   stepPhaseRef.current = stepPhase;
   activeTagRef.current = activeTag;
 
+  const speechOutput = useSpeechOutput();
+
   const speech = useSpeechInput({
-    onFinalTranscript: (text) => {
-      if (stepPhaseRef.current === STEP_PHASES.VOICE && activeTagRef.current) {
-        streetCanvasRef.current?.placePinWithText(text);
+    onFinalTranscript: (fullText) => {
+      if (stepPhaseRef.current !== STEP_PHASES.VOICE || !activeTagRef.current) return;
+      if (!fullText.trim() || placedForTagRef.current) return;
+
+      const placed = streetCanvasRef.current?.placePinWithText(fullText);
+      if (placed) {
+        placedForTagRef.current = true;
       }
     },
   });
 
+  const finishFollowUp = useCallback(() => {
+    speechOutput.stopSpeaking();
+    speech.stopListening();
+    speech.clearTranscript();
+    setFollowUp(null);
+    setSubmitHint('');
+    if (followUpInputRef.current) followUpInputRef.current.value = '';
+    setStepPhase(STEP_PHASES.GAZE);
+  }, [speech, speechOutput]);
+
+  const beginFollowUp = useCallback(
+    async (pin) => {
+      setStepPhase(STEP_PHASES.FOLLOWUP);
+      setFollowUp({ pinId: pin.id, question: '', loading: true, error: null });
+      speech.stopListening();
+      speech.clearTranscript();
+      setActiveTag(null);
+      onGazeClipChange?.(null);
+
+      const result = await fetchFollowUpQuestion({
+        opinion: pin.text,
+        visionLabel: winnerCard?.label || winnerCard?.shortLabel || '',
+      });
+
+      setFollowUp({
+        pinId: pin.id,
+        question: result.question,
+        loading: false,
+        error: null,
+      });
+    },
+    [onGazeClipChange, speech, winnerCard]
+  );
+
   const handleAddPin = useCallback(
     (pin) => {
       onPinsChange?.((prev) => [...prev, pin]);
-      speech.clearTranscript();
-      setActiveTag(null);
-      setStepPhase(STEP_PHASES.GAZE);
+      placedForTagRef.current = false;
       setSubmitHint('');
+      beginFollowUp(pin);
     },
-    [onPinsChange, speech]
+    [beginFollowUp, onPinsChange]
   );
 
   const handleLikePin = useCallback(
@@ -73,6 +120,7 @@ export default function DiscussionStep({
   );
 
   const handleTagLocked = useCallback((coords) => {
+    placedForTagRef.current = false;
     setActiveTag(coords);
     setStepPhase(STEP_PHASES.VOICE);
     setSubmitHint('');
@@ -82,11 +130,22 @@ export default function DiscussionStep({
     if (stepPhase === STEP_PHASES.VOICE) {
       speech.startListening();
       speech.clearTranscript();
-    } else {
+    } else if (stepPhase === STEP_PHASES.FOLLOWUP && followUp?.question && !followUp.loading) {
+      speech.startListening();
+    } else if (stepPhase !== STEP_PHASES.FOLLOWUP || followUp?.loading) {
       speech.stopListening();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepPhase]);
+  }, [stepPhase, followUp?.question, followUp?.loading]);
+
+  useEffect(() => {
+    if (stepPhase !== STEP_PHASES.FOLLOWUP || !followUp?.question || followUp.loading) {
+      return undefined;
+    }
+
+    speechOutput.speak(followUp.question);
+    return () => speechOutput.stopSpeaking();
+  }, [stepPhase, followUp?.question, followUp?.loading, speechOutput]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -108,6 +167,7 @@ export default function DiscussionStep({
     if (!placed) {
       setSubmitHint('의견을 입력해 주세요.');
     } else {
+      placedForTagRef.current = true;
       speech.clearTranscript();
       setSubmitHint('');
     }
@@ -115,18 +175,60 @@ export default function DiscussionStep({
     manualInputRef.current.value = '';
   }, [stepPhase, activeTag, speech]);
 
+  const handleFollowUpSubmit = useCallback(() => {
+    const typed = followUpInputRef.current?.value?.trim();
+    const spoken = speech.getCombinedText().trim();
+    const answer = typed || spoken;
+
+    if (!followUp?.pinId) return;
+
+    if (!answer) {
+      setSubmitHint('답변을 말하거나 입력해 주세요.');
+      return;
+    }
+
+    onPinsChange?.((prev) =>
+      prev.map((pin) => {
+        if (pin.id !== followUp.pinId) return pin;
+        return {
+          ...pin,
+          followUpQuestion: followUp.question,
+          followUpAnswer: answer,
+          text: `${pin.text} — ${answer}`,
+        };
+      })
+    );
+
+    finishFollowUp();
+  }, [finishFollowUp, followUp, onPinsChange, speech]);
+
+  const handleFollowUpSkip = useCallback(() => {
+    if (followUp?.pinId && followUp.question) {
+      onPinsChange?.((prev) =>
+        prev.map((pin) => {
+          if (pin.id !== followUp.pinId) return pin;
+          return { ...pin, followUpQuestion: followUp.question };
+        })
+      );
+    }
+    finishFollowUp();
+  }, [finishFollowUp, followUp, onPinsChange]);
+
   const combinedSpeech = speech.getCombinedText();
 
   const handleStartGaze = useCallback(() => {
     setStepPhase(STEP_PHASES.GAZE);
   }, []);
 
-  const handleCanvasRect = useCallback((rect) => {
-    canvasRectRef.current = rect;
-    if (stepPhaseRef.current === STEP_PHASES.GAZE && rect) {
-      onGazeClipChange?.(rect);
-    }
-  }, [onGazeClipChange]);
+  const handleCanvasRect = useCallback(
+    (rect) => {
+      canvasRectRef.current = rect;
+      if (stepPhaseRef.current === STEP_PHASES.GAZE && rect) {
+        onGazeClipChange?.(rect);
+      }
+    },
+    [onGazeClipChange]
+  );
 
   useEffect(() => {
     if (stepPhase === STEP_PHASES.GAZE && canvasRectRef.current) {
@@ -138,24 +240,38 @@ export default function DiscussionStep({
     return undefined;
   }, [stepPhase, onGazeClipChange]);
 
+  const canvasPhase =
+    stepPhase === STEP_PHASES.PROMPT
+      ? 'idle'
+      : stepPhase === STEP_PHASES.GAZE
+        ? 'gaze'
+        : stepPhase === STEP_PHASES.VOICE
+          ? 'voice'
+          : 'followup';
+
   const phaseHint =
     stepPhase === STEP_PHASES.PROMPT
       ? DISCUSSION_PROMPT
       : stepPhase === STEP_PHASES.GAZE
         ? DISCUSSION_GAZE_HINT
-        : DISCUSSION_VOICE_PROMPT;
+        : stepPhase === STEP_PHASES.VOICE
+          ? DISCUSSION_VOICE_PROMPT
+          : DISCUSSION_FOLLOWUP_HINT;
+
+  const titleText =
+    stepPhase === STEP_PHASES.PROMPT
+      ? '어디에 식물을 심을까요?'
+      : stepPhase === STEP_PHASES.GAZE
+        ? '시선으로 위치를 선택하세요'
+        : stepPhase === STEP_PHASES.VOICE
+          ? '의견을 말해 주세요'
+          : DISCUSSION_FOLLOWUP_TITLE;
 
   return (
     <section className={styles.discussionStep}>
       <div className={styles.header}>
         <p className={styles.subtitle}>선택된 비전 · {winnerCard.shortLabel}</p>
-        <h2 className={styles.title}>
-          {stepPhase === STEP_PHASES.PROMPT
-            ? '어디에 식물을 심을까요?'
-            : stepPhase === STEP_PHASES.GAZE
-              ? '시선으로 위치를 선택하세요'
-              : '의견을 말해 주세요'}
-        </h2>
+        <h2 className={styles.title}>{titleText}</h2>
         <p className={styles.hint}>{phaseHint}</p>
       </div>
 
@@ -175,7 +291,7 @@ export default function DiscussionStep({
           onAddPin={handleAddPin}
           onLikePin={handleLikePin}
           registerGazeHandler={registerGazeHandler}
-          phase={stepPhase === STEP_PHASES.PROMPT ? 'idle' : stepPhase}
+          phase={canvasPhase}
           activeTag={activeTag}
           onTagLocked={handleTagLocked}
           onCanvasRect={handleCanvasRect}
@@ -215,6 +331,63 @@ export default function DiscussionStep({
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {stepPhase === STEP_PHASES.FOLLOWUP && (
+        <div className={styles.followUpArea}>
+          <div className={styles.agentBubble}>
+            <span className={styles.agentLabel}>AI</span>
+            {followUp?.loading ? (
+              <p className={styles.agentQuestion}>{DISCUSSION_FOLLOWUP_LOADING}</p>
+            ) : (
+              <p className={styles.agentQuestion}>{followUp?.question}</p>
+            )}
+            {speechOutput.isSpeaking && (
+              <span className={styles.agentSpeaking}>🔊 질문을 읽고 있어요</span>
+            )}
+            {!followUp?.loading && speechOutput.isSupported && (
+              <button
+                type="button"
+                className={styles.replayBtn}
+                onClick={() => speechOutput.speak(followUp?.question)}
+              >
+                다시 듣기
+              </button>
+            )}
+          </div>
+
+          {!followUp?.loading && (
+            <>
+              <div className={styles.speechStatus}>
+                {speech.isListening ? (
+                  <span className={styles.listening}>● 답변을 말씀해 주세요</span>
+                ) : (
+                  <span className={styles.paused}>음성 인식 대기 중</span>
+                )}
+                {(combinedSpeech || speech.interimTranscript) && (
+                  <p className={styles.liveTranscript}>{combinedSpeech || speech.interimTranscript}</p>
+                )}
+                {submitHint && <p className={styles.submitHint}>{submitHint}</p>}
+              </div>
+
+              <div className={styles.manualRow}>
+                <input
+                  ref={followUpInputRef}
+                  type="text"
+                  className={styles.textInput}
+                  placeholder="떠오르는 장면이나 디테일을 입력해 주세요"
+                  onKeyDown={(e) => e.key === 'Enter' && handleFollowUpSubmit()}
+                />
+                <button type="button" className={styles.submitBtn} onClick={handleFollowUpSubmit}>
+                  답변 등록
+                </button>
+                <button type="button" className={styles.skipBtn} onClick={handleFollowUpSkip}>
+                  건너뛰기
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

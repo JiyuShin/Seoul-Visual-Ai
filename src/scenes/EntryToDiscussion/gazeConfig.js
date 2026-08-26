@@ -69,3 +69,8 @@ export const DISCUSSION_GAZE_HINT =
 
 export const DISCUSSION_VOICE_PROMPT =
   '선택한 위치에 대한 의견을 말하거나 입력해 주세요. 말한 내용이 태그 위치에 붙습니다.';
+
+export const DISCUSSION_FOLLOWUP_TITLE = 'AI가 조금 더 구체적으로 여쭤볼게요';
+export const DISCUSSION_FOLLOWUP_HINT =
+  '질문을 듣고, 떠오르는 장면이나 디테일을 말하거나 입력해 주세요. 답변은 태그에 함께 남습니다.';
+export const DISCUSSION_FOLLOWUP_LOADING = '당신의 의견을 바탕으로 질문을 준비하고 있어요…';

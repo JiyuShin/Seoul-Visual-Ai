@@ -192,7 +192,6 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
           onPinsChange={setPins}
           onComplete={handleDiscussionComplete}
           registerGazeHandler={registerGazeHandler}
-          gazePosition={gazePosition}
           onGazeClipChange={handleGazeClipChange}
         />
       )}

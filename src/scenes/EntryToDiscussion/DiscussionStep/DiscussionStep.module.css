@@ -153,7 +153,8 @@
 
 .submitBtn,
 .micBtn,
-.nextBtn {
+.nextBtn,
+.skipBtn {
   padding: 10px 16px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -170,7 +171,8 @@
 
 .submitBtn:hover,
 .micBtn:hover,
-.nextBtn:hover {
+.nextBtn:hover,
+.skipBtn:hover {
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -178,6 +180,70 @@
   margin-top: 8px;
   color: #66bb7a;
   letter-spacing: 0.02em;
+}
+
+.followUpArea {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agentBubble {
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(102, 187, 122, 0.25);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(76, 175, 109, 0.08);
+}
+
+.agentLabel {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(102, 187, 122, 0.15);
+  font-size: 11px;
+  font-weight: 600;
+  color: #2d6a3e;
+  letter-spacing: 0.04em;
+}
+
+.agentQuestion {
+  margin: 0;
+  font-size: clamp(14px, 1.8vw, 17px);
+  color: #2e2e2e;
+  line-height: 1.65;
+}
+
+.agentSpeaking {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #4caf6d;
+}
+
+.replayBtn,
+.skipBtn {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  color: #4a4a4a;
+  cursor: pointer;
+}
+
+.replayBtn:hover,
+.skipBtn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.skipBtn {
+  flex-shrink: 0;
 }
 
 .micBtn {
