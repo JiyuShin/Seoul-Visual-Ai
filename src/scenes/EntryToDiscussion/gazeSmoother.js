@@ -20,18 +20,16 @@ export const GAZE_DISPLAY_MAX_STEP = 1.6;
 export const GAZE_DISPLAY_MIN_STEP = 0.25;
 export const GAZE_DISPLAY_EASE = 0.055;
 
-export const GAZE_TAG_PLACEMENT_MEDIAN_WINDOW = 3;
-export const GAZE_TAG_PLACEMENT_MICRO_DEADZONE_PX = 0;
-export const GAZE_TAG_PLACEMENT_AXIS_GAIN_X = 0.52;
-export const GAZE_TAG_PLACEMENT_AXIS_GAIN_Y = 0.38;
-export const GAZE_TAG_PLACEMENT_AXIS_MAX_STEP_X = 5;
-export const GAZE_TAG_PLACEMENT_AXIS_MAX_STEP_Y = 3.5;
-export const GAZE_TAG_PLACEMENT_GLIDE_DEADZONE_PX = 2;
-export const GAZE_TAG_PLACEMENT_GLIDE_FOLLOW_SLOW = 0.3;
-export const GAZE_TAG_PLACEMENT_GLIDE_MAX_STEP_SLOW = 8;
-export const GAZE_TAG_PLACEMENT_DISPLAY_MAX_STEP = 2.3;
-export const GAZE_TAG_PLACEMENT_DISPLAY_MIN_STEP = 0.38;
-export const GAZE_TAG_PLACEMENT_DISPLAY_EASE = 0.1;
+export const GAZE_TAG_PLACEMENT_MEDIAN_WINDOW = 11;
+export const GAZE_TAG_PLACEMENT_ONE_EURO_MIN_CUTOFF = 0.26;
+export const GAZE_TAG_PLACEMENT_ONE_EURO_BETA = 0.0035;
+export const GAZE_TAG_PLACEMENT_MICRO_DEADZONE_PX = 11;
+export const GAZE_TAG_PLACEMENT_GLIDE_DEADZONE_PX = 6;
+export const GAZE_TAG_PLACEMENT_GLIDE_FOLLOW_SLOW = 0.14;
+export const GAZE_TAG_PLACEMENT_GLIDE_MAX_STEP_SLOW = 3;
+export const GAZE_TAG_PLACEMENT_DISPLAY_MAX_STEP = 0.95;
+export const GAZE_TAG_PLACEMENT_DISPLAY_MIN_STEP = 0;
+export const GAZE_TAG_PLACEMENT_DISPLAY_EASE = 0.034;
 
 export const CALIBRATION_POINTS = [
   { x: 0.1, y: 0.1 },
@@ -93,16 +91,6 @@ function moveTowardPoint(currentX, currentY, targetX, targetY, maxStep, minStep,
     x: currentX + errX * ratio,
     y: currentY + errY * ratio,
   };
-}
-
-function moveAxis(current, target, gain, maxStep) {
-  const delta = target - current;
-  if (Math.abs(delta) < 0.5) return target;
-  const step = clamp(delta * gain, -maxStep, maxStep);
-  if (Math.abs(step) < 0.5 && Math.abs(delta) > 0.5) {
-    return current + Math.sign(delta) * 0.5;
-  }
-  return current + step;
 }
 
 function createOneEuroAxis({ minCutoff, beta, dCutoff }) {
@@ -186,12 +174,9 @@ export function createGazePipeline({
     displayMaxStep,
     displayMinStep,
     displayEase,
-    axisGainX: null,
-    axisGainY: null,
-    axisMaxStepX: null,
-    axisMaxStepY: null,
     medianWindow,
     lockEnabled: true,
+    roundOutput: true,
   };
 
   const tagRuntime = {
@@ -202,18 +187,25 @@ export function createGazePipeline({
     displayMaxStep: GAZE_TAG_PLACEMENT_DISPLAY_MAX_STEP,
     displayMinStep: GAZE_TAG_PLACEMENT_DISPLAY_MIN_STEP,
     displayEase: GAZE_TAG_PLACEMENT_DISPLAY_EASE,
-    axisGainX: GAZE_TAG_PLACEMENT_AXIS_GAIN_X,
-    axisGainY: GAZE_TAG_PLACEMENT_AXIS_GAIN_Y,
-    axisMaxStepX: GAZE_TAG_PLACEMENT_AXIS_MAX_STEP_X,
-    axisMaxStepY: GAZE_TAG_PLACEMENT_AXIS_MAX_STEP_Y,
     medianWindow: GAZE_TAG_PLACEMENT_MEDIAN_WINDOW,
     lockEnabled: false,
+    roundOutput: false,
   };
 
   let runtime = { ...defaultRuntime };
 
   const filterX = createOneEuroAxis({ minCutoff, beta, dCutoff });
   const filterY = createOneEuroAxis({ minCutoff, beta, dCutoff });
+  const tagFilterX = createOneEuroAxis({
+    minCutoff: GAZE_TAG_PLACEMENT_ONE_EURO_MIN_CUTOFF,
+    beta: GAZE_TAG_PLACEMENT_ONE_EURO_BETA,
+    dCutoff,
+  });
+  const tagFilterY = createOneEuroAxis({
+    minCutoff: GAZE_TAG_PLACEMENT_ONE_EURO_MIN_CUTOFF,
+    beta: GAZE_TAG_PLACEMENT_ONE_EURO_BETA,
+    dCutoff,
+  });
 
   const stepAxis = (display, target, follow, maxStep) => {
     const delta = target - display;
@@ -278,12 +270,8 @@ export function createGazePipeline({
       runtime = tagPlacementMode ? tagRuntime : defaultRuntime;
       breakLock();
       if (tagPlacementMode && latestGazeX !== null && latestGazeY !== null) {
-        displayX = latestGazeX;
-        displayY = latestGazeY;
-      }
-      if (tagPlacementMode && clipRect) {
-        displayX = clamp(displayX, clipRect.left, clipRect.right);
-        displayY = clamp(displayY, clipRect.top, clipRect.bottom);
+        tagFilterX.reset(latestGazeX);
+        tagFilterY.reset(latestGazeY);
       }
     },
     setGazeClipRect(rect) {
@@ -327,6 +315,18 @@ export function createGazePipeline({
       }
 
       if (tagPlacementMode) {
+        const filtered = {
+          x: tagFilterX.filter(preFiltered.x, timestampMs),
+          y: tagFilterY.filter(preFiltered.y, timestampMs),
+        };
+        latestGazeX = filtered.x;
+        latestGazeY = filtered.y;
+
+        if (clipRect) {
+          latestGazeX = clamp(latestGazeX, clipRect.left, clipRect.right);
+          latestGazeY = clamp(latestGazeY, clipRect.top, clipRect.bottom);
+        }
+
         if (isLocked) breakLock();
         return;
       }
@@ -391,35 +391,20 @@ export function createGazePipeline({
         displayX = lockPoint.x;
         displayY = lockPoint.y;
       } else if (latestGazeX !== null && latestGazeY !== null) {
-        if (tagPlacementMode) {
-          displayX = moveAxis(
-            displayX,
-            latestGazeX,
-            runtime.axisGainX,
-            runtime.axisMaxStepX
-          );
-          displayY = moveAxis(
-            displayY,
-            latestGazeY,
-            runtime.axisGainY,
-            runtime.axisMaxStepY
-          );
-        } else {
-          const errDist = distance(displayX, displayY, latestGazeX, latestGazeY);
+        const errDist = distance(displayX, displayY, latestGazeX, latestGazeY);
 
-          if (errDist >= runtime.microDeadzonePx) {
-            const next = moveTowardPoint(
-              displayX,
-              displayY,
-              latestGazeX,
-              latestGazeY,
-              runtime.displayMaxStep,
-              runtime.displayMinStep,
-              runtime.displayEase
-            );
-            displayX = next.x;
-            displayY = next.y;
-          }
+        if (errDist >= runtime.microDeadzonePx) {
+          const next = moveTowardPoint(
+            displayX,
+            displayY,
+            latestGazeX,
+            latestGazeY,
+            runtime.displayMaxStep,
+            runtime.displayMinStep,
+            runtime.displayEase
+          );
+          displayX = next.x;
+          displayY = next.y;
         }
       }
 
@@ -431,9 +416,12 @@ export function createGazePipeline({
         displayY = clamp(displayY, 0, window.innerHeight);
       }
 
+      const outX = runtime.roundOutput ? Math.round(displayX) : displayX;
+      const outY = runtime.roundOutput ? Math.round(displayY) : displayY;
+
       return {
-        x: Math.round(displayX),
-        y: Math.round(displayY),
+        x: outX,
+        y: outY,
         locked: isLocked,
       };
     },
