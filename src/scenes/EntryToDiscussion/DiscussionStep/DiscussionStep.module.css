@@ -1,0 +1,125 @@
+.discussionStep {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 72px 32px 48px;
+  box-sizing: border-box;
+  gap: 24px;
+}
+
+.header {
+  text-align: center;
+  max-width: 640px;
+}
+
+.subtitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #66bb7a;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0 0 10px;
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 450;
+  color: #2e2e2e;
+  line-height: 1.4;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: #6b6b6b;
+  line-height: 1.5;
+}
+
+.inputArea {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.speechStatus {
+  min-height: 20px;
+}
+
+.listening {
+  font-size: 12px;
+  color: #4caf6d;
+  letter-spacing: 0.02em;
+}
+
+.paused,
+.fallback {
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.liveTranscript {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #2e2e2e;
+  font-style: italic;
+}
+
+.manualRow {
+  display: flex;
+  gap: 8px;
+}
+
+.textInput {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: #2e2e2e;
+  outline: none;
+  transition: border-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.textInput:focus {
+  border-color: rgba(102, 187, 122, 0.5);
+}
+
+.submitBtn,
+.micBtn,
+.nextBtn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: #2e2e2e;
+  cursor: pointer;
+  transition:
+    background 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.submitBtn:hover,
+.micBtn:hover,
+.nextBtn:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.nextBtn {
+  margin-top: 8px;
+  color: #66bb7a;
+  letter-spacing: 0.02em;
+}
+
+.micBtn {
+  padding: 10px 12px;
+}

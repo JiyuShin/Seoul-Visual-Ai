@@ -1,0 +1,51 @@
+.cardWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transition: transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cardWrapper.winner {
+  transform: scale(1.02);
+}
+
+.card {
+  width: clamp(120px, 14vw, 168px);
+  aspect-ratio: 1;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  transition:
+    box-shadow 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.compact .card {
+  width: clamp(80px, 10vw, 120px);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.label {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: #6b6b6b;
+  text-align: center;
+  font-weight: 400;
+  max-width: 140px;
+  line-height: 1.4;
+}
+
+.compact .label {
+  font-size: 11px;
+  max-width: 100px;
+}
