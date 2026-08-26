@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DISCUSSION_PHASE_MAX_MS } from '../gazeConfig';
 import { useSpeechInput } from '../useSpeechInput';
 import StreetCanvas from './StreetCanvas';
@@ -10,13 +10,26 @@ export default function DiscussionStep({
   onPinsChange,
   onComplete,
   registerGazeHandler,
+  gazePosition,
 }) {
-  const speech = useSpeechInput();
   const manualInputRef = useRef(null);
   const streetCanvasRef = useRef(null);
   const pinsRef = useRef(pins);
+  const gazePositionRef = useRef(gazePosition);
+  const [submitHint, setSubmitHint] = useState('');
 
   pinsRef.current = pins;
+  gazePositionRef.current = gazePosition;
+
+  const handleFinalSpeech = useCallback((text) => {
+    streetCanvasRef.current?.placePinWithText(
+      text,
+      gazePositionRef.current?.x,
+      gazePositionRef.current?.y
+    );
+  }, []);
+
+  const speech = useSpeechInput({ onFinalTranscript: handleFinalSpeech });
 
   useEffect(() => {
     onPinsChange?.((prev) => {
@@ -53,6 +66,7 @@ export default function DiscussionStep({
     (pin) => {
       onPinsChange?.((prev) => [...prev, pin]);
       speech.clearTranscript();
+      setSubmitHint('');
     },
     [onPinsChange, speech]
   );
@@ -75,12 +89,21 @@ export default function DiscussionStep({
   const handleManualSubmit = useCallback(() => {
     const text = manualInputRef.current?.value?.trim();
     if (!text) return;
-    const placed = streetCanvasRef.current?.submitManualAtPending(text);
+
+    const placed = streetCanvasRef.current?.placePinWithText(
+      text,
+      gazePosition?.x,
+      gazePosition?.y
+    );
+
     if (!placed) {
-      speech.setManualText(text);
+      setSubmitHint('이미지 위 지점을 1.2초간 응시한 뒤 입력해 주세요.');
+    } else {
+      setSubmitHint('');
     }
+
     manualInputRef.current.value = '';
-  }, [speech]);
+  }, [gazePosition]);
 
   const combinedSpeech = speech.getCombinedText();
 
@@ -105,8 +128,8 @@ export default function DiscussionStep({
         <p className={styles.subtitle}>선택된 비전 · {winnerCard.shortLabel}</p>
         <h2 className={styles.title}>거리의 어느 지점을 바꿀까요?</h2>
         <p className={styles.hint}>
-          지점을 1.2초간 응시하며 말하거나, 아래 입력창에 의견을 적어주세요. 다른 핀을 2초간
-          응시하면 공감(♥)이 붙습니다.
+          이미지 위 지점을 1.2초간 응시한 뒤 말하세요. 위치가 고정되면 말한 내용이 그 자리에
+          붙습니다. 다른 핀을 2초간 응시하면 공감(♥)이 붙습니다.
         </p>
       </div>
 
@@ -117,6 +140,7 @@ export default function DiscussionStep({
         onLikePin={handleLikePin}
         registerGazeHandler={registerGazeHandler}
         pendingSpeechText={combinedSpeech}
+        onPlacementStateChange={() => setSubmitHint('')}
       />
 
       <div className={styles.inputArea}>
@@ -131,6 +155,7 @@ export default function DiscussionStep({
           {(combinedSpeech || speech.interimTranscript) && (
             <p className={styles.liveTranscript}>{combinedSpeech || speech.interimTranscript}</p>
           )}
+          {submitHint && <p className={styles.submitHint}>{submitHint}</p>}
         </div>
 
         <div className={styles.manualRow}>

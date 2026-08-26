@@ -45,7 +45,6 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
     calibrationIndex,
     calibrationTotal,
     calibrationPoint,
-    calibrationProgress,
     calibrationHint,
     gazePosition,
     faceDetected,
@@ -53,6 +52,8 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
     trackingActive,
     recordedPoints,
     minCalibrationPoints,
+    isRecordingCalibration,
+    confirmCalibrationPoint,
     finishCalibration,
     error,
   } = useGazeTracker(registerGazeSample);
@@ -88,8 +89,13 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
           <div className={styles.calibrationPanel}>
             <h2 className={styles.calibrationTitle}>시선 추적 보정</h2>
             <p className={styles.calibrationDesc}>
-              9개 점을 순서대로 <strong>눈으로만</strong> 2.5초간 정확히 응시합니다. (
-              {Math.min(calibrationIndex + 1, calibrationTotal)} / {calibrationTotal})
+              초록 점을 <strong>눈동자로 정확히</strong> 맞춘 뒤{' '}
+              <strong>스페이스바</strong> 또는 버튼을 누르세요. ({calibrationIndex + 1} /{' '}
+              {calibrationTotal})
+            </p>
+            <p className={styles.calibrationDescSub}>
+              화면 네 모서리 점을 순서대로 맞춥니다. 고개는 고정하고 <strong>눈만</strong>{' '}
+              움직이세요.
             </p>
             <p className={`${styles.faceStatus} ${faceDetected ? styles.faceOk : styles.faceWarn}`}>
               {faceDetected
@@ -102,6 +108,14 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
               <p className={styles.trackingStatus}>시선 추적 활성 — 점선 커서가 시선을 따라갑니다</p>
             )}
             {calibrationHint && <p className={styles.calibrationHint}>{calibrationHint}</p>}
+            <button
+              type="button"
+              className={styles.confirmBtn}
+              onClick={confirmCalibrationPoint}
+              disabled={isRecordingCalibration}
+            >
+              {isRecordingCalibration ? '보정 중…' : '이 점 보정하기 (Space)'}
+            </button>
             {recordedPoints >= minCalibrationPoints && (
               <button type="button" className={styles.skipBtn} onClick={finishCalibration}>
                 보정 완료하고 시작하기
@@ -114,18 +128,7 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
                   left: `${calibrationPoint.x * 100}%`,
                   top: `${calibrationPoint.y * 100}%`,
                 }}
-              >
-                <svg className={styles.calibrationRing} viewBox="0 0 36 36">
-                  <circle className={styles.ringBg} cx="18" cy="18" r="16" />
-                  <circle
-                    className={styles.ringFill}
-                    cx="18"
-                    cy="18"
-                    r="16"
-                    strokeDasharray={`${calibrationProgress * 100} 100`}
-                  />
-                </svg>
-              </div>
+              />
             )}
           </div>
         </div>
@@ -159,6 +162,7 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
           onPinsChange={setPins}
           onComplete={handleDiscussionComplete}
           registerGazeHandler={registerGazeHandler}
+          gazePosition={gazePosition}
         />
       )}
 

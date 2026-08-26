@@ -1,6 +1,7 @@
 export const MAX_EXPECTED_VIEWERS = 5;
 
-export const GAZE_VOTE_DWELL_MS = 3000;
+export const GAZE_VOTE_HOVER_MS = 4000;
+export const GAZE_VOTE_DWELL_MS = 5000;
 export const GAZE_VOTE_PHASE_MAX_MS = 45000;
 
 export const GAZE_PIN_DURATION_MS = 1200;

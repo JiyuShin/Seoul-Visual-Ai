@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export function useSpeechInput() {
+export function useSpeechInput({ onFinalTranscript } = {}) {
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
+  const shouldListenRef = useRef(false);
+  const onFinalRef = useRef(onFinalTranscript);
+
+  useEffect(() => {
+    onFinalRef.current = onFinalTranscript;
+  }, [onFinalTranscript]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setIsSupported(false);
@@ -39,23 +44,38 @@ export function useSpeechInput() {
       }
 
       if (finalText) {
-        setTranscript((prev) => `${prev}${finalText}`.trim());
+        setTranscript((prev) => {
+          const updated = `${prev}${finalText}`.trim();
+          onFinalRef.current?.(updated, finalText.trim());
+          return updated;
+        });
       }
       setInterimTranscript(interimText);
     };
 
     recognition.onerror = (event) => {
-      setError(event.error);
-      setIsListening(false);
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError(event.error);
+      }
     };
 
     recognition.onend = () => {
+      if (shouldListenRef.current && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setIsListening(true);
+          return;
+        } catch {
+          // start() can throw if called too quickly after stop()
+        }
+      }
       setIsListening(false);
     };
 
     recognitionRef.current = recognition;
 
     return () => {
+      shouldListenRef.current = false;
       recognition.stop();
     };
   }, []);
@@ -64,6 +84,7 @@ export function useSpeechInput() {
     const recognition = recognitionRef.current;
     if (!recognition) return;
     setError(null);
+    shouldListenRef.current = true;
     try {
       recognition.start();
       setIsListening(true);
@@ -73,6 +94,7 @@ export function useSpeechInput() {
   }, []);
 
   const stopListening = useCallback(() => {
+    shouldListenRef.current = false;
     recognitionRef.current?.stop();
     setIsListening(false);
   }, []);

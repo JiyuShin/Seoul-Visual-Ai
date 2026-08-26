@@ -10,9 +10,7 @@ export default function GazeReticle({ position, dwellProgress = 0, visible = tru
     <div
       className={styles.reticle}
       style={{
-        left: position.x,
-        top: position.y,
-        transform: `translate(-50%, -50%)`,
+        transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,
       }}
       aria-hidden="true"
     >
