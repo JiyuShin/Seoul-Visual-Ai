@@ -79,7 +79,15 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
     confirmCalibrationPoint,
     finishCalibration,
     error,
+    setTagPlacementMode,
+    setGazeClipRect,
   } = useGazeTracker(registerGazeSample);
+
+  useEffect(() => {
+    const inTagPlacement = step === 'discussion' && Boolean(gazeClip);
+    setTagPlacementMode(inTagPlacement);
+    setGazeClipRect(inTagPlacement ? gazeClip : null);
+  }, [step, gazeClip, setTagPlacementMode, setGazeClipRect]);
 
   const handleVoteComplete = useCallback((card) => {
     setWinnerCard(card);

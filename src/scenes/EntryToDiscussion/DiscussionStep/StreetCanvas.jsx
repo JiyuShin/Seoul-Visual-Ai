@@ -174,18 +174,25 @@ export default forwardRef(function StreetCanvas(
         (isInZone(pending) || now - pending.lastInZoneAt <= GAZE_TAG_DWELL_GRACE_MS);
 
       if (stillInZone) {
+        pendingPinRef.current = {
+          ...pending,
+          anchorX: norm.x,
+          anchorY: norm.y,
+          lastInZoneAt: now,
+        };
+
         const elapsed = now - pending.since;
         dwellProgress = Math.min(1, elapsed / GAZE_PIN_DURATION_MS);
         setPendingCircle({
-          x: pending.anchorX,
-          y: pending.anchorY,
+          x: norm.x,
+          y: norm.y,
           progress: dwellProgress,
           locked: false,
         });
 
         if (elapsed >= GAZE_PIN_DURATION_MS) {
           clearPendingCircle();
-          onTagLocked?.({ x: pending.anchorX, y: pending.anchorY });
+          onTagLocked?.({ x: norm.x, y: norm.y });
         }
       } else {
         pendingPinRef.current = {

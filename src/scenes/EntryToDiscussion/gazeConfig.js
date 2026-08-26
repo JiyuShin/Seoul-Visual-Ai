@@ -5,9 +5,9 @@ export const GAZE_VOTE_DWELL_MS = 3000;
 export const GAZE_VOTE_DWELL_GRACE_MS = 700;
 export const GAZE_VOTE_PHASE_MAX_MS = 45000;
 
-export const GAZE_PIN_DURATION_MS = 3000;
+export const GAZE_PIN_DURATION_MS = 4000;
 export const GAZE_TAG_DWELL_TOLERANCE = 0.2;
-export const GAZE_TAG_DWELL_GRACE_MS = 1200;
+export const GAZE_TAG_DWELL_GRACE_MS = 1400;
 export const GAZE_LIKE_DURATION_MS = 2000;
 
 export const REVEAL_AGENT_DIALOGUE_MS = 5000;
@@ -65,7 +65,7 @@ export const DISCUSSION_PROMPT =
   '이 서울의 광경에서, 당신만의 식물을 심어 개선하고 싶은 곳을 시선으로 선택해 주세요.';
 
 export const DISCUSSION_GAZE_HINT =
-  '개선하고 싶은 곳을 약 3초간 바라보세요. 원하는 위치를 찾을 때까지 시선을 유지하면 태그가 붙습니다.';
+  '개선하고 싶은 곳을 약 4초간 바라보세요. 원하는 위치를 찾을 때까지 시선을 유지하면 태그가 붙습니다.';
 
 export const DISCUSSION_VOICE_PROMPT =
   '선택한 위치에 대한 의견을 말하거나 입력해 주세요. 말한 내용이 태그 위치에 붙습니다.';

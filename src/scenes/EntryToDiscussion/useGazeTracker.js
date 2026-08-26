@@ -264,5 +264,11 @@ export function useGazeTracker(onGazeSample) {
     confirmCalibrationPoint,
     finishCalibration,
     error,
+    setTagPlacementMode: useCallback((active) => {
+      gazePipelineRef.current.setTagPlacementMode(active);
+    }, []),
+    setGazeClipRect: useCallback((rect) => {
+      gazePipelineRef.current.setGazeClipRect(rect);
+    }, []),
   };
 }
