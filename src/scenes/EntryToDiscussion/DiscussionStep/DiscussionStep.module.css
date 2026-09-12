@@ -1,0 +1,278 @@
+.discussionStep {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100dvh;
+  min-height: 100vh;
+  padding: 24px 32px 20px;
+  box-sizing: border-box;
+  gap: 14px;
+}
+
+.header {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  max-width: 640px;
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: rgba(247, 246, 242, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.subtitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #66bb7a;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0 0 10px;
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 450;
+  color: #2e2e2e;
+  line-height: 1.4;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: #6b6b6b;
+  line-height: 1.5;
+}
+
+.canvasArea {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.promptOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  border-radius: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(247, 246, 242, 0.18),
+    rgba(247, 246, 242, 0.42)
+  );
+  backdrop-filter: blur(2px);
+  text-align: center;
+}
+
+.promptText {
+  margin: 0;
+  max-width: 480px;
+  font-size: clamp(15px, 2vw, 18px);
+  font-weight: 450;
+  color: #2e2e2e;
+  line-height: 1.6;
+}
+
+.promptBtn {
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(102, 187, 122, 0.4);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d6a3e;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  transition: background 200ms ease;
+}
+
+.promptBtn:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+.secondaryHint {
+  margin: 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.inputArea {
+  position: relative;
+  z-index: 3;
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.speechStatus {
+  min-height: 20px;
+}
+
+.listening {
+  font-size: 12px;
+  color: #4caf6d;
+  letter-spacing: 0.02em;
+}
+
+.paused,
+.fallback {
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.liveTranscript {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #2e2e2e;
+  font-style: italic;
+}
+
+.submitHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #b45309;
+}
+
+.manualRow {
+  display: flex;
+  gap: 8px;
+}
+
+.textInput {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: #2e2e2e;
+  outline: none;
+  transition: border-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.textInput:focus {
+  border-color: rgba(102, 187, 122, 0.5);
+}
+
+.submitBtn,
+.micBtn,
+.nextBtn,
+.skipBtn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: #2e2e2e;
+  cursor: pointer;
+  transition:
+    background 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.submitBtn:hover,
+.micBtn:hover,
+.nextBtn:hover,
+.skipBtn:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.nextBtn {
+  margin-top: 8px;
+  color: #66bb7a;
+  letter-spacing: 0.02em;
+}
+
+.followUpArea {
+  position: relative;
+  z-index: 3;
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .discussionStep {
+    min-height: 100dvh;
+    height: auto;
+    padding: 20px 16px;
+  }
+
+  .canvasArea {
+    position: fixed;
+  }
+}
+
+.agentBubble {
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(102, 187, 122, 0.25);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(76, 175, 109, 0.08);
+}
+
+.agentLabel {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(102, 187, 122, 0.15);
+  font-size: 11px;
+  font-weight: 600;
+  color: #2d6a3e;
+  letter-spacing: 0.04em;
+}
+
+.agentQuestion {
+  margin: 0;
+  font-size: clamp(14px, 1.8vw, 17px);
+  color: #2e2e2e;
+  line-height: 1.65;
+}
+
+.agentSpeaking {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #4caf6d;
+}
+
+.replayBtn,
+.skipBtn {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  color: #4a4a4a;
+  cursor: pointer;
+}
+
+.replayBtn:hover,
+.skipBtn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.skipBtn {
+  flex-shrink: 0;
+}
+
+.micBtn {
+  padding: 10px 12px;
+}
