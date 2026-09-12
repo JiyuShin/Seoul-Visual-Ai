@@ -183,21 +183,21 @@ export function useGazeTracker(onGazeSample) {
     let smoothX = null;
     let smoothY = null;
     const history = []; // 최근 좌표 저장 (평균 계산용)
-    const HISTORY_SIZE = 8; // 8프레임 평균
+    const HISTORY_SIZE = 15; // 15프레임 평균 (더 안정적)
 
     const tick = () => {
       const lastRaw = lastRawGazeRef.current;
       if (lastRaw && Date.now() - lastRaw.receivedAt < 500) {
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
-        const amplify = 1.3; // 1.3배 증폭
+        const amplify = 1.2; // 1.2배 증폭 (더 줄임)
         
         // 증폭된 좌표 계산
         let targetX = centerX + (lastRaw.x - centerX) * amplify;
         let targetY = centerY + (lastRaw.y - centerY) * amplify;
         
         // 화면 범위 내로 제한
-        const margin = 40;
+        const margin = 50;
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
         targetX = Math.max(margin, Math.min(screenW - margin, targetX));
@@ -210,13 +210,13 @@ export function useGazeTracker(onGazeSample) {
         const avgX = history.reduce((sum, p) => sum + p.x, 0) / history.length;
         const avgY = history.reduce((sum, p) => sum + p.y, 0) / history.length;
         
-        // 스무딩 적용 (5%만 새 위치로 이동 - 매우 부드럽게)
+        // 스무딩 적용 (2%만 새 위치로 이동 - 매우 천천히)
         if (smoothX === null || smoothY === null) {
           smoothX = avgX;
           smoothY = avgY;
         } else {
-          smoothX = smoothX + (avgX - smoothX) * 0.05;
-          smoothY = smoothY + (avgY - smoothY) * 0.05;
+          smoothX = smoothX + (avgX - smoothX) * 0.02;
+          smoothY = smoothY + (avgY - smoothY) * 0.02;
         }
         
         // 최종 클램핑
