@@ -28,6 +28,7 @@ export default function DiscussionStep({
   onComplete,
   registerGazeHandler,
   onGazeClipChange,
+  gazePosition,
 }) {
   const manualInputRef = useRef(null);
   const followUpInputRef = useRef(null);
@@ -466,6 +467,7 @@ export default function DiscussionStep({
           activeTag={activeTag}
           onTagLocked={handleTagLocked}
           onCanvasRect={handleCanvasRect}
+          gazePosition={gazePosition}
         />
       </div>
 

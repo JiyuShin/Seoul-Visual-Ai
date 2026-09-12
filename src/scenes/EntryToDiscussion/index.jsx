@@ -201,6 +201,7 @@ export default function EntryToDiscussion({ onDiscussionComplete }) {
           onComplete={handleDiscussionComplete}
           registerGazeHandler={registerGazeHandler}
           onGazeClipChange={handleGazeClipChange}
+          gazePosition={gazePosition}
         />
       )}
 

@@ -1,15 +1,18 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   GAZE_LIKE_DURATION_MS,
   GAZE_PIN_DURATION_MS,
   GAZE_TAG_DWELL_GRACE_MS,
   GAZE_TAG_DWELL_TOLERANCE,
   PIN_HIT_RADIUS_PX,
-  STREET_IMAGE,
 } from '../gazeConfig';
 import LocationTag from './LocationTag';
 import OpinionPin from './OpinionPin';
 import styles from './StreetCanvas.module.css';
+
+// SSR 비활성화 - Three.js는 클라이언트에서만 실행
+const StreetView3D = dynamic(() => import('./StreetView3D'), { ssr: false });
 
 function normalizePinText(text) {
   return text
@@ -39,6 +42,7 @@ export default forwardRef(function StreetCanvas(
     onTagLocked,
     onCanvasRect,
     currentViewerId = 'viewer-1',
+    gazePosition = null,
   },
   ref
 ) {
@@ -265,7 +269,13 @@ export default forwardRef(function StreetCanvas(
     <div className={styles.canvasWrapper}>
       <div className={styles.canvas} ref={canvasRef}>
         <div className={styles.imageFrame}>
-          <img src={STREET_IMAGE} alt="토론 대상 거리" className={styles.image} draggable={false} />
+          <StreetView3D
+            colorImage="/og.png"
+            depthImage="/pn.png"
+            depthScale={0.12}
+            gazePosition={gazePosition}
+            className={styles.image}
+          />
         </div>
         {pendingCircle && phase === 'gaze' && (
           <div
