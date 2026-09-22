@@ -1,0 +1,18 @@
+<svg width="797" height="1131" viewBox="0 0 797 1131" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect
+    x="3.5"
+    y="3.5"
+    width="789.849"
+    height="1123.59"
+    rx="43.9315"
+    stroke="url(#menuCardHoverStroke)"
+    stroke-width="7"
+  />
+  <defs>
+    <linearGradient id="menuCardHoverStroke" x1="-17.8184" y1="0" x2="796.682" y2="1131" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#65FF00"/>
+      <stop offset="0.5" stop-color="white"/>
+      <stop offset="1" stop-color="#7C20CC"/>
+    </linearGradient>
+  </defs>
+</svg>

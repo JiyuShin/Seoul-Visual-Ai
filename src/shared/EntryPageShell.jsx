@@ -1,11 +1,10 @@
 import Head from 'next/head';
 import DreamyBackground from './DreamyBackground';
-import GazeReticle from './GazeReticle';
 import { useEntryFlow } from './EntryFlowContext';
 import styles from './EntryPageShell.module.css';
 
 export default function EntryPageShell({ title, showReticle = true, children }) {
-  const { isReady, error, reticlePosition, dwellProgress } = useEntryFlow();
+  const { isReady, error } = useEntryFlow();
 
   return (
     <>
@@ -32,12 +31,6 @@ export default function EntryPageShell({ title, showReticle = true, children }) 
         )}
 
         {children}
-
-        <GazeReticle
-          position={reticlePosition}
-          dwellProgress={dwellProgress}
-          visible={isReady && showReticle}
-        />
 
         <footer className={styles.footer}>Visual AI Glass · Scene 2–3 Prototype</footer>
       </div>

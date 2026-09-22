@@ -2,37 +2,96 @@
   position: fixed;
   left: 0;
   top: 0;
-  width: 18px;
-  height: 18px;
-  border: 2px dashed #4caf6d;
-  border-radius: 2px;
+  width: 81.55px;
+  height: 81.55px;
   pointer-events: none;
-  z-index: 99999;
-  backface-visibility: hidden;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.9),
-    0 0 8px rgba(76, 175, 109, 0.5);
-  background: rgba(255, 255, 255, 0.35);
+  z-index: 2147483647;
+  will-change: left, top, transform;
 }
 
-.reticleLocked {
-  border-style: solid;
-  border-width: 2px;
-  border-color: #3d9a5a;
-  background: rgba(255, 255, 255, 0.65);
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.95),
-    0 0 16px rgba(76, 175, 109, 0.75);
-  transition: box-shadow 180ms ease, border-color 180ms ease;
-}
-
-.reticleInner {
-  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.inner {
+.glowOuter {
   position: absolute;
-  inset: 3px;
-  border-radius: 1px;
-  transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  width: 81.55px;
+  height: 81.55px;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: rgba(147, 240, 75, 0.5);
+}
+
+.glowMid {
+  position: absolute;
+  width: 64.82px;
+  height: 64.82px;
+  left: 8.365px;
+  top: 8.365px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.glowInner {
+  position: absolute;
+  width: 47.05px;
+  height: 47.05px;
+  left: 17.25px;
+  top: 17.25px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.core {
+  position: absolute;
+  width: 52px;
+  height: 52.03px;
+  left: 14.775px;
+  top: 14.82px;
+  filter:
+    drop-shadow(0px 0px 9px rgba(0, 0, 0, 0.55))
+    drop-shadow(0px 0px 10.8952px rgba(191, 255, 130, 0.54))
+    drop-shadow(0px 0px 4.26069px #cfffe2);
+  border-radius: 60.867px;
+}
+
+.coreFillA {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  left: 0;
+  top: 0.03px;
+  border-radius: 50%;
+  background: radial-gradient(
+    43.57% 28.29% at 29.76% 21.43%,
+    rgba(248, 248, 248, 0.64) 0%,
+    rgba(197, 238, 247, 0.64) 24.75%,
+    rgba(187, 236, 247, 0.384) 51.87%,
+    rgba(95, 0, 169, 0.128) 100%
+  );
+  box-shadow:
+    inset 2.93785px 0.881356px 4.40678px rgba(157, 255, 253, 0.5),
+    inset 0px -0.881356px 0.587571px #ffb347,
+    inset 0px -0.293785px 0.587571px rgba(255, 179, 71, 0.5),
+    inset 0px 2.93785px 2.93785px rgba(92, 48, 161, 0.4),
+    inset 0px 0.587571px 1.46893px #ffffff,
+    inset 0px 5.87571px 5.87571px rgba(178, 11, 182, 0.4),
+    inset 0px 14.6893px 5.87571px rgba(255, 179, 71, 0.4);
+}
+
+.coreFillB {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: rgba(185, 228, 192, 0.48);
+  border: 0.304335px solid #ffffff;
+  box-shadow:
+    inset 2.93785px 0.881356px 4.40678px rgba(157, 255, 253, 0.5),
+    inset 0px -0.881356px 0.587571px #ffb347,
+    inset 0px -0.293785px 0.587571px rgba(255, 179, 71, 0.5),
+    inset 0px 2.93785px 2.93785px rgba(92, 48, 161, 0.4),
+    inset 0px 0.587571px 1.46893px #ffffff,
+    inset 0px 5.87571px 5.87571px rgba(88, 255, 105, 0.4),
+    inset 0px 19.085px 11.7514px rgba(200, 255, 213, 0.59),
+    inset 0px 14.6893px 9.06919px rgba(255, 222, 176, 0.4);
 }

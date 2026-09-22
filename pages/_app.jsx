@@ -1,5 +1,18 @@
 import '../styles/globals.css';
-import { EntryFlowProvider } from '../src/shared/EntryFlowContext';
+import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
+import GazeReticle from '../src/shared/GazeReticle';
+
+function GlobalGazeCursor() {
+  const { reticlePosition, dwellProgress, isReady } = useEntryFlow();
+
+  return (
+    <GazeReticle
+      position={reticlePosition}
+      dwellProgress={dwellProgress}
+      visible={isReady}
+    />
+  );
+}
 
 export default function App({ Component, pageProps }) {
   // 트래커 페이지는 자기 카메라를 직접 고르기 위해 WebGazer를 스스로 띄운다.
@@ -11,6 +24,7 @@ export default function App({ Component, pageProps }) {
   return (
     <EntryFlowProvider>
       <Component {...pageProps} />
+      <GlobalGazeCursor />
     </EntryFlowProvider>
   );
 }

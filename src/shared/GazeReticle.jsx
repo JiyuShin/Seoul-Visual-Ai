@@ -1,29 +1,53 @@
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './GazeReticle.module.css';
 
 export default function GazeReticle({ position, dwellProgress = 0, visible = true }) {
-  if (!visible || !position) return null;
+  const elRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
 
-  const scale = 1 + dwellProgress * 0.25;
-  const fillOpacity = dwellProgress * 0.35;
-  const locked = position.locked;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return undefined;
+    const runtime = window.__seoulGazeRuntime || (window.__seoulGazeRuntime = {});
+    runtime.cursorEl = elRef.current;
+    if (elRef.current && position) {
+      elRef.current.style.left = `${position.x}px`;
+      elRef.current.style.top = `${position.y}px`;
+    }
+    return () => {
+      if (runtime.cursorEl === elRef.current) runtime.cursorEl = null;
+    };
+  }, [mounted, position]);
+
+  if (!mounted || !visible) return null;
+
+  const scale = 1 + dwellProgress * 0.08;
+  const x = position?.x ?? window.innerWidth / 2;
+  const y = position?.y ?? window.innerHeight / 2;
+
+  return createPortal(
     <div
-      className={`${styles.reticle} ${locked ? styles.reticleLocked : ''}`}
+      ref={elRef}
+      className={styles.reticle}
       style={{
-        transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: `translate(-50%, -50%) scale(${scale})`,
       }}
       aria-hidden="true"
     >
-      <div
-        className={`${styles.inner} ${styles.reticleInner}`}
-        style={{
-          transform: `scale(${scale})`,
-          backgroundColor: locked
-            ? `rgba(76, 175, 109, ${0.25 + dwellProgress * 0.25})`
-            : `rgba(76, 175, 109, ${fillOpacity})`,
-        }}
-      />
-    </div>
+      <div className={styles.glowOuter} />
+      <div className={styles.glowMid} />
+      <div className={styles.glowInner} />
+      <div className={styles.core}>
+        <div className={styles.coreFillA} />
+        <div className={styles.coreFillB} />
+      </div>
+    </div>,
+    document.body
   );
 }

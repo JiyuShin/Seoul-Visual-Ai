@@ -20,6 +20,73 @@ function getGazeRuntime() {
   return window.__seoulGazeRuntime;
 }
 
+function pointAt(pts, index) {
+  const p = pts?.[index];
+  if (!p) return null;
+  if (typeof p.x === 'number' && typeof p.y === 'number') return p;
+  if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+    return { x: p[0], y: p[1] };
+  }
+  return null;
+}
+
+function ratioOnAxis(value, a, b) {
+  const min = Math.min(a, b);
+  const span = Math.max(8, Math.abs(b - a));
+  return (value - min) / span;
+}
+
+function expand01(value, inner = 0.32, outer = 0.68) {
+  return Math.max(0, Math.min(1, (value - inner) / Math.max(0.08, outer - inner)));
+}
+
+function gazeFromIris(webgazer) {
+  const tracker = webgazer?.getTracker?.();
+  const pts = tracker?.getPositions?.() || tracker?.positionsArray;
+  if (!pts || pts.length < 400) return null;
+
+  const leftOuter = pointAt(pts, 33);
+  const leftInner = pointAt(pts, 133);
+  const leftTop = pointAt(pts, 159);
+  const leftBot = pointAt(pts, 145);
+  const rightOuter = pointAt(pts, 263);
+  const rightInner = pointAt(pts, 362);
+  const rightTop = pointAt(pts, 386);
+  const rightBot = pointAt(pts, 374);
+  const leftIris = pointAt(pts, 468) || pointAt(pts, 159);
+  const rightIris = pointAt(pts, 473) || pointAt(pts, 386);
+
+  if (!leftOuter || !leftInner || !leftIris || !rightOuter || !rightInner || !rightIris) {
+    return null;
+  }
+
+  const nx =
+    1 -
+    (ratioOnAxis(leftIris.x, leftOuter.x, leftInner.x) +
+      ratioOnAxis(rightIris.x, rightOuter.x, rightInner.x)) /
+      2;
+
+  let ny = 0.5;
+  if (leftTop && leftBot && rightTop && rightBot) {
+    ny =
+      (ratioOnAxis(leftIris.y, leftTop.y, leftBot.y) +
+        ratioOnAxis(rightIris.y, rightTop.y, rightBot.y)) /
+      2;
+  }
+
+  return {
+    x: expand01(nx) * window.innerWidth,
+    y: expand01(ny, 0.28, 0.72) * window.innerHeight,
+  };
+}
+
+function applyCursorDom(x, y) {
+  const el = getGazeRuntime()?.cursorEl;
+  if (!el) return;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+}
+
 function guardFaceMeshSend(webgazer) {
   const tracker = webgazer?.getTracker?.();
   if (!tracker?.getEyePatches || tracker.__abortGuarded) return;
@@ -71,7 +138,7 @@ async function ensureWebGazerStarted(cameraDeviceId) {
       await webgazer.begin();
       webgazer.removeMouseEventListeners();
       webgazer.showVideoPreview(true);
-      webgazer.showPredictionPoints(false);
+      webgazer.showPredictionPoints(true);
       webgazer.showFaceOverlay(false);
       webgazer.showFaceFeedbackBox(false);
       webgazer.setVideoViewerSize(160, 120);
@@ -110,6 +177,8 @@ export function useGazeTracker(
   const lastFaceSeenRef = useRef(0);
   const facePollRef = useRef(null);
   const rafRef = useRef(null);
+  const recordedPointsRef = useRef(0);
+  recordedPointsRef.current = recordedPoints;
 
   isCalibratingRef.current = isCalibrating;
   viewerIdRef.current = viewerId;
@@ -124,8 +193,8 @@ export function useGazeTracker(
     setCalibrationIndex(CALIBRATION_POINTS.length);
     setCalibrationHint('');
     setIsRecordingCalibration(false);
-    document.body.classList.remove('calibrating-gaze');
-    // WebGazer 설정 변경하지 않음 - 보정 중과 동일하게 유지
+    // 보정 종료 후에도 웹캠 프리뷰를 보정 때와 같이 유지한다.
+    // 숨기면 브라우저가 카메라 프레임을 멈춰 시선 커서가 사라진다.
   }, []);
 
   const advanceCalibration = useCallback(() => {
@@ -183,6 +252,24 @@ export function useGazeTracker(
     if (typeof window === 'undefined' || !enabled) return undefined;
 
     let cancelled = false;
+    const runtime = getGazeRuntime();
+
+    runtime.onGaze = (data) => {
+      if (cancelled || !data) return;
+
+      if (data.eyeFeatures || data.x != null) {
+        lastFaceSeenRef.current = Date.now();
+        setFaceDetected(true);
+      }
+
+      if (data.x == null || data.y == null || Number.isNaN(data.x) || Number.isNaN(data.y)) {
+        return;
+      }
+
+      lastRawGazeRef.current = { x: data.x, y: data.y, receivedAt: Date.now() };
+      setTrackingActive(true);
+      gazePipelineRef.current.pushRaw(data.x, data.y);
+    };
 
     const init = async () => {
       try {
@@ -190,26 +277,17 @@ export function useGazeTracker(
         if (cancelled) return;
 
         webgazerRef.current = webgazer;
+        webgazer.showVideoPreview(true);
+        webgazer.showPredictionPoints(true);
+        webgazer.showFaceOverlay(false);
+        webgazer.showFaceFeedbackBox(false);
+
         webgazer.setGazeListener((data) => {
-          if (cancelled || !data) return;
-
-          if (data.eyeFeatures || data.x != null) {
-            lastFaceSeenRef.current = Date.now();
-            setFaceDetected(true);
-          }
-
-          if (data.x == null || data.y == null || Number.isNaN(data.x) || Number.isNaN(data.y)) {
-            return;
-          }
-
-          lastRawGazeRef.current = { x: data.x, y: data.y, receivedAt: Date.now() };
-          setTrackingActive(true);
-          gazePipelineRef.current.pushRaw(data.x, data.y);
+          getGazeRuntime().onGaze?.(data);
         });
+        runtime.listenerAttached = true;
 
-        if (isCalibratingRef.current) {
-          document.body.classList.add('calibrating-gaze');
-        }
+        document.body.classList.add('calibrating-gaze');
         setCalibrationHint(
           '초록 점을 눈동자로 맞춘 뒤 스페이스바 또는 버튼을 누르세요. 첫 보정 후 커서가 나타납니다.'
         );
@@ -226,11 +304,6 @@ export function useGazeTracker(
 
     return () => {
       cancelled = true;
-      setIsReady(false);
-      document.body.classList.remove('calibrating-gaze');
-      if (facePollRef.current) clearInterval(facePollRef.current);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // webgazer.end() 호출 금지: FaceMesh WASM이 죽은 비디오 프레임을 보내 abort 함
     };
   }, [cameraDeviceId, enabled]);
 
@@ -239,54 +312,75 @@ export function useGazeTracker(
 
     let smoothX = null;
     let smoothY = null;
-    const history = []; // 최근 좌표 저장 (평균 계산용)
-    const HISTORY_SIZE = 15; // 15프레임 평균 (더 안정적)
+    const history = [];
+    const HISTORY_SIZE = 6;
+    const CURSOR_MARGIN = 41;
+    let reading = false;
+    let lastRidge = null;
 
     const tick = () => {
-      const lastRaw = lastRawGazeRef.current;
-      if (lastRaw && Date.now() - lastRaw.receivedAt < 500) {
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
-        const amplify = 1.2; // 1.2배 증폭 (더 줄임)
+      rafRef.current = requestAnimationFrame(tick);
+      const webgazer = webgazerRef.current;
 
-        // 증폭된 좌표 계산
-        let targetX = centerX + (lastRaw.x - centerX) * amplify;
-        let targetY = centerY + (lastRaw.y - centerY) * amplify;
-
-        // 화면 범위 내로 제한
-        const margin = 50;
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        targetX = Math.max(margin, Math.min(screenW - margin, targetX));
-        targetY = Math.max(margin, Math.min(screenH - margin, targetY));
-
-        // 히스토리에 추가하고 평균 계산 (노이즈 제거)
-        history.push({ x: targetX, y: targetY });
-        if (history.length > HISTORY_SIZE) history.shift();
-
-        const avgX = history.reduce((sum, p) => sum + p.x, 0) / history.length;
-        const avgY = history.reduce((sum, p) => sum + p.y, 0) / history.length;
-
-        // 스무딩 적용 (2%만 새 위치로 이동 - 매우 천천히)
-        if (smoothX === null || smoothY === null) {
-          smoothX = avgX;
-          smoothY = avgY;
-        } else {
-          smoothX = smoothX + (avgX - smoothX) * 0.02;
-          smoothY = smoothY + (avgY - smoothY) * 0.02;
-        }
-
-        // 최종 클램핑
-        const x = Math.max(0, Math.min(screenW, Math.round(smoothX)));
-        const y = Math.max(0, Math.min(screenH, Math.round(smoothY)));
-
-        setGazePosition({ x, y, locked: false });
-        if (!isCalibratingRef.current) {
-          onGazeSampleRef.current?.(viewerIdRef.current, x, y);
-        }
+      if (webgazer && !reading) {
+        reading = true;
+        Promise.resolve(webgazer.getCurrentPrediction())
+          .then((pred) => {
+            if (pred && Number.isFinite(pred.x) && Number.isFinite(pred.y)) {
+              lastRidge = { x: pred.x, y: pred.y };
+            }
+            const iris = gazeFromIris(webgazer);
+            const useRidge = lastRidge && recordedPointsRef.current >= 3;
+            const sample = useRidge ? lastRidge : iris || lastRidge;
+            if (sample) {
+              lastRawGazeRef.current = {
+                x: sample.x,
+                y: sample.y,
+                receivedAt: Date.now(),
+              };
+              lastFaceSeenRef.current = Date.now();
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            reading = false;
+          });
       }
 
-      rafRef.current = requestAnimationFrame(tick);
+      const lastRaw = lastRawGazeRef.current;
+      if (!lastRaw || Date.now() - lastRaw.receivedAt >= 800) return;
+
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      const targetX = Math.max(CURSOR_MARGIN, Math.min(screenW - CURSOR_MARGIN, lastRaw.x));
+      const targetY = Math.max(CURSOR_MARGIN, Math.min(screenH - CURSOR_MARGIN, lastRaw.y));
+
+      history.push({ x: targetX, y: targetY });
+      if (history.length > HISTORY_SIZE) history.shift();
+
+      const avgX = history.reduce((sum, p) => sum + p.x, 0) / history.length;
+      const avgY = history.reduce((sum, p) => sum + p.y, 0) / history.length;
+
+      if (smoothX === null || smoothY === null) {
+        smoothX = avgX;
+        smoothY = avgY;
+      } else {
+        smoothX += (avgX - smoothX) * 0.35;
+        smoothY += (avgY - smoothY) * 0.35;
+      }
+
+      const x = Math.max(CURSOR_MARGIN, Math.min(screenW - CURSOR_MARGIN, Math.round(smoothX)));
+      const y = Math.max(CURSOR_MARGIN, Math.min(screenH - CURSOR_MARGIN, Math.round(smoothY)));
+
+      applyCursorDom(x, y);
+      setGazePosition((prev) => {
+        if (prev && prev.x === x && prev.y === y) return prev;
+        return { x, y, locked: false };
+      });
+      setTrackingActive(true);
+      if (!isCalibratingRef.current) {
+        onGazeSampleRef.current?.(viewerIdRef.current, x, y);
+      }
     };
 
     rafRef.current = requestAnimationFrame(tick);
@@ -314,6 +408,9 @@ export function useGazeTracker(
 
     facePollRef.current = setInterval(() => {
       const video = document.getElementById('webgazerVideoFeed');
+      if (video?.paused) {
+        video.play().catch(() => {});
+      }
       const videoOk =
         video && video.readyState >= 2 && video.videoWidth > 0 && !video.paused;
 
