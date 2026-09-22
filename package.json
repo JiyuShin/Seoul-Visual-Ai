@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.mjs",
+    "dev:next": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.mjs",
     "postinstall": "node scripts/copy-mediapipe.js"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "react-dom": "^18.3.1",
     "seedrandom": "^3.0.5",
     "three": "^0.186.0",
-    "webgazer": "^3.3.0"
+    "webgazer": "^3.3.0",
+    "ws": "^8.21.3"
   }
 }

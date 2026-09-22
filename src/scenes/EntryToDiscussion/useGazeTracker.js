@@ -12,7 +12,10 @@ function hasFaceLandmarks(webgazer) {
   return Boolean(tracker?.positionsArray?.length);
 }
 
-export function useGazeTracker(onGazeSample) {
+export function useGazeTracker(
+  onGazeSample,
+  { viewerId = 'viewer-1', cameraDeviceId = null, enabled = true } = {}
+) {
   const [isReady, setIsReady] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(true);
   const [calibrationIndex, setCalibrationIndex] = useState(0);
@@ -27,6 +30,7 @@ export function useGazeTracker(onGazeSample) {
 
   const webgazerRef = useRef(null);
   const onGazeSampleRef = useRef(onGazeSample);
+  const viewerIdRef = useRef(viewerId);
   const isCalibratingRef = useRef(true);
   const gazePipelineRef = useRef(createGazePipeline());
   const lastRawGazeRef = useRef(null);
@@ -35,6 +39,7 @@ export function useGazeTracker(onGazeSample) {
   const rafRef = useRef(null);
 
   isCalibratingRef.current = isCalibrating;
+  viewerIdRef.current = viewerId;
 
   useEffect(() => {
     onGazeSampleRef.current = onGazeSample;
@@ -102,7 +107,7 @@ export function useGazeTracker(onGazeSample) {
   }, [advanceCalibration, calibrationIndex, isRecordingCalibration]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || !enabled) return undefined;
 
     let cancelled = false;
 
@@ -113,6 +118,18 @@ export function useGazeTracker(onGazeSample) {
 
         webgazerRef.current = webgazer;
         webgazer.params.faceMeshSolutionPath = '/mediapipe/face_mesh';
+
+        // 웹캠 두 대로 두 사람을 추적할 때, 트래커 탭마다 다른 카메라를 잡게 한다.
+        if (cameraDeviceId) {
+          webgazer.params.camConstraints = {
+            video: {
+              deviceId: { exact: cameraDeviceId },
+              width: { min: 320, ideal: 640, max: 1280 },
+              height: { min: 240, ideal: 480, max: 720 },
+              facingMode: 'user',
+            },
+          };
+        }
 
         await webgazer.clearData();
 
@@ -164,6 +181,7 @@ export function useGazeTracker(onGazeSample) {
 
     return () => {
       cancelled = true;
+      setIsReady(false);
       document.body.classList.remove('calibrating-gaze');
       if (facePollRef.current) clearInterval(facePollRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -175,7 +193,7 @@ export function useGazeTracker(onGazeSample) {
         }
       }
     };
-  }, []);
+  }, [cameraDeviceId, enabled]);
 
   useEffect(() => {
     if (!isReady) return undefined;
@@ -225,7 +243,7 @@ export function useGazeTracker(onGazeSample) {
         
         setGazePosition({ x, y, locked: false });
         if (!isCalibratingRef.current) {
-          onGazeSampleRef.current?.('viewer-1', x, y);
+          onGazeSampleRef.current?.(viewerIdRef.current, x, y);
         }
       }
 

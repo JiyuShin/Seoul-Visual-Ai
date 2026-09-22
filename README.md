@@ -11,6 +11,23 @@ yarn dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 을 엽니다.
 
+## 두 사람이 함께 고르기 (웹캠 2대)
+
+1단계 투표는 두 사람이 같은 카드를 바라봐야 선택됩니다. WebGazer는 창마다 카메라 하나·얼굴
+하나만 다루므로 창을 두 개 띄웁니다.
+
+| 창 | 주소 | 역할 |
+| --- | --- | --- |
+| 표시 창 | `/app` → `/1` | 카드를 그리고, 자기 웹캠으로 1번 참가자를 추적 |
+| 트래커 창 | `/tracker` | 다른 웹캠을 골라 2번 참가자의 시선만 전송 |
+
+두 창이 같은 화면을 가리키도록 각각 전체화면으로 띄우세요. 트래커 창에서 참가자와 웹캠을 고르고
+9점 보정을 마치면 시선이 표시 창으로 흐릅니다.
+
+카드는 응시 인원에 따라 두 단계로 커집니다. 한 명이 보면 조금(1.07배), 두 명이 함께 보면
+최종 크기(1.18배)까지 커집니다. 점수는 응시한 시간의 합에 "함께 본 시간"을 가중해서 쌓이므로,
+혼자 오래 보는 것보다 둘이 같이 보는 쪽이 4배 빠르게 확정됩니다.
+
 ## 사용 방법
 
 1. **카메라 권한 허용** — WebGazer.js가 눈동자 추적에 웹캠을 사용합니다.
@@ -23,6 +40,7 @@ yarn dev
 ## 기술 스택
 
 - Next.js (Pages Router) + React (JavaScript)
+- 커스텀 서버(`server.mjs`) + `ws` — 시선 좌표를 실시간으로 주고받는 WebSocket (`/ws/vote`)
 - WebGazer.js — 웹캠 시선 추적
 - Web Speech API — 음성 입력 (실패 시 텍스트 입력 fallback)
 - CSS Modules
@@ -30,6 +48,12 @@ yarn dev
 ## 프로젝트 구조
 
 ```
+server.mjs               # Next.js + WebSocket 커스텀 서버
+src/server/voteRoom.js   # 투표 룸: 참가자 등록, 시선 중계, 승자 결정
+src/lib/voteState.js     # 다인 응시 누적 점수 상태머신 (서버·클라이언트 공용)
+src/lib/voteSocket.js    # 재연결 지원 WebSocket 클라이언트
+src/scenes/Tracker/      # /tracker 화면 (웹캠 선택 + 보정 + 시선 전송)
+
 src/scenes/EntryToDiscussion/
   index.jsx              # 상태머신 (vote → reveal → discussion → done)
   useGazeTracker.js      # WebGazer 초기화
