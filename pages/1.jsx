@@ -8,6 +8,8 @@ const CARD_OFFSETS = [0, 913.167, 1826.34, 2739.5];
 const SVG_WIDTH = 3541;
 const MENU_CARDS = VISION_CARDS.slice(0, CARD_OFFSETS.length);
 const HIT_PADDING_PX = 16;
+const CARD_VIDEOS = ['/s.mp4', '/s2.mp4', '/s3.mp4', '/s4.mp4'];
+const BG_SWITCH_MS = 1200;
 
 function hitTestCard(x, y, cardEls) {
   for (let i = 0; i < cardEls.length; i += 1) {
@@ -41,7 +43,10 @@ export default function MenuSelectionPage() {
   const dwellStartRef = useRef(0);
   const lastHitAtRef = useRef(0);
   const selectedRef = useRef(false);
+  const bgIndexRef = useRef(0);
+  const bgVideoRefs = useRef([]);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
+  const [bgIndex, setBgIndex] = useState(0);
 
   useEffect(() => {
     if (isReady && isCalibrating) {
@@ -76,7 +81,13 @@ export default function MenuSelectionPage() {
           setHoveredIndex(hit);
         }
 
-        const progress = Math.min(1, (now - dwellStartRef.current) / GAZE_VOTE_DWELL_MS);
+        const hoveredMs = now - dwellStartRef.current;
+        if (hoveredMs >= BG_SWITCH_MS && bgIndexRef.current !== hit) {
+          bgIndexRef.current = hit;
+          setBgIndex(hit);
+        }
+
+        const progress = Math.min(1, hoveredMs / GAZE_VOTE_DWELL_MS);
         if (progress >= 1) {
           selectedRef.current = true;
           setWinnerCard(MENU_CARDS[hit]);
@@ -103,17 +114,34 @@ export default function MenuSelectionPage() {
     return () => registerGazeHandler?.('vote', null);
   }, [handleGaze, registerGazeHandler]);
 
+  useEffect(() => {
+    bgVideoRefs.current.forEach((video) => {
+      if (video?.paused) {
+        video.play().catch(() => {});
+      }
+    });
+  }, [bgIndex]);
+
   return (
     <div className={styles.page}>
-      <video
-        className={styles.backgroundVideo}
-        src="/s.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        aria-hidden="true"
-      />
+      {CARD_VIDEOS.map((src, index) => (
+        <video
+          key={src}
+          ref={(el) => {
+            bgVideoRefs.current[index] = el;
+          }}
+          className={`${styles.backgroundVideo} ${
+            index === bgIndex ? styles.backgroundVideoVisible : ''
+          }`}
+          src={src}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-hidden="true"
+        />
+      ))}
       <div className={styles.titleGroup}>
         <img
           className={styles.pageTitle}
@@ -136,32 +164,41 @@ export default function MenuSelectionPage() {
               cardRefs.current[index] = el;
             }}
           >
-            <div className={styles.cardClip}>
-              {index === 0 ? (
+            <div className={styles.cardFace}>
+              <div className={styles.cardClip}>
+                {index === 0 ? (
+                  <img
+                    className={styles.cardImageSingle}
+                    src="/menu-card-1.svg?v=3"
+                    alt=""
+                  />
+                ) : (
+                  <img
+                    className={styles.cardImage}
+                    src="/menu-cards.svg?v=3"
+                    alt=""
+                    style={{ transform: `translateX(${(-x / SVG_WIDTH) * 100}%)` }}
+                  />
+                )}
+              </div>
+              {hoveredIndex === index && (
                 <img
-                  className={styles.cardImageSingle}
-                  src="/menu-card-1.svg"
+                  className={styles.cardHoverOutline}
+                  src="/menu-card-hover-outline.svg"
                   alt=""
-                />
-              ) : (
-                <img
-                  className={styles.cardImage}
-                  src="/menu-cards.svg"
-                  alt=""
-                  style={{ transform: `translateX(${(-x / SVG_WIDTH) * 100}%)` }}
                 />
               )}
             </div>
-            {hoveredIndex === index && (
-              <img
-                className={styles.cardHoverOutline}
-                src="/menu-card-hover-outline.svg"
-                alt=""
-              />
-            )}
           </div>
         ))}
       </div>
+      <p className={styles.pagePrompt}>
+        2026년, 쉼 없이 가속 페달을 밟고 있는{' '}
+        <span className={styles.pagePromptEm}>무채색의 도시 서울</span>.
+        <br />
+        과열된 일상에 작은 여백과 지친 마음이 잠시 머물며 숨 고를 수 있는{' '}
+        <span className={styles.pagePromptEm}>당신만의 초록빛 서울</span>은 어떤 모습인가요?
+      </p>
     </div>
   );
 }
