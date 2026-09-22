@@ -1,0 +1,87 @@
+.page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.backgroundVideo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.titleGroup {
+  position: fixed;
+  top: 65px;
+  left: 50%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 25px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+.pageTitle {
+  width: min(58vw, 980px);
+  height: auto;
+}
+
+.pageSubtitle {
+  width: min(45vw, 760px);
+  height: auto;
+}
+
+.cardRow {
+  --strip: min(82vw, 1480px, calc(78vh * 3.1176));
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--strip) * 112.63 / 3541);
+  transform: translate(-50%, calc(-50% + 50px));
+  pointer-events: none;
+  user-select: none;
+}
+
+.card {
+  --card-w: calc(var(--strip) * 800.537 / 3541 * 0.92);
+  position: relative;
+  flex-shrink: 0;
+  width: var(--card-w);
+  aspect-ratio: 800.537 / 1135.83;
+  overflow: visible;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22))
+    drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.cardClip {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: calc(var(--card-w) * 47.651 / 800.537);
+  clip-path: inset(0 round calc(var(--card-w) * 47.651 / 800.537));
+}
+
+.cardImage {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: none;
+}
+
+.cardImageSingle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

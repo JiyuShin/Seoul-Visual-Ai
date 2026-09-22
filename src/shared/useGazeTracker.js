@@ -12,6 +12,79 @@ function hasFaceLandmarks(webgazer) {
   return Boolean(tracker?.positionsArray?.length);
 }
 
+function getGazeRuntime() {
+  if (typeof window === 'undefined') return null;
+  if (!window.__seoulGazeRuntime) {
+    window.__seoulGazeRuntime = { started: false, initPromise: null };
+  }
+  return window.__seoulGazeRuntime;
+}
+
+function guardFaceMeshSend(webgazer) {
+  const tracker = webgazer?.getTracker?.();
+  if (!tracker?.getEyePatches || tracker.__abortGuarded) return;
+
+  tracker.__abortGuarded = true;
+  const original = tracker.getEyePatches.bind(tracker);
+
+  tracker.getEyePatches = async function (video, canvas, width, height) {
+    if (!video || video.readyState < 2 || video.videoWidth < 2 || video.videoHeight < 2) {
+      return null;
+    }
+
+    try {
+      return await original(video, canvas, width, height);
+    } catch {
+      return null;
+    }
+  };
+}
+
+async function ensureWebGazerStarted(cameraDeviceId) {
+  const runtime = getGazeRuntime();
+  if (runtime.initPromise) return runtime.initPromise;
+
+  runtime.initPromise = (async () => {
+    const webgazer = await loadWebGazerScript();
+    webgazer.params.faceMeshSolutionPath = '/mediapipe/face_mesh';
+
+    if (!runtime.started) {
+      if (cameraDeviceId) {
+        webgazer.params.camConstraints = {
+          video: {
+            deviceId: { exact: cameraDeviceId },
+            width: { min: 320, ideal: 640, max: 1280 },
+            height: { min: 240, ideal: 480, max: 720 },
+            facingMode: 'user',
+          },
+        };
+      }
+
+      await webgazer.clearData();
+      webgazer
+        .setRegression('ridge')
+        .setTracker('TFFacemesh')
+        .saveDataAcrossSessions(false)
+        .applyKalmanFilter(true);
+
+      guardFaceMeshSend(webgazer);
+      await webgazer.begin();
+      webgazer.removeMouseEventListeners();
+      webgazer.showVideoPreview(true);
+      webgazer.showPredictionPoints(false);
+      webgazer.showFaceOverlay(false);
+      webgazer.showFaceFeedbackBox(false);
+      webgazer.setVideoViewerSize(160, 120);
+      runtime.started = true;
+    }
+
+    guardFaceMeshSend(webgazer);
+    return webgazer;
+  })();
+
+  return runtime.initPromise;
+}
+
 export function useGazeTracker(
   onGazeSample,
   { viewerId = 'viewer-1', cameraDeviceId = null, enabled = true } = {}
@@ -113,58 +186,30 @@ export function useGazeTracker(
 
     const init = async () => {
       try {
-        const webgazer = await loadWebGazerScript();
+        const webgazer = await ensureWebGazerStarted(cameraDeviceId);
         if (cancelled) return;
 
         webgazerRef.current = webgazer;
-        webgazer.params.faceMeshSolutionPath = '/mediapipe/face_mesh';
+        webgazer.setGazeListener((data) => {
+          if (cancelled || !data) return;
 
-        // 웹캠 두 대로 두 사람을 추적할 때, 트래커 탭마다 다른 카메라를 잡게 한다.
-        if (cameraDeviceId) {
-          webgazer.params.camConstraints = {
-            video: {
-              deviceId: { exact: cameraDeviceId },
-              width: { min: 320, ideal: 640, max: 1280 },
-              height: { min: 240, ideal: 480, max: 720 },
-              facingMode: 'user',
-            },
-          };
+          if (data.eyeFeatures || data.x != null) {
+            lastFaceSeenRef.current = Date.now();
+            setFaceDetected(true);
+          }
+
+          if (data.x == null || data.y == null || Number.isNaN(data.x) || Number.isNaN(data.y)) {
+            return;
+          }
+
+          lastRawGazeRef.current = { x: data.x, y: data.y, receivedAt: Date.now() };
+          setTrackingActive(true);
+          gazePipelineRef.current.pushRaw(data.x, data.y);
+        });
+
+        if (isCalibratingRef.current) {
+          document.body.classList.add('calibrating-gaze');
         }
-
-        await webgazer.clearData();
-
-        webgazer
-          .setRegression('ridge')
-          .setTracker('TFFacemesh')
-          .saveDataAcrossSessions(false)
-          .applyKalmanFilter(true)
-          .setGazeListener((data) => {
-            if (cancelled || !data) return;
-
-            if (data.eyeFeatures || data.x != null) {
-              lastFaceSeenRef.current = Date.now();
-              setFaceDetected(true);
-            }
-
-            if (data.x == null || data.y == null || Number.isNaN(data.x) || Number.isNaN(data.y)) {
-              return;
-            }
-
-            lastRawGazeRef.current = { x: data.x, y: data.y, receivedAt: Date.now() };
-            setTrackingActive(true);
-            gazePipelineRef.current.pushRaw(data.x, data.y);
-          });
-
-        await webgazer.begin();
-        webgazer.removeMouseEventListeners();
-
-        webgazer.showVideoPreview(true);
-        webgazer.showPredictionPoints(false);
-        webgazer.showFaceOverlay(false);
-        webgazer.showFaceFeedbackBox(false);
-        webgazer.setVideoViewerSize(160, 120);
-
-        document.body.classList.add('calibrating-gaze');
         setCalibrationHint(
           '초록 점을 눈동자로 맞춘 뒤 스페이스바 또는 버튼을 누르세요. 첫 보정 후 커서가 나타납니다.'
         );
@@ -185,13 +230,7 @@ export function useGazeTracker(
       document.body.classList.remove('calibrating-gaze');
       if (facePollRef.current) clearInterval(facePollRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (webgazerRef.current) {
-        try {
-          webgazerRef.current.end();
-        } catch {
-          /* ignore cleanup errors */
-        }
-      }
+      // webgazer.end() 호출 금지: FaceMesh WASM이 죽은 비디오 프레임을 보내 abort 함
     };
   }, [cameraDeviceId, enabled]);
 
@@ -209,25 +248,25 @@ export function useGazeTracker(
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
         const amplify = 1.2; // 1.2배 증폭 (더 줄임)
-        
+
         // 증폭된 좌표 계산
         let targetX = centerX + (lastRaw.x - centerX) * amplify;
         let targetY = centerY + (lastRaw.y - centerY) * amplify;
-        
+
         // 화면 범위 내로 제한
         const margin = 50;
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
         targetX = Math.max(margin, Math.min(screenW - margin, targetX));
         targetY = Math.max(margin, Math.min(screenH - margin, targetY));
-        
+
         // 히스토리에 추가하고 평균 계산 (노이즈 제거)
         history.push({ x: targetX, y: targetY });
         if (history.length > HISTORY_SIZE) history.shift();
-        
+
         const avgX = history.reduce((sum, p) => sum + p.x, 0) / history.length;
         const avgY = history.reduce((sum, p) => sum + p.y, 0) / history.length;
-        
+
         // 스무딩 적용 (2%만 새 위치로 이동 - 매우 천천히)
         if (smoothX === null || smoothY === null) {
           smoothX = avgX;
@@ -236,11 +275,11 @@ export function useGazeTracker(
           smoothX = smoothX + (avgX - smoothX) * 0.02;
           smoothY = smoothY + (avgY - smoothY) * 0.02;
         }
-        
+
         // 최종 클램핑
         const x = Math.max(0, Math.min(screenW, Math.round(smoothX)));
         const y = Math.max(0, Math.min(screenH, Math.round(smoothY)));
-        
+
         setGazePosition({ x, y, locked: false });
         if (!isCalibratingRef.current) {
           onGazeSampleRef.current?.(viewerIdRef.current, x, y);

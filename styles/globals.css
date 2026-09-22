@@ -44,6 +44,24 @@ body.calibrating-gaze #webgazerVideoContainer {
   opacity: 0.85 !important;
 }
 
+/* display:none 하면 MediaPipe FaceMesh WASM이 빈 프레임을 보내 abort 함 */
 body:not(.calibrating-gaze) #webgazerVideoContainer {
-  display: none !important;
+  display: block !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 160px !important;
+  height: 120px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+body:not(.calibrating-gaze) #webgazerVideoFeed {
+  display: block !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

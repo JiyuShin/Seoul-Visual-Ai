@@ -1,21 +1,17 @@
 import { useEffect, useState } from 'react';
 import { AGENT_DIALOGUE, REVEAL_AGENT_DIALOGUE_MS } from '../../shared/gazeConfig';
 import VisionCard from '../VoteStep/VisionCard';
-import ContrastImage from './ContrastImage';
 import styles from './RevealStep.module.css';
 
 export default function RevealStep({ winnerCard, onComplete }) {
-  const [showImage, setShowImage] = useState(false);
   const [showDialogue, setShowDialogue] = useState(false);
   const [dialogueDone, setDialogueDone] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setShowImage(true), 600);
     const t2 = setTimeout(() => setShowDialogue(true), 1400);
     const t3 = setTimeout(() => setDialogueDone(true), 1400 + REVEAL_AGENT_DIALOGUE_MS);
 
     return () => {
-      clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
@@ -33,8 +29,6 @@ export default function RevealStep({ winnerCard, onComplete }) {
         <VisionCard card={winnerCard} intensity={1} isWinner compact />
         <p className={styles.winnerLabel}>{winnerCard.label}</p>
       </div>
-
-      <ContrastImage visible={showImage} />
 
       <div className={`${styles.dialogue} ${showDialogue ? styles.visible : ''}`}>
         <span className={styles.agentTag}>AI Agent</span>
