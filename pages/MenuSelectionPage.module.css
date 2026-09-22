@@ -45,7 +45,34 @@
 
 .pageSubtitle {
   width: min(45vw, 760px);
-  height: auto;
+  aspect-ratio: 1774 / 52;
+  background-image: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #bdff95 25%,
+    #ffffff 50%,
+    #bdff95 75%,
+    #ffffff 100%
+  );
+  background-size: 200% 100%;
+  animation: subtitleFlow 5.5s linear infinite;
+  -webkit-mask-image: url('/menu-subtitle.svg?v=2');
+  mask-image: url('/menu-subtitle.svg?v=2');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+@keyframes subtitleFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: -200% 50%;
+  }
 }
 
 .cardRow {
@@ -120,26 +147,14 @@
   height: 100%;
   overflow: hidden;
   border-radius: calc(var(--card-w) * 47.651 / 800.537);
-}
-
-.cardImage {
-  display: block;
-  height: 100%;
-  width: auto;
-  max-width: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: 0 0;
   opacity: 0;
 }
 
-.cardImageSingle {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-  opacity: 0;
-}
-
-.cardImagesReady .cardImage,
-.cardImagesReady .cardImageSingle {
+.cardImagesReady .cardClip {
   opacity: 1;
 }
 

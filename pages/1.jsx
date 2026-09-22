@@ -9,8 +9,16 @@ const SVG_WIDTH = 3541;
 const MENU_CARDS = VISION_CARDS.slice(0, CARD_OFFSETS.length);
 const HIT_PADDING_PX = 16;
 const CARD_VIDEOS = ['/s.mp4', '/s2.mp4', '/s3.mp4', '/s4.mp4'];
-const CARD_IMAGE_SRCS = ['/menu-card-1.svg?v=4', '/menu-cards.svg?v=4'];
+const CARD_IMAGE_SRCS = ['/menu-card-1.svg?v=6', '/menu-cards.svg?v=6'];
+const CARD_SVG_W = 800.537;
 const BG_SWITCH_MS = 1200;
+const SELECT_ADVANCE_MS = 3000;
+const CARD_COPY = [
+  '탁한 일상을 비우고 맑은 초록으로 채우는 서울',
+  '초록 사이로 선명한 햇살이 스며드는 서울',
+  '지친 걸음을 품어주는 넉넉한 초록 그늘의 서울',
+  '자연의 형태가 도심 곳곳에 녹아드는 서울',
+];
 
 function hitTestCard(x, y, cardEls) {
   for (let i = 0; i < cardEls.length; i += 1) {
@@ -47,6 +55,7 @@ export default function MenuSelectionPage() {
   const bgIndexRef = useRef(0);
   const bgVideoRefs = useRef([]);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [bgIndex, setBgIndex] = useState(0);
   const [cardsReady, setCardsReady] = useState(false);
 
@@ -92,8 +101,10 @@ export default function MenuSelectionPage() {
         const progress = Math.min(1, hoveredMs / GAZE_VOTE_DWELL_MS);
         if (progress >= 1) {
           selectedRef.current = true;
+          hoverRef.current = hit;
+          setHoveredIndex(hit);
+          setSelectedIndex(hit);
           setWinnerCard(MENU_CARDS[hit]);
-          router.push('/2');
           return { dwellProgress: 1, hitCardId: MENU_CARDS[hit].id };
         }
 
@@ -108,8 +119,16 @@ export default function MenuSelectionPage() {
 
       return { dwellProgress: 0, hitCardId: null };
     },
-    [router, setWinnerCard]
+    [setWinnerCard]
   );
+
+  useEffect(() => {
+    if (selectedIndex < 0) return undefined;
+    const timer = window.setTimeout(() => {
+      router.push('/2');
+    }, SELECT_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [router, selectedIndex]);
 
   useEffect(() => {
     registerGazeHandler?.('vote', handleGaze);
@@ -170,11 +189,7 @@ export default function MenuSelectionPage() {
           src="/menu-title.svg?v=3"
           alt=""
         />
-        <img
-          className={styles.pageSubtitle}
-          src="/menu-subtitle.svg"
-          alt=""
-        />
+        <div className={styles.pageSubtitle} aria-hidden="true" />
       </div>
       <div
         className={`${styles.cardRow} ${cardsReady ? styles.cardImagesReady : ''}`}
@@ -190,22 +205,18 @@ export default function MenuSelectionPage() {
             }}
           >
             <div className={styles.cardFace}>
-              <div className={styles.cardClip}>
-                {index === 0 ? (
-                  <img
-                    className={styles.cardImageSingle}
-                    src="/menu-card-1.svg?v=4"
-                    alt=""
-                  />
-                ) : (
-                  <img
-                    className={styles.cardImage}
-                    src="/menu-cards.svg?v=4"
-                    alt=""
-                    style={{ transform: `translateX(${(-x / SVG_WIDTH) * 100}%)` }}
-                  />
-                )}
-              </div>
+              <div
+                className={styles.cardClip}
+                style={
+                  index === 0
+                    ? { backgroundImage: 'url(/menu-card-1.svg?v=6)' }
+                    : {
+                        backgroundImage: 'url(/menu-cards.svg?v=6)',
+                        backgroundSize: `${(SVG_WIDTH / CARD_SVG_W) * 100}% 100%`,
+                        backgroundPosition: `calc(var(--card-w) * ${-x} / ${CARD_SVG_W}) 0`,
+                      }
+                }
+              />
               {hoveredIndex === index && (
                 <img
                   className={styles.cardHoverOutline}
@@ -218,11 +229,21 @@ export default function MenuSelectionPage() {
         ))}
       </div>
       <p className={styles.pagePrompt}>
-        2026년, 쉼 없이 가속 페달을 밟고 있는{' '}
-        <span className={styles.pagePromptEm}>무채색의 도시 서울</span>.
-        <br />
-        과열된 일상에 작은 여백과 지친 마음이 잠시 머물며 숨 고를 수 있는{' '}
-        <span className={styles.pagePromptEm}>당신만의 초록빛 서울</span>은 어떤 모습인가요?
+        {selectedIndex >= 0 ? (
+          <>
+            <span className={styles.pagePromptEm}>{CARD_COPY[selectedIndex]}</span>, 선택하셨네요.
+            <br />
+            이제 그 풍경 속을 함께 걸어보며 이야기 나눠볼게요!
+          </>
+        ) : (
+          <>
+            2026년, 쉼 없이 가속 페달을 밟고 있는{' '}
+            <span className={styles.pagePromptEm}>무채색의 도시 서울</span>.
+            <br />
+            과열된 일상에 작은 여백과 지친 마음이 잠시 머물며 숨 고를 수 있는{' '}
+            <span className={styles.pagePromptEm}>당신만의 초록빛 서울</span>은 어떤 모습인가요?
+          </>
+        )}
       </p>
     </div>
   );
