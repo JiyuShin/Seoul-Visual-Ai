@@ -9,6 +9,7 @@ const SVG_WIDTH = 3541;
 const MENU_CARDS = VISION_CARDS.slice(0, CARD_OFFSETS.length);
 const HIT_PADDING_PX = 16;
 const CARD_VIDEOS = ['/s.mp4', '/s2.mp4', '/s3.mp4', '/s4.mp4'];
+const CARD_IMAGE_SRCS = ['/menu-card-1.svg?v=4', '/menu-cards.svg?v=4'];
 const BG_SWITCH_MS = 1200;
 
 function hitTestCard(x, y, cardEls) {
@@ -47,6 +48,7 @@ export default function MenuSelectionPage() {
   const bgVideoRefs = useRef([]);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   const [bgIndex, setBgIndex] = useState(0);
+  const [cardsReady, setCardsReady] = useState(false);
 
   useEffect(() => {
     if (isReady && isCalibrating) {
@@ -122,6 +124,26 @@ export default function MenuSelectionPage() {
     });
   }, [bgIndex]);
 
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      CARD_IMAGE_SRCS.map(
+        (src) =>
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = resolve;
+            img.onerror = resolve;
+            img.src = src;
+          })
+      )
+    ).then(() => {
+      if (!cancelled) setCardsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className={styles.page}>
       {CARD_VIDEOS.map((src, index) => (
@@ -145,7 +167,7 @@ export default function MenuSelectionPage() {
       <div className={styles.titleGroup}>
         <img
           className={styles.pageTitle}
-          src="/menu-title.svg?v=2"
+          src="/menu-title.svg?v=3"
           alt=""
         />
         <img
@@ -154,7 +176,10 @@ export default function MenuSelectionPage() {
           alt=""
         />
       </div>
-      <div className={styles.cardRow} aria-label="메뉴 카드">
+      <div
+        className={`${styles.cardRow} ${cardsReady ? styles.cardImagesReady : ''}`}
+        aria-label="메뉴 카드"
+      >
         {CARD_OFFSETS.map((x, index) => (
           <div
             className={`${styles.card} ${hoveredIndex === index ? styles.cardHovered : ''}`}
@@ -169,13 +194,13 @@ export default function MenuSelectionPage() {
                 {index === 0 ? (
                   <img
                     className={styles.cardImageSingle}
-                    src="/menu-card-1.svg?v=3"
+                    src="/menu-card-1.svg?v=4"
                     alt=""
                   />
                 ) : (
                   <img
                     className={styles.cardImage}
-                    src="/menu-cards.svg?v=3"
+                    src="/menu-cards.svg?v=4"
                     alt=""
                     style={{ transform: `translateX(${(-x / SVG_WIDTH) * 100}%)` }}
                   />
@@ -184,7 +209,7 @@ export default function MenuSelectionPage() {
               {hoveredIndex === index && (
                 <img
                   className={styles.cardHoverOutline}
-                  src="/menu-card-hover-outline.svg"
+                  src="/menu-card-hover-outline.svg?v=2"
                   alt=""
                 />
               )}
