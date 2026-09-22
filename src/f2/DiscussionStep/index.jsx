@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchFollowUpQuestion } from '../../../lib/fetchFollowUpQuestion';
+import { fetchFollowUpQuestion } from '../fetchFollowUpQuestion';
 import {
   DISCUSSION_FOLLOWUP_HINT,
   DISCUSSION_FOLLOWUP_LOADING,
@@ -8,7 +8,7 @@ import {
   DISCUSSION_PHASE_MAX_MS,
   DISCUSSION_PROMPT,
   DISCUSSION_VOICE_PROMPT,
-} from '../gazeConfig';
+} from '../../shared/gazeConfig';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
 import StreetCanvas from './StreetCanvas';

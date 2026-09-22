@@ -4,7 +4,7 @@ import {
   VOTE_REQUIRED_VIEWERS,
   VOTE_STAGE_SCALES,
   VOTE_WIN_SCORE_MS,
-} from '../scenes/EntryToDiscussion/gazeConfig.js';
+} from '../shared/gazeConfig.js';
 
 /**
  * 여러 사람이 같은 카드를 응시한 시간을 누적해 승자를 뽑는 상태머신.

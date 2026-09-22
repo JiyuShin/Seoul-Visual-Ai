@@ -1,34 +1,4 @@
-.root {
-  position: relative;
-  min-height: 100vh;
-  overflow-x: hidden;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: #2e2e2e;
-}
-
-.loading,
-.error,
-.doneStep {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 32px;
-  text-align: center;
-}
-
-.loadingSub {
-  font-size: 13px;
-  color: #6b6b6b;
-  margin-top: 8px;
-}
-
-.error {
-  color: #8b4a4a;
-}
+/* /app 시선 보정 화면 전용 스타일. */
 
 .calibration {
   position: fixed;
@@ -164,6 +134,7 @@
   height: 32px;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  animation: calPulse 1.5s ease-in-out infinite;
 }
 
 .calibrationDot::after {
@@ -195,10 +166,6 @@
   transition: stroke-dasharray 80ms linear;
 }
 
-.calibrationDot {
-  animation: calPulse 1.5s ease-in-out infinite;
-}
-
 @keyframes calPulse {
   0%,
   100% {
@@ -209,40 +176,4 @@
     transform: translate(-50%, -50%) scale(1.15);
     opacity: 1;
   }
-}
-
-.footer {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(107, 107, 107, 0.7);
-  z-index: 2;
-  pointer-events: none;
-}
-
-.doneTitle {
-  margin: 0 0 12px;
-  font-size: 22px;
-  font-weight: 450;
-}
-
-.doneDesc {
-  margin: 0 0 24px;
-  font-size: 14px;
-  color: #6b6b6b;
-}
-
-.donePreview {
-  max-width: 90vw;
-  max-height: 40vh;
-  overflow: auto;
-  text-align: left;
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.6);
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
 }

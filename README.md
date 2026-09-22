@@ -47,19 +47,35 @@ yarn dev
 
 ## 프로젝트 구조
 
-```
-server.mjs               # Next.js + WebSocket 커스텀 서버
-src/server/voteRoom.js   # 투표 룸: 참가자 등록, 시선 중계, 승자 결정
-src/lib/voteState.js     # 다인 응시 누적 점수 상태머신 (서버·클라이언트 공용)
-src/lib/voteSocket.js    # 재연결 지원 WebSocket 클라이언트
-src/scenes/Tracker/      # /tracker 화면 (웹캠 선택 + 보정 + 시선 전송)
+소스는 페이지 단위로 폴더를 나눕니다. 페이지 주소와 폴더 이름이 1:1로 대응하므로,
+`/1`을 고칠 때는 `src/f1/`만 보면 됩니다. 여러 페이지가 함께 쓰는 것만 `src/shared/`에 둡니다.
 
-src/scenes/EntryToDiscussion/
-  index.jsx              # 상태머신 (vote → reveal → discussion → done)
-  useGazeTracker.js      # WebGazer 초기화
-  useSpeechInput.js      # 음성 + 텍스트 fallback
-  gazeConfig.js          # 상수
-  VoteStep/              # 비전 카드 선택
-  RevealStep/            # 대비 이미지
-  DiscussionStep/        # 의견 핀 + 하트
+```
+server.mjs                 # Next.js + WebSocket 커스텀 서버
+
+src/shared/                # 모든 페이지 공용
+  EntryFlowContext.jsx     # 페이지 사이를 잇는 상태 (선택된 카드, 핀, 시선)
+  EntryPageShell.jsx       # 배경·로딩·오류·바닥글 공용 셸
+  useGazeTracker.js        # WebGazer 초기화 (참가자·카메라 선택 가능)
+  gazeSmoother.js          # 시선 좌표 보정 파이프라인
+  gazeConfig.js            # 상수 (카드 목록, 응시 시간, 투표 설정)
+  loadWebGazer.js
+  DreamyBackground.jsx
+  GazeReticle.jsx
+
+src/calibration/           # /app  시선 보정
+src/f1/                    # /1    비전 카드 투표 + 대비 이미지
+  VoteStep/                #       두 사람 응시로 카드 선택
+  RevealStep/              #       선택된 비전 + 현재 거리 대비
+  useVoteSync.js           #       투표 룸 연결 훅
+  voteSocket.js            #       재연결 지원 WebSocket 클라이언트
+  voteState.js             #       다인 응시 누적 점수 (서버와 공용)
+src/f2/                    # /2    거리뷰 토론
+  DiscussionStep/          #       의견 핀 + 공감
+  useSpeechInput.js        #       음성 + 텍스트 fallback
+  useSpeechOutput.js
+  buildFollowUpQuestion.js #       AI 후속 질문 (로컬 대체 로직)
+  fetchFollowUpQuestion.js
+src/tracker/               # /tracker  2번 참가자용 웹캠 트래커
+src/server/                # WebSocket 룸 (점수 누적, 승자 결정)
 ```

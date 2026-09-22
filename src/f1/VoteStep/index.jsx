@@ -7,7 +7,7 @@ import {
   VOTE_REQUIRED_VIEWERS,
   VOTE_VIEWER_IDS,
   VOTE_QUESTION,
-} from '../gazeConfig';
+} from '../../shared/gazeConfig';
 import { useVoteSync } from '../useVoteSync';
 import VisionCard from './VisionCard';
 import styles from './VoteStep.module.css';

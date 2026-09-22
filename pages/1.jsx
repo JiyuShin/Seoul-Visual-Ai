@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import EntryPageShell from '../src/scenes/EntryToDiscussion/EntryPageShell';
-import { useEntryFlow } from '../src/scenes/EntryToDiscussion/EntryFlowContext';
-import RevealStep from '../src/scenes/EntryToDiscussion/RevealStep';
-import VoteStep from '../src/scenes/EntryToDiscussion/VoteStep';
+import EntryPageShell from '../src/shared/EntryPageShell';
+import { useEntryFlow } from '../src/shared/EntryFlowContext';
+import RevealStep from '../src/f1/RevealStep';
+import VoteStep from '../src/f1/VoteStep';
 
 export default function MenuSelectionPage() {
   const router = useRouter();

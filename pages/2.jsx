@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DiscussionStep from '../src/scenes/EntryToDiscussion/DiscussionStep';
-import EntryPageShell from '../src/scenes/EntryToDiscussion/EntryPageShell';
-import { useEntryFlow } from '../src/scenes/EntryToDiscussion/EntryFlowContext';
-import styles from '../src/scenes/EntryToDiscussion/EntryToDiscussion.module.css';
+import DiscussionStep from '../src/f2/DiscussionStep';
+import EntryPageShell from '../src/shared/EntryPageShell';
+import { useEntryFlow } from '../src/shared/EntryFlowContext';
+import styles from '../src/f2/DonePanel.module.css';
 
 export default function StreetDiscussionPage() {
   const router = useRouter();

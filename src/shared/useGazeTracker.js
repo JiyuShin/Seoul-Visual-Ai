@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadWebGazerScript } from '../../lib/loadWebGazer';
+import { loadWebGazerScript } from './loadWebGazer';
 import {
   CALIBRATION_POINTS,
   createGazePipeline,

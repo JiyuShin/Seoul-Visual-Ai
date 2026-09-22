@@ -1,4 +1,4 @@
-import TrackerScreen from '../src/scenes/Tracker/TrackerScreen';
+import TrackerScreen from '../src/tracker/TrackerScreen';
 
 export default function TrackerPage() {
   return <TrackerScreen />;

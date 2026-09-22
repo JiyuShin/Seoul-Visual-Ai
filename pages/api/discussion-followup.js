@@ -1,4 +1,4 @@
-import { buildFollowUpQuestion } from '../../src/lib/buildFollowUpQuestion';
+import { buildFollowUpQuestion } from '../../src/f2/buildFollowUpQuestion';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

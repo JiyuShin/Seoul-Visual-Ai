@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import EntryPageShell from '../src/scenes/EntryToDiscussion/EntryPageShell';
-import { useEntryFlow } from '../src/scenes/EntryToDiscussion/EntryFlowContext';
-import styles from '../src/scenes/EntryToDiscussion/EntryToDiscussion.module.css';
+import EntryPageShell from '../src/shared/EntryPageShell';
+import { useEntryFlow } from '../src/shared/EntryFlowContext';
+import styles from '../src/calibration/Calibration.module.css';
 
 export default function CalibrationPage() {
   const router = useRouter();

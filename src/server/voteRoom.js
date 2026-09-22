@@ -1,5 +1,5 @@
 import { WebSocketServer } from 'ws';
-import { createVoteState } from '../lib/voteState.js';
+import { createVoteState } from '../f1/voteState.js';
 import {
   VISION_CARDS,
   VOTE_REQUIRED_VIEWERS,
@@ -7,7 +7,7 @@ import {
   VOTE_SYNC_INTERVAL_MS,
   VOTE_VIEWER_IDS,
   VOTE_VIEWER_TIMEOUT_MS,
-} from '../scenes/EntryToDiscussion/gazeConfig.js';
+} from '../shared/gazeConfig.js';
 
 const CARD_IDS = VISION_CARDS.map((card) => card.id);
 

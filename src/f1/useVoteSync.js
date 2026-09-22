@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createVoteSocket } from '../../lib/voteSocket';
+import { createVoteSocket } from './voteSocket';
 
 /**
  * 투표 룸과의 연결을 React 쪽에서 쓰기 편하게 감싼다.

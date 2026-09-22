@@ -6,7 +6,7 @@ import {
   GAZE_TAG_DWELL_GRACE_MS,
   GAZE_TAG_DWELL_TOLERANCE,
   PIN_HIT_RADIUS_PX,
-} from '../gazeConfig';
+} from '../../shared/gazeConfig';
 import LocationTag from './LocationTag';
 import OpinionPin from './OpinionPin';
 import styles from './StreetCanvas.module.css';

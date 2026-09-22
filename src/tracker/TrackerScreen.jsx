@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Head from 'next/head';
-import { VOTE_VIEWER_IDS } from '../EntryToDiscussion/gazeConfig';
-import { useGazeTracker } from '../EntryToDiscussion/useGazeTracker';
-import { useVoteSync } from '../EntryToDiscussion/useVoteSync';
+import { VOTE_VIEWER_IDS } from '../shared/gazeConfig';
+import { useGazeTracker } from '../shared/useGazeTracker';
+import { useVoteSync } from '../f1/useVoteSync';
 import styles from './TrackerScreen.module.css';
 
 /**

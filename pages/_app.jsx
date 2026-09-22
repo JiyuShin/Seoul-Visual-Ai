@@ -1,5 +1,5 @@
 import '../styles/globals.css';
-import { EntryFlowProvider } from '../src/scenes/EntryToDiscussion/EntryFlowContext';
+import { EntryFlowProvider } from '../src/shared/EntryFlowContext';
 
 export default function App({ Component, pageProps }) {
   // 트래커 페이지는 자기 카메라를 직접 고르기 위해 WebGazer를 스스로 띄운다.

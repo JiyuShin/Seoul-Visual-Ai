@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AGENT_DIALOGUE, REVEAL_AGENT_DIALOGUE_MS } from '../gazeConfig';
+import { AGENT_DIALOGUE, REVEAL_AGENT_DIALOGUE_MS } from '../../shared/gazeConfig';
 import VisionCard from '../VoteStep/VisionCard';
 import ContrastImage from './ContrastImage';
 import styles from './RevealStep.module.css';

@@ -1,4 +1,4 @@
-import { VOTE_SOCKET_PATH } from '../scenes/EntryToDiscussion/gazeConfig.js';
+import { VOTE_SOCKET_PATH } from '../shared/gazeConfig.js';
 
 const RECONNECT_DELAY_MS = 1000;
 

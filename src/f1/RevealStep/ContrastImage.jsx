@@ -1,4 +1,4 @@
-import { ENV_OVERLAY_TEXT, STREET_IMAGE } from '../gazeConfig';
+import { ENV_OVERLAY_TEXT, STREET_IMAGE } from '../../shared/gazeConfig';
 import styles from './ContrastImage.module.css';
 
 export default function ContrastImage({ visible }) {
