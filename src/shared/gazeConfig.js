@@ -15,9 +15,6 @@ export const VOTE_STAGE_SCALES = [1, 1.07, 1.18];
 // 시선이 잠깐 흔들려도 응시가 끊기지 않도록 허용하는 시간.
 export const VOTE_HIT_GRACE_MS = 700;
 
-// 트래커가 이 시간 동안 아무 샘플도 보내지 않으면 접속이 끊긴 것으로 본다.
-export const VOTE_VIEWER_TIMEOUT_MS = 2500;
-
 // 누적 점수가 이 값에 도달한 카드가 선택된다.
 export const VOTE_WIN_SCORE_MS = 8000;
 
@@ -25,12 +22,8 @@ export const VOTE_WIN_SCORE_MS = 8000;
 // 혼자 볼 때는 1배, 둘이 함께 볼 때는 (2 + 가중치)배로 점수가 쌓인다.
 export const VOTE_JOINT_SCORE_WEIGHT = 2;
 
+// 카드 상태를 화면에 다시 올리는 주기. 점수는 매 프레임 쌓지만 렌더는 이 간격으로 줄인다.
 export const VOTE_SYNC_INTERVAL_MS = 33;
-export const VOTE_HITS_SEND_INTERVAL_MS = 33;
-export const VOTE_SOCKET_PATH = '/ws/vote';
-
-// 로컬 시선 샘플이 이 시간보다 오래되면 응시가 끊긴 것으로 본다.
-export const VOTE_LOCAL_GAZE_STALE_MS = 400;
 
 export const GAZE_PIN_DURATION_MS = 4000;
 export const GAZE_TAG_DWELL_TOLERANCE = 0.2;

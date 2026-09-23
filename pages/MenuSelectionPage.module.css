@@ -56,8 +56,8 @@
   );
   background-size: 200% 100%;
   animation: subtitleFlow 5.5s linear infinite;
-  -webkit-mask-image: url('/menu-subtitle.svg?v=2');
-  mask-image: url('/menu-subtitle.svg?v=2');
+  -webkit-mask-image: url('/1/menu-subtitle.svg?v=2');
+  mask-image: url('/1/menu-subtitle.svg?v=2');
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;

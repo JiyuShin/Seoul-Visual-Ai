@@ -9,7 +9,7 @@ export default function EntryPageShell({ title, showReticle = true, children }) 
   return (
     <>
       <Head>
-        <title>{title} · Visual AI Glass</title>
+        <title>{`${title} · Visual AI Glass`}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="description" content="시선 기반 서울 거리 토론 프로토타입" />
       </Head>

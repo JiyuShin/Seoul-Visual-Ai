@@ -1,0 +1,158 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(247, 246, 242, 0.97);
+}
+
+/* ── 단계 대기 화면 ───────────────────────────────────────── */
+
+.intro {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 48px));
+  padding: 32px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(76, 175, 109, 0.22);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(31, 42, 34, 0.12);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  font-size: 13px;
+  color: #5b6b5f;
+  border-bottom: 1px solid rgba(76, 175, 109, 0.16);
+}
+
+.step {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #8a9a8e;
+}
+
+.introTitle {
+  margin: 0 0 14px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.desc {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4a5a4e;
+}
+
+.descDim {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #9aa79d;
+}
+
+.startBtn {
+  padding: 13px 30px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: #4caf6d;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.startBtn:hover {
+  background: #3d9a5a;
+  transform: translateY(-1px);
+}
+
+/* ── 진행 중 HUD ──────────────────────────────────────────── */
+
+.hud {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 12px;
+  color: #5b6b5f;
+  white-space: nowrap;
+}
+
+.badge {
+  padding: 5px 12px;
+  font-weight: 600;
+  border: 1.5px solid #4caf6d;
+  border-radius: 999px;
+}
+
+.hudHint {
+  color: #9aa79d;
+}
+
+/* ── 보정 타깃 ────────────────────────────────────────────── */
+
+.target {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  /* 점이 다음 위치로 부드럽게 이동하는 시간이 세션의 moveMs(800ms)와 맞아야 한다. */
+  transition: left 780ms cubic-bezier(0.4, 0, 0.2, 1), top 780ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.halo {
+  position: absolute;
+  inset: 0;
+  border: 2px solid color-mix(in srgb, var(--target-color, #4caf6d) 45%, transparent);
+  border-radius: 50%;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--target-color, #4caf6d) 30%, transparent);
+  transform: scale(0);
+}
+
+/* 수집 단계에 들어갈 때만 채워지는 애니메이션을 돌린다. */
+.target[data-phase='collect'] .fill {
+  animation: fillUp linear forwards;
+}
+
+.core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--target-color, #4caf6d);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--target-color, #4caf6d) 60%, transparent);
+}
+
+@keyframes fillUp {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}

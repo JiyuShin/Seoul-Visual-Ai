@@ -1,25 +1,22 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CARD_HIT_PADDING_PX,
   VISION_CARDS,
-  VOTE_HITS_SEND_INTERVAL_MS,
-  VOTE_LOCAL_GAZE_STALE_MS,
   VOTE_REQUIRED_VIEWERS,
-  VOTE_VIEWER_IDS,
+  VOTE_SYNC_INTERVAL_MS,
   VOTE_QUESTION,
 } from '../../shared/gazeConfig';
-import { useVoteSync } from '../useVoteSync';
+import { useEntryFlow } from '../../shared/EntryFlowContext';
+import { CAM_KEYS, PERSON_LABEL, VIEWER_BY_CAM } from '../../shared/gaze/participants';
+import { createVoteState } from '../voteState';
 import VisionCard from './VisionCard';
 import styles from './VoteStep.module.css';
 
-function getCardRects() {
-  return VISION_CARDS.map((card) => {
-    const el = document.querySelector(`[data-card-id="${card.id}"]`);
-    if (!el) return null;
-
+function getCardRects(elements) {
+  return elements.map(({ id, el }) => {
     const rect = el.getBoundingClientRect();
     return {
-      id: card.id,
+      id,
       rect: {
         left: rect.left - CARD_HIT_PADDING_PX,
         top: rect.top - CARD_HIT_PADDING_PX,
@@ -27,7 +24,7 @@ function getCardRects() {
         bottom: rect.bottom + CARD_HIT_PADDING_PX,
       },
     };
-  }).filter(Boolean);
+  });
 }
 
 function hitTestCard(x, y, cardRects) {
@@ -43,88 +40,65 @@ function hitTestCard(x, y, cardRects) {
 /**
  * 두 사람이 함께 카드를 고르는 단계.
  *
- * 이 창은 화면을 그리면서 1번 참가자의 웹캠도 직접 쓴다. 2번 참가자는 /tracker 창이
- * 다른 웹캠으로 측정해서 서버로 보낸다. 카드 배치를 아는 건 이 창뿐이므로
- * 교차 판정은 여기서 하고, 점수 누적과 승자 결정은 서버가 맡는다.
+ * 시선 엔진이 웹캠 두 대를 한 번에 다루므로 두 사람의 좌표가 이 창에 모두 들어온다.
+ * 교차 판정과 점수 누적을 여기서 함께 처리하고, 화면 갱신은 카드 상태가 바뀔 정도의
+ * 주기로만 올린다.
  */
-export default function VoteStep({ onComplete, registerGazeHandler }) {
-  const { sync, syncRef, send, status } = useVoteSync({
-    role: 'display',
-    viewerId: VOTE_VIEWER_IDS[0],
-  });
-
-  const localViewerId = VOTE_VIEWER_IDS[0];
-  const localGazeRef = useRef(null);
-  const hitsRef = useRef({});
-  const lastSentAtRef = useRef(0);
+export default function VoteStep({ onComplete }) {
+  const { gazeRef } = useEntryFlow();
+  const [snapshot, setSnapshot] = useState(null);
   const completedRef = useRef(false);
 
-  // 이 창의 웹캠에서 나온 시선은 서버를 거치지 않고 바로 판정한다.
-  const handleGaze = useCallback(
-    (_viewerId, x, y) => {
-      localGazeRef.current = { x, y, at: Date.now() };
-
-      const hitCardId = hitsRef.current[localViewerId] || null;
-      const progress = hitCardId ? syncRef.current?.cards?.[hitCardId]?.progress || 0 : 0;
-
-      return { dwellProgress: progress, hitCardId };
-    },
-    [localViewerId, syncRef]
-  );
-
   useEffect(() => {
-    registerGazeHandler?.('vote', handleGaze);
-    return () => registerGazeHandler?.('vote', null);
-  }, [handleGaze, registerGazeHandler]);
+    const vote = createVoteState({ cardIds: VISION_CARDS.map((card) => card.id) });
 
-  useEffect(() => {
+    // querySelector 를 매 프레임 돌리면 시선 추론과 메인 스레드를 다툰다. 엘리먼트는 한 번만
+    // 찾아두고, 위치만 프레임마다 읽는다 (카드가 커지면 실제 위치가 바뀌므로).
+    const elements = VISION_CARDS.map((card) => ({
+      id: card.id,
+      el: document.querySelector(`[data-card-id="${card.id}"]`),
+    })).filter((item) => item.el);
+
     let rafId;
+    let lastPublishedAt = 0;
 
     const loop = () => {
+      rafId = requestAnimationFrame(loop);
+
       const now = Date.now();
-      const cardRects = getCardRects();
-      const hits = {};
+      const cardRects = getCardRects(elements);
+      const tracked = [];
 
-      const local = localGazeRef.current;
-      if (local && now - local.at <= VOTE_LOCAL_GAZE_STALE_MS) {
-        hits[localViewerId] = hitTestCard(local.x, local.y, cardRects);
-      }
-
-      // 트래커 창이 보낸 좌표는 0~1로 정규화되어 있으므로 이 창 크기에 맞춰 되돌린다.
-      syncRef.current?.viewers?.forEach((viewer) => {
-        if (viewer.id === localViewerId || !viewer.connected || viewer.x == null) return;
-
-        hits[viewer.id] = hitTestCard(
-          viewer.x * window.innerWidth,
-          viewer.y * window.innerHeight,
-          cardRects
-        );
+      CAM_KEYS.forEach((key) => {
+        const viewerId = VIEWER_BY_CAM[key];
+        const gaze = gazeRef.current?.[viewerId];
+        if (gaze) tracked.push(viewerId);
+        vote.recordHit(viewerId, gaze ? hitTestCard(gaze.x, gaze.y, cardRects) : null, now);
       });
 
-      hitsRef.current = hits;
+      vote.tick(now);
 
-      if (now - lastSentAtRef.current >= VOTE_HITS_SEND_INTERVAL_MS) {
-        lastSentAtRef.current = now;
-        send({ t: 'hits', hits });
+      // 점수는 매 프레임 쌓지만 화면은 사람 눈에 보이는 주기로만 다시 그린다.
+      if (now - lastPublishedAt >= VOTE_SYNC_INTERVAL_MS) {
+        lastPublishedAt = now;
+        setSnapshot({ ...vote.getSnapshot(now), tracked });
       }
-
-      rafId = requestAnimationFrame(loop);
     };
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [localViewerId, send, syncRef]);
+  }, [gazeRef]);
 
   useEffect(() => {
-    if (!sync?.winnerId || completedRef.current) return;
+    if (!snapshot?.winnerId || completedRef.current) return;
 
     completedRef.current = true;
-    const winner = VISION_CARDS.find((card) => card.id === sync.winnerId);
-    onComplete?.(winner, { reason: 'joint-gaze', cards: sync.cards });
-  }, [sync, onComplete]);
+    const winner = VISION_CARDS.find((card) => card.id === snapshot.winnerId);
+    onComplete?.(winner, { reason: 'joint-gaze', cards: snapshot.cards });
+  }, [snapshot, onComplete]);
 
-  const connectedViewers = sync?.viewers?.filter((viewer) => viewer.connected) || [];
-  const requiredViewers = sync?.requiredViewers || VOTE_REQUIRED_VIEWERS;
+  const requiredViewers = snapshot?.requiredViewers || VOTE_REQUIRED_VIEWERS;
+  const trackedCount = snapshot?.tracked?.length || 0;
 
   return (
     <section className={styles.voteStep}>
@@ -134,16 +108,14 @@ export default function VoteStep({ onComplete, registerGazeHandler }) {
       </p>
 
       <p className={styles.viewerStatus}>
-        {status !== 'open'
-          ? '투표 서버에 연결 중…'
-          : `참가자 ${connectedViewers.length} / ${requiredViewers}명 연결됨${
-              connectedViewers.length < requiredViewers ? ' · /tracker 창을 열어 주세요' : ''
-            }`}
+        {trackedCount >= requiredViewers
+          ? `${requiredViewers}명의 시선을 추적 중입니다`
+          : `시선 추적 ${trackedCount} / ${requiredViewers}명 · ${PERSON_LABEL.B} 카메라와 보정을 확인하세요`}
       </p>
 
       <div className={styles.cardRow}>
         {VISION_CARDS.map((card) => {
-          const cardState = sync?.cards?.[card.id];
+          const cardState = snapshot?.cards?.[card.id];
 
           return (
             <VisionCard

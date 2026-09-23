@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../src/shared/EntryFlowContext';
-import { GAZE_VOTE_DWELL_MS, GAZE_VOTE_DWELL_GRACE_MS, VISION_CARDS } from '../src/shared/gazeConfig';
+import { VISION_CARDS } from '../src/shared/gazeConfig';
+import { useMenuJointSelect } from '../src/f1/VoteStep/useMenuJointSelect';
 import styles from './MenuSelectionPage.module.css';
 
 const CARD_OFFSETS = [0, 913.167, 1826.34, 2739.5];
 const SVG_WIDTH = 3541;
 const MENU_CARDS = VISION_CARDS.slice(0, CARD_OFFSETS.length);
-const HIT_PADDING_PX = 16;
-const CARD_VIDEOS = ['/s.mp4', '/s2.mp4', '/s3.mp4', '/s4.mp4'];
-const CARD_IMAGE_SRCS = ['/menu-card-1.svg?v=6', '/menu-cards.svg?v=6'];
+const CARD_VIDEOS = ['/1/s.mp4', '/1/s2.mp4', '/1/s3.mp4', '/1/s4.mp4'];
+const CARD_IMAGE_SRCS = ['/1/menu-card-1.svg?v=6', '/1/menu-cards.svg?v=6'];
 const CARD_SVG_W = 800.537;
-const BG_SWITCH_MS = 1200;
 const SELECT_ADVANCE_MS = 3000;
 const CARD_COPY = [
   '탁한 일상을 비우고 맑은 초록으로 채우는 서울',
@@ -20,50 +19,27 @@ const CARD_COPY = [
   '자연의 형태가 도심 곳곳에 녹아드는 서울',
 ];
 
-function hitTestCard(x, y, cardEls) {
-  for (let i = 0; i < cardEls.length; i += 1) {
-    const el = cardEls[i];
-    if (!el) continue;
-    const rect = el.getBoundingClientRect();
-    if (
-      x >= rect.left - HIT_PADDING_PX &&
-      x <= rect.right + HIT_PADDING_PX &&
-      y >= rect.top - HIT_PADDING_PX &&
-      y <= rect.bottom + HIT_PADDING_PX
-    ) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 export default function MenuSelectionPage() {
   const router = useRouter();
   const {
     isReady,
     isCalibrating,
-    finishCalibration,
-    registerGazeHandler,
+    gazeRef,
+    calibrated,
     setWinnerCard,
+    reportDwellProgress,
   } = useEntryFlow();
 
   const cardRefs = useRef([]);
-  const hoverRef = useRef(-1);
-  const dwellStartRef = useRef(0);
-  const lastHitAtRef = useRef(0);
-  const selectedRef = useRef(false);
-  const bgIndexRef = useRef(0);
   const bgVideoRefs = useRef([]);
-  const [hoveredIndex, setHoveredIndex] = useState(-1);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [bgIndex, setBgIndex] = useState(0);
   const [cardsReady, setCardsReady] = useState(false);
 
+  // 보정은 /app 에서 MediaPipe 엔진으로 진행한다.
   useEffect(() => {
     if (isReady && isCalibrating) {
-      finishCalibration();
+      router.replace('/app');
     }
-  }, [isReady, isCalibrating, finishCalibration]);
+  }, [isReady, isCalibrating, router]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -77,50 +53,25 @@ export default function MenuSelectionPage() {
     };
   }, []);
 
-  const handleGaze = useCallback(
-    (_viewerId, x, y) => {
-      if (selectedRef.current) return { dwellProgress: 1 };
-
-      const now = Date.now();
-      const hit = hitTestCard(x, y, cardRefs.current);
-
-      if (hit >= 0) {
-        lastHitAtRef.current = now;
-        if (hoverRef.current !== hit) {
-          hoverRef.current = hit;
-          dwellStartRef.current = now;
-          setHoveredIndex(hit);
-        }
-
-        const hoveredMs = now - dwellStartRef.current;
-        if (hoveredMs >= BG_SWITCH_MS && bgIndexRef.current !== hit) {
-          bgIndexRef.current = hit;
-          setBgIndex(hit);
-        }
-
-        const progress = Math.min(1, hoveredMs / GAZE_VOTE_DWELL_MS);
-        if (progress >= 1) {
-          selectedRef.current = true;
-          hoverRef.current = hit;
-          setHoveredIndex(hit);
-          setSelectedIndex(hit);
-          setWinnerCard(MENU_CARDS[hit]);
-          return { dwellProgress: 1, hitCardId: MENU_CARDS[hit].id };
-        }
-
-        return { dwellProgress: progress, hitCardId: MENU_CARDS[hit].id };
-      }
-
-      if (hoverRef.current >= 0 && now - lastHitAtRef.current > GAZE_VOTE_DWELL_GRACE_MS) {
-        hoverRef.current = -1;
-        dwellStartRef.current = 0;
-        setHoveredIndex(-1);
-      }
-
-      return { dwellProgress: 0, hitCardId: null };
+  const handleSelect = useCallback(
+    (card, index) => {
+      setWinnerCard(card);
     },
     [setWinnerCard]
   );
+
+  const { hoveredIndex, selectedIndex, bgIndex, stage, dwellProgress, scale } = useMenuJointSelect({
+    gazeRef,
+    cardRefs,
+    menuCards: MENU_CARDS,
+    calibrated,
+    enabled: isReady && !isCalibrating,
+    onSelect: handleSelect,
+  });
+
+  useEffect(() => {
+    reportDwellProgress?.(dwellProgress);
+  }, [dwellProgress, reportDwellProgress]);
 
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
@@ -129,11 +80,6 @@ export default function MenuSelectionPage() {
     }, SELECT_ADVANCE_MS);
     return () => window.clearTimeout(timer);
   }, [router, selectedIndex]);
-
-  useEffect(() => {
-    registerGazeHandler?.('vote', handleGaze);
-    return () => registerGazeHandler?.('vote', null);
-  }, [handleGaze, registerGazeHandler]);
 
   useEffect(() => {
     bgVideoRefs.current.forEach((video) => {
@@ -163,6 +109,8 @@ export default function MenuSelectionPage() {
     };
   }, []);
 
+  const joint = stage >= 2;
+
   return (
     <div className={styles.page}>
       {CARD_VIDEOS.map((src, index) => (
@@ -184,49 +132,51 @@ export default function MenuSelectionPage() {
         />
       ))}
       <div className={styles.titleGroup}>
-        <img
-          className={styles.pageTitle}
-          src="/menu-title.svg?v=3"
-          alt=""
-        />
+        <img className={styles.pageTitle} src="/1/menu-title.svg?v=3" alt="" />
         <div className={styles.pageSubtitle} aria-hidden="true" />
       </div>
       <div
         className={`${styles.cardRow} ${cardsReady ? styles.cardImagesReady : ''}`}
         aria-label="메뉴 카드"
       >
-        {CARD_OFFSETS.map((x, index) => (
-          <div
-            className={`${styles.card} ${hoveredIndex === index ? styles.cardHovered : ''}`}
-            key={MENU_CARDS[index].id}
-            data-card-id={MENU_CARDS[index].id}
-            ref={(el) => {
-              cardRefs.current[index] = el;
-            }}
-          >
-            <div className={styles.cardFace}>
-              <div
-                className={styles.cardClip}
-                style={
-                  index === 0
-                    ? { backgroundImage: 'url(/menu-card-1.svg?v=6)' }
-                    : {
-                        backgroundImage: 'url(/menu-cards.svg?v=6)',
-                        backgroundSize: `${(SVG_WIDTH / CARD_SVG_W) * 100}% 100%`,
-                        backgroundPosition: `calc(var(--card-w) * ${-x} / ${CARD_SVG_W}) 0`,
-                      }
-                }
-              />
-              {hoveredIndex === index && (
-                <img
-                  className={styles.cardHoverOutline}
-                  src="/menu-card-hover-outline.svg?v=2"
-                  alt=""
+        {CARD_OFFSETS.map((x, index) => {
+          const active = hoveredIndex === index;
+          // 1명 응시: 친구 CSS(1.055). 2명 합의: 한 단계 더 키운다.
+          const faceScale = active ? (joint && hoveredIndex === index ? scale : 1.055) : 1;
+
+          return (
+            <div
+              className={`${styles.card} ${active ? styles.cardHovered : ''}`}
+              key={MENU_CARDS[index].id}
+              data-card-id={MENU_CARDS[index].id}
+              ref={(el) => {
+                cardRefs.current[index] = el;
+              }}
+            >
+              <div className={styles.cardFace} style={{ transform: `scale(${faceScale})` }}>
+                <div
+                  className={styles.cardClip}
+                  style={
+                    index === 0
+                      ? { backgroundImage: 'url(/1/menu-card-1.svg?v=6)' }
+                      : {
+                          backgroundImage: 'url(/1/menu-cards.svg?v=6)',
+                          backgroundSize: `${(SVG_WIDTH / CARD_SVG_W) * 100}% 100%`,
+                          backgroundPosition: `calc(var(--card-w) * ${-x} / ${CARD_SVG_W}) 0`,
+                        }
+                  }
                 />
-              )}
+                {active && (
+                  <img
+                    className={styles.cardHoverOutline}
+                    src="/1/menu-card-hover-outline.svg?v=2"
+                    alt=""
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <p className={styles.pagePrompt}>
         {selectedIndex >= 0 ? (

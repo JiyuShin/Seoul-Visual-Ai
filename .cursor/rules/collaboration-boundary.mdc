@@ -1,0 +1,54 @@
+---
+description: 협업 파일 경계. 합의한 파일 밖은 수정 금지.
+alwaysApply: true
+---
+
+# 협업 파일 경계
+
+이 저장소는 친구와 나눠 작업한다. 아래 허용 목록에 없는 파일은 읽기만 하고 절대 수정하지 않는다.
+
+수정이 필요하면 그 파일을 사용자에게 먼저 말하고, 허락을 받기 전에는 쓰지 않는다. 관련되어 보여도, 고치기 쉬워도, import가 깨져도 예외가 아니다.
+
+## 이 계정이 만져도 되는 파일
+
+시선 추적과 그 연결부만 담당한다.
+
+- `src/shared/gaze/**`
+- `src/calibration/**`
+- `src/shared/gazeConfig.js`
+- `src/shared/GazeReticle.jsx`
+- `src/shared/GazeReticle.module.css`
+- `src/shared/EntryFlowContext.jsx`
+- `src/shared/EntryPageShell.jsx`
+- `src/shared/EntryPageShell.module.css`
+- `src/f1/voteState.js`
+- `src/f1/VoteStep/**`
+- `pages/app.jsx`
+- `pages/_app.jsx`
+- `scripts/setup-assets.mjs`
+- `package.json`
+- `yarn.lock`
+- `next.config.js`
+- `.gitignore`
+- `README.md`
+- `styles/globals.css`
+
+## 절대 손대지 않는 것
+
+- `src/f2/**` — 토론 화면은 상대 영역
+- `src/f1/RevealStep/**` — 투표 다음 연출
+- `pages/1.jsx`, `pages/2.jsx` — 페이지 라우트 UI
+- 상대가 만든 피그마 UI, 카드 스타일, 카피, 레이아웃
+- 이번 요청에 이름이 안 나온 파일
+
+## 해야 할 일 / 하지 말 일
+
+```text
+// 금지: 허용 목록 밖을 “ついでに” 고침
+pages/1.jsx 의 문구를 시선 훅에 맞게 바꿈
+src/f2/DiscussionStep 에 gazeRef 를 직접 심음
+
+// 허용: 목록 안만 고치고, 밖이 필요하면 질문
+src/shared/gaze/useGazeEngine.js 만 수정
+pages/1.jsx 가 필요하면 “이 파일을 건드려도 되나?” 라고 물음
+```

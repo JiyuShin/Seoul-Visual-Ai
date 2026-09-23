@@ -15,56 +15,11 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font-family: inherit;
 }
 
 img {
   max-width: 100%;
-}
-
-#webgazerFaceOverlay,
-#webgazerFaceFeedbackBox {
-  display: none !important;
-}
-
-#webgazerGazeDot {
-  display: none !important;
-}
-
-body.calibrating-gaze #webgazerVideoContainer {
-  display: block !important;
-  position: fixed !important;
-  bottom: 20px !important;
-  right: 20px !important;
-  width: 160px !important;
-  height: 120px !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
-  z-index: 10001 !important;
-  opacity: 0.85 !important;
-}
-
-/* opacity:0 / display:none 이면 브라우저가 웹캠 프레임을 멈추거나 FaceMesh가 abort 함 */
-body:not(.calibrating-gaze) #webgazerVideoContainer {
-  display: block !important;
-  position: fixed !important;
-  bottom: 0 !important;
-  right: 0 !important;
-  width: 160px !important;
-  height: 120px !important;
-  overflow: hidden !important;
-  opacity: 0.04 !important;
-  pointer-events: none !important;
-  z-index: 2 !important;
-  box-shadow: none !important;
-  border: 0 !important;
-}
-
-body:not(.calibrating-gaze) #webgazerVideoFeed {
-  display: block !important;
-  opacity: 1 !important;
-  pointer-events: none !important;
 }

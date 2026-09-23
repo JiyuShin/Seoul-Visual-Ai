@@ -18,17 +18,16 @@ export default function StreetDiscussionPage() {
     gazePosition,
     registerGazeHandler,
     handleGazeClipChange,
-    finishCalibration,
   } = useEntryFlow();
 
   useEffect(() => {
     if (!isReady) return;
     if (isCalibrating) {
-      finishCalibration();
+      router.replace('/app');
     } else if (!winnerCard) {
       router.replace('/1');
     }
-  }, [isReady, isCalibrating, winnerCard, finishCalibration, router]);
+  }, [isReady, isCalibrating, winnerCard, router]);
 
   const handleDiscussionComplete = useCallback(
     (finalPins) => {

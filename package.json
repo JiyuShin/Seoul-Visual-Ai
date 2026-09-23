@@ -3,24 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.mjs",
-    "dev:next": "next dev",
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node server.mjs",
-    "postinstall": "node scripts/copy-mediapipe.js"
+    "start": "next start",
+    "setup:assets": "node scripts/setup-assets.mjs",
+    "postinstall": "node scripts/setup-assets.mjs"
   },
   "dependencies": {
-    "@mediapipe/face_mesh": "^0.4.1633559619",
-    "@tensorflow-models/face-detection": "^1.0.3",
-    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
-    "@tensorflow/tfjs-converter": "^4.22.0",
-    "@tensorflow/tfjs-core": "^4.22.0",
+    "@mediapipe/tasks-vision": "^0.10.18",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "seedrandom": "^3.0.5",
-    "three": "^0.186.0",
-    "webgazer": "^3.3.0",
-    "ws": "^8.21.3"
+    "three": "^0.186.0"
   }
 }
