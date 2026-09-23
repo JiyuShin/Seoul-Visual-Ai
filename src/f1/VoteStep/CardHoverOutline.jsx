@@ -12,25 +12,23 @@ const W = SVG_W - STROKE;
 const H = SVG_H - STROKE;
 
 function outlineVariant(viewers = []) {
-  const green = viewers.includes(VOTE_VIEWER_IDS[0]);
-  const orange = viewers.includes(VOTE_VIEWER_IDS[1]);
-  if (green && orange) return 'both';
-  if (orange) return 'orange';
-  return 'green';
+  const purpleCursor = viewers.includes(VOTE_VIEWER_IDS[0]);
+  const orangeCursor = viewers.includes(VOTE_VIEWER_IDS[1]);
+  if (purpleCursor && orangeCursor) return 'both';
+  if (orangeCursor) return 'green';
+  return 'purple';
 }
 
 function gradientStops(variant) {
-  if (variant === 'orange') {
-    return [
-      { offset: '0', color: '#BFFF95' },
-      { offset: '0.5', color: '#FFFFFF' },
-      { offset: '1', color: '#E9FF79' },
-    ];
-  }
-  if (variant === 'both') {
+  if (variant === 'green') {
     return [
       { offset: '0', color: '#65FF00' },
-      { offset: '0.5', color: '#FFFFFF' },
+      { offset: '1', color: '#65FF00' },
+    ];
+  }
+  if (variant === 'purple') {
+    return [
+      { offset: '0', color: '#7C20CC' },
       { offset: '1', color: '#7C20CC' },
     ];
   }
@@ -42,13 +40,10 @@ function gradientStops(variant) {
 }
 
 function gradientCoords(variant) {
-  if (variant === 'orange') {
-    return { x1: '333.133', y1: '4', x2: '333.133', y2: String(SVG_H) };
-  }
   if (variant === 'both') {
     return { x1: '0', y1: '0', x2: String(SVG_W), y2: '0' };
   }
-  return { x1: '-17.8184', y1: '0', x2: String(SVG_W), y2: String(SVG_H) };
+  return { x1: '0', y1: '0', x2: '0', y2: String(SVG_H) };
 }
 
 export function CardHoverOutline({ viewers }) {

@@ -13,6 +13,8 @@ const CARD_VIDEOS = ['/1/s.mp4', '/1/s2.mp4', '/1/s3.mp4', '/1/s4.mp4'];
 const CARD_IMAGE_SRCS = ['/1/menu-card-1.svg?v=6', '/1/menu-cards.svg?v=6'];
 const CARD_SVG_W = 800.537;
 const SELECT_ADVANCE_MS = 3000;
+const SPLIT_SCALE = 1.03;
+const SPLIT_HOLD_MS = 1000;
 const CARD_COPY = [
   '탁한 일상을 비우고 맑은 초록으로 채우는 서울',
   '초록 사이로 선명한 햇살이 스며드는 서울',
@@ -34,6 +36,7 @@ export default function MenuSelectionPage() {
   const cardRefs = useRef([]);
   const bgVideoRefs = useRef([]);
   const [cardsReady, setCardsReady] = useState(false);
+  const [splitScale, setSplitScale] = useState(1);
 
   // 보정은 /app 에서 MediaPipe 엔진으로 진행한다.
   useEffect(() => {
@@ -61,7 +64,14 @@ export default function MenuSelectionPage() {
     [setWinnerCard]
   );
 
-  const { hoveredIndex, hoverViewers, selectedIndex, bgIndex, stage, dwellProgress, scale } = useMenuJointSelect({
+  const {
+    cardViewers,
+    isSplit,
+    selectedIndex,
+    bgIndex,
+    dwellProgress,
+    scale,
+  } = useMenuJointSelect({
     gazeRef,
     cardRefs,
     menuCards: MENU_CARDS,
@@ -70,9 +80,21 @@ export default function MenuSelectionPage() {
     onSelect: handleSelect,
   });
 
+  const occupiedKey = (cardViewers || []).map((ids) => (ids.length ? '1' : '0')).join('');
+
   useEffect(() => {
     reportDwellProgress?.(dwellProgress);
   }, [dwellProgress, reportDwellProgress]);
+
+  useEffect(() => {
+    if (!isSplit) {
+      setSplitScale(1);
+      return undefined;
+    }
+    setSplitScale(SPLIT_SCALE);
+    const timer = window.setTimeout(() => setSplitScale(1), SPLIT_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [isSplit, occupiedKey]);
 
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
@@ -110,8 +132,6 @@ export default function MenuSelectionPage() {
     };
   }, []);
 
-  const joint = stage >= 2;
-
   return (
     <div className={styles.page}>
       {CARD_VIDEOS.map((src, index) => (
@@ -133,7 +153,17 @@ export default function MenuSelectionPage() {
         />
       ))}
       <div className={styles.titleGroup}>
-        <img className={styles.pageTitle} src="/1/menu-title.svg?v=3" alt="" />
+        <div className={`${styles.titleBlur} ${isSplit ? styles.titleBlurVisible : ''}`} />
+        <div className={styles.titleStack}>
+          <img
+            className={`${styles.pageTitle} ${isSplit ? styles.titleHidden : ''}`}
+            src="/1/menu-title.svg?v=3"
+            alt=""
+          />
+          <p className={`${styles.pageTitleText} ${isSplit ? styles.titleVisible : ''}`}>
+            두 분이 <span className={styles.pageTitleEm}>같은 주제</span>를 바라봐주세요
+          </p>
+        </div>
         <div className={styles.pageSubtitle} aria-hidden="true" />
       </div>
       <div
@@ -141,9 +171,16 @@ export default function MenuSelectionPage() {
         aria-label="메뉴 카드"
       >
         {CARD_OFFSETS.map((x, index) => {
-          const active = hoveredIndex === index;
-          // 1명 응시: 친구 CSS(1.055). 2명 합의: 한 단계 더 키운다.
-          const faceScale = active ? (joint && hoveredIndex === index ? scale : 1.055) : 1;
+          const viewers = cardViewers[index] || [];
+          const active = viewers.length > 0;
+          const jointOnCard = viewers.length >= 2;
+          const faceScale = jointOnCard
+            ? scale
+            : isSplit && active
+              ? splitScale
+              : active
+                ? 1.055
+                : 1;
 
           return (
             <div
@@ -153,9 +190,11 @@ export default function MenuSelectionPage() {
               ref={(el) => {
                 cardRefs.current[index] = el;
               }}
-              style={{ transform: `scale(${faceScale})` }}
             >
-              <div className={styles.cardFace}>
+              <div
+                className={styles.cardFace}
+                style={{ transform: `scale(${faceScale})` }}
+              >
                 <div
                   className={styles.cardClip}
                   style={
@@ -170,8 +209,8 @@ export default function MenuSelectionPage() {
                 />
                 {active && (
                   <CardHoverOutline
-                    key={`${MENU_CARDS[index].id}-${hoverViewers.join('-')}`}
-                    viewers={hoverViewers}
+                    key={`${MENU_CARDS[index].id}-${viewers.join('-')}`}
+                    viewers={viewers}
                   />
                 )}
               </div>
@@ -185,6 +224,13 @@ export default function MenuSelectionPage() {
             <span className={styles.pagePromptEm}>{CARD_COPY[selectedIndex]}</span>, 선택하셨네요.
             <br />
             이제 그 풍경 속을 함께 걸어보며 이야기 나눠볼게요!
+          </>
+        ) : isSplit ? (
+          <>
+            두분께서 서로 다른 주제를 선택해주셨네요.
+            <br />
+            다음 단계로 넘어가기 위해{' '}
+            <span className={styles.pagePromptEm}>같은 주제를 함께 응시해주세요!</span>
           </>
         ) : (
           <>

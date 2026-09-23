@@ -28,6 +28,8 @@ export function useMenuJointSelect({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   const [hoverViewers, setHoverViewers] = useState([]);
+  const [cardViewers, setCardViewers] = useState([]);
+  const [isSplit, setIsSplit] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [bgIndex, setBgIndex] = useState(0);
   const [stage, setStage] = useState(0);
@@ -55,22 +57,61 @@ export function useMenuJointSelect({
     let lastPublishedAt = 0;
     let lastHover = -1;
     let lastViewersKey = '';
+    let lastCardsKey = '';
     let lastStage = 0;
     let lastProgress = 0;
     let hoverStartedAt = 0;
     let bgSwitchedFor = -1;
 
+    // 레이아웃 박스만 쓴다. CSS scale/transition 이 붙어 있어도 offset 크기는 안 변하고,
+    // transform-origin 이 가운데라 시각적 중심 = 레이아웃 중심이다.
+    const getLayoutBox = (el) => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      return {
+        left: cx - w / 2,
+        right: cx + w / 2,
+        top: cy - h / 2,
+        bottom: cy + h / 2,
+        cx,
+        cy,
+      };
+    };
+
+    const dist2ToBox = (x, y, box) => {
+      const nx = Math.min(Math.max(x, box.left), box.right);
+      const ny = Math.min(Math.max(y, box.top), box.bottom);
+      const dx = x - nx;
+      const dy = y - ny;
+      return dx * dx + dy * dy;
+    };
+
     const hitTest = (x, y) => {
       const els = cardRefs.current || [];
+      let best = -1;
+      let bestDist = Infinity;
+      const near = 24;
+      const near2 = near * near;
+
       for (let i = 0; i < els.length; i += 1) {
         const el = els[i];
         if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-          return i;
+        const box = getLayoutBox(el);
+        if (dist2ToBox(x, y, box) > near2) continue;
+
+        const dx = x - box.cx;
+        const dy = y - box.cy;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
         }
       }
-      return -1;
+
+      return best;
     };
 
     const loop = () => {
@@ -80,7 +121,6 @@ export function useMenuJointSelect({
       const now = Date.now();
 
       CAM_KEYS.forEach((key) => {
-        if (calibrated.length && !calibrated.includes(key)) return;
         const viewerId = VIEWER_BY_CAM[key];
         const gaze = gazeRef.current?.[viewerId];
         const index = gaze ? hitTest(gaze.x, gaze.y) : -1;
@@ -113,6 +153,10 @@ export function useMenuJointSelect({
 
       const viewers = hover >= 0 ? snap.cards[menuCards[hover].id]?.viewers || [] : [];
       const viewersKey = viewers.join(',');
+      const nextCardViewers = menuCards.map((card) => snap.cards[card.id]?.viewers || []);
+      const cardsKey = nextCardViewers.map((ids) => ids.join(',')).join('|');
+      const occupied = nextCardViewers.filter((ids) => ids.length > 0).length;
+      const split = occupied >= 2 && nextCardViewers.every((ids) => ids.length < 2);
 
       if (hover !== lastHover) {
         lastHover = hover;
@@ -123,6 +167,12 @@ export function useMenuJointSelect({
       } else if (viewersKey !== lastViewersKey) {
         lastViewersKey = viewersKey;
         setHoverViewers(viewers);
+      }
+
+      if (cardsKey !== lastCardsKey) {
+        lastCardsKey = cardsKey;
+        setCardViewers(nextCardViewers);
+        setIsSplit(split);
       }
 
       if (bestStage !== lastStage) {
@@ -153,6 +203,8 @@ export function useMenuJointSelect({
         setSelectedIndex(index);
         setHoveredIndex(index);
         setHoverViewers(snap.cards[snap.winnerId]?.viewers || []);
+        setCardViewers(menuCards.map((card) => snap.cards[card.id]?.viewers || []));
+        setIsSplit(false);
         setStage(requiredViewers);
         setDwellProgress(1);
         onSelectRef.current?.(menuCards[index], index);
@@ -168,6 +220,8 @@ export function useMenuJointSelect({
   return {
     hoveredIndex,
     hoverViewers,
+    cardViewers,
+    isSplit,
     selectedIndex,
     bgIndex,
     stage,

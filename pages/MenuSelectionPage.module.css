@@ -38,9 +38,68 @@
   user-select: none;
 }
 
-.pageTitle {
+.titleBlur {
+  position: absolute;
+  left: 50%;
+  top: -62px;
+  z-index: 0;
+  width: min(140vw, 1600px);
+  height: 280px;
+  transform: translateX(-50%);
+  background: linear-gradient(0.09deg, rgba(255, 255, 255, 0) 0.08%, #ffffff 99.92%);
+  filter: blur(53.45px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+
+.titleBlurVisible {
+  opacity: 1;
+}
+
+.titleStack {
+  position: relative;
+  z-index: 1;
   width: min(58vw, 980px);
+}
+
+.pageTitle {
+  display: block;
+  width: 100%;
   height: auto;
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+
+.pageTitleText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-family: Pretendard, 'Pretendard Variable', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: clamp(22px, 3.1vw, 42px);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.pageTitleEm {
+  font-weight: 700;
+}
+
+.titleHidden {
+  opacity: 0;
+}
+
+.titleVisible {
+  opacity: 1;
 }
 
 .pageSubtitle {
@@ -97,17 +156,17 @@
   aspect-ratio: 800.537 / 1135.83;
   overflow: visible;
   pointer-events: none;
-  transform-origin: center center;
-  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .cardFace {
   position: relative;
   width: 100%;
   height: 100%;
+  transform-origin: center center;
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.card::before {
+.cardFace::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -143,7 +202,7 @@
   --card-h: calc(var(--card-w) * 1135.83 / 800.537);
   position: fixed;
   left: 50%;
-  top: calc(50% + 26px + var(--card-h) / 2 + 56px);
+  top: calc(50% + 26px + var(--card-h) / 2 + 48px);
   z-index: 1;
   width: min(72vw, 980px);
   margin: 0;
