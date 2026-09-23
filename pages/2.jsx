@@ -1,15 +1,14 @@
-import { useCallback, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useCallback } from 'react';
 import DiscussionStep from '../src/f2/DiscussionStep';
 import EntryPageShell from '../src/shared/EntryPageShell';
 import { useEntryFlow } from '../src/shared/EntryFlowContext';
 import styles from '../src/f2/DonePanel.module.css';
 
+const DIRECT_CARD = { id: '', label: '', shortLabel: '' };
+
 export default function StreetDiscussionPage() {
-  const router = useRouter();
   const {
     isReady,
-    isCalibrating,
     winnerCard,
     pins,
     setPins,
@@ -19,15 +18,6 @@ export default function StreetDiscussionPage() {
     registerGazeHandler,
     handleGazeClipChange,
   } = useEntryFlow();
-
-  useEffect(() => {
-    if (!isReady) return;
-    if (isCalibrating) {
-      router.replace('/app');
-    } else if (!winnerCard) {
-      router.replace('/1');
-    }
-  }, [isReady, isCalibrating, winnerCard, router]);
 
   const handleDiscussionComplete = useCallback(
     (finalPins) => {
@@ -43,9 +33,9 @@ export default function StreetDiscussionPage() {
 
   return (
     <EntryPageShell title="거리뷰 토론" showReticle={!discussionDone}>
-      {isReady && !isCalibrating && winnerCard && !discussionDone && (
+      {isReady && !discussionDone && (
         <DiscussionStep
-          winnerCard={winnerCard}
+          winnerCard={winnerCard || DIRECT_CARD}
           pins={pins}
           onPinsChange={setPins}
           onComplete={handleDiscussionComplete}

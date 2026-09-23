@@ -13,10 +13,12 @@ export function clearGazeInput() {
   gazeInputOverride = null;
 }
 
+const PANORAMA_SRC = '/2/boulevard-detail-panorama.webp';
+const DEG = Math.PI / 180;
+const BASE_FOV = 68 * DEG;
+
 export default function StreetView3D({
-  colorImage = '/og.png',
-  depthImage = '/pn.png',
-  depthScale = 0.15,
+  panorama = PANORAMA_SRC,
   onDwellComplete,
   gazePosition,
   className,
@@ -32,7 +34,6 @@ export default function StreetView3D({
   const targetCamRef = useRef({ x: 0, y: 0, rotX: 0, rotY: 0 });
   const currentCamRef = useRef({ x: 0, y: 0, rotX: 0, rotY: 0 });
   const dwellRef = useRef({ x: 0, y: 0, since: 0, triggered: false });
-  const markerRef = useRef(null);
   const gazePositionRef = useRef(gazePosition);
 
   // gazePosition이 바뀔 때마다 ref 업데이트
@@ -73,103 +74,77 @@ export default function StreetView3D({
     
     console.log('[StreetView3D] Container size:', width, height);
 
-    // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB); // 하늘색 배경 (디버깅용)
     sceneRef.current = scene;
 
-    // Camera
-    const aspect = width / height || 16/9;
-    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 100);
-    camera.position.z = 1;
+    const camera = new THREE.Camera();
     cameraRef.current = camera;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Texture Loader
-    const textureLoader = new THREE.TextureLoader();
-
-    // Load textures with error handling
-    const colorTexture = textureLoader.load(
-      colorImage,
-      () => console.log('[StreetView3D] Color texture loaded'),
+    const panoramaTexture = new THREE.TextureLoader().load(
+      panorama,
+      () => console.log('[StreetView3D] Panorama loaded'),
       undefined,
-      (err) => console.error('[StreetView3D] Color texture error:', err)
+      (err) => console.error('[StreetView3D] Panorama error:', err)
     );
-    const depthTexture = textureLoader.load(
-      depthImage,
-      () => console.log('[StreetView3D] Depth texture loaded'),
-      undefined,
-      (err) => console.error('[StreetView3D] Depth texture error:', err)
-    );
+    panoramaTexture.colorSpace = THREE.NoColorSpace;
+    panoramaTexture.flipY = false;
+    panoramaTexture.generateMipmaps = false;
+    panoramaTexture.minFilter = THREE.LinearFilter;
+    panoramaTexture.magFilter = THREE.LinearFilter;
+    panoramaTexture.wrapS = THREE.ClampToEdgeWrapping;
+    panoramaTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-    colorTexture.minFilter = THREE.LinearFilter;
-    colorTexture.magFilter = THREE.LinearFilter;
-    depthTexture.minFilter = THREE.LinearFilter;
-    depthTexture.magFilter = THREE.LinearFilter;
-
-    // Shader Material
+    const viewUniform = new THREE.Vector3(0, 0, BASE_FOV);
+    const viewportUniform = new THREE.Vector2(width, height);
     const shaderMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        colorMap: { value: colorTexture },
-        depthMap: { value: depthTexture },
-        depthScale: { value: depthScale },
+        panorama: { value: panoramaTexture },
+        viewport: { value: viewportUniform },
+        view: { value: viewUniform },
       },
       vertexShader: `
-        uniform sampler2D depthMap;
-        uniform float depthScale;
-        varying vec2 vUv;
-        
+        varying vec2 screenUV;
         void main() {
-          vUv = uv;
-          vec4 depthColor = texture2D(depthMap, uv);
-          float depth = depthColor.r;
-          
-          vec3 newPosition = position;
-          // 밝을수록 가까움 (z축으로 앞으로)
-          newPosition.z += depth * depthScale;
-          
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+          screenUV = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
         }
       `,
       fragmentShader: `
-        uniform sampler2D colorMap;
-        varying vec2 vUv;
-        
+        precision highp float;
+        varying vec2 screenUV;
+        uniform sampler2D panorama;
+        uniform vec2 viewport;
+        uniform vec3 view;
+        const float PI = 3.141592653589793;
         void main() {
-          vec4 color = texture2D(colorMap, vUv);
-          gl_FragColor = color;
+          float a = viewport.x / viewport.y;
+          float t = tan(view.z * 0.5);
+          vec2 p = screenUV * 2.0 - 1.0;
+          vec3 ray = normalize(vec3(p.x * a * t, p.y * t, 1.0));
+          float cp = cos(view.y), sp = sin(view.y);
+          ray = vec3(ray.x, cp * ray.y + sp * ray.z, -sp * ray.y + cp * ray.z);
+          float cy = cos(view.x), sy = sin(view.x);
+          ray = vec3(cy * ray.x + sy * ray.z, ray.y, -sy * ray.x + cy * ray.z);
+          vec2 uv = vec2(fract(0.5 + atan(ray.x, ray.z) / (2.0 * PI)),
+                         0.5 - asin(clamp(ray.y, -1.0, 1.0)) / PI);
+          uv.y += 0.12 * sin(PI * uv.y);
+          gl_FragColor = vec4(texture2D(panorama, uv).rgb, 1.0);
         }
       `,
-      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
     });
 
-    // Plane Geometry (250x250 분할)
-    const planeWidth = 2 * aspect;
-    const planeHeight = 2;
-    const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, 250, 250);
+    const geometry = new THREE.PlaneGeometry(2, 2);
     const mesh = new THREE.Mesh(geometry, shaderMaterial);
     scene.add(mesh);
     meshRef.current = mesh;
-
-    // 마커 (응시 완료 시 표시)
-    const markerGeometry = new THREE.RingGeometry(0.02, 0.03, 32);
-    const markerMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0x4caf6d, 
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    marker.visible = false;
-    marker.position.z = 0.2;
-    scene.add(marker);
-    markerRef.current = marker;
 
     // Mouse move handler
     const handleMouseMove = (e) => {
@@ -185,9 +160,9 @@ export default function StreetView3D({
     const handleResize = () => {
       const w = container.clientWidth || window.innerWidth;
       const h = container.clientHeight || window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
       renderer.setSize(w, h);
+      const buffer = renderer.getSize(new THREE.Vector2());
+      viewportUniform.set(buffer.x, buffer.y);
     };
 
     window.addEventListener('resize', handleResize);
@@ -218,11 +193,10 @@ export default function StreetView3D({
       currentCamRef.current.rotX += (targetCamRef.current.rotX - currentCamRef.current.rotX) * LERP_FACTOR;
       currentCamRef.current.rotY += (targetCamRef.current.rotY - currentCamRef.current.rotY) * LERP_FACTOR;
 
-      // 카메라 적용
-      camera.position.x = currentCamRef.current.x;
-      camera.position.y = currentCamRef.current.y;
-      camera.rotation.x = currentCamRef.current.rotX;
-      camera.rotation.y = currentCamRef.current.rotY;
+      const buffer = renderer.getSize(new THREE.Vector2());
+      const aspect = buffer.x / Math.max(1, buffer.y);
+      const fov = Math.min(BASE_FOV, 2 * Math.atan(Math.tan(52.5 * DEG) / aspect));
+      viewUniform.set(currentCamRef.current.rotY, currentCamRef.current.rotX, fov);
 
       // 3초 응시 감지
       const dwell = dwellRef.current;
@@ -230,21 +204,11 @@ export default function StreetView3D({
       const dist = Math.sqrt((gaze.x - dwell.x) ** 2 + (gaze.y - dwell.y) ** 2);
 
       if (dist < 0.1) {
-        // 같은 위치 유지
         if (!dwell.triggered && now - dwell.since >= DWELL_THRESHOLD_MS) {
-          // 3초 경과 - 마커 표시
           dwell.triggered = true;
-          
-          const marker = markerRef.current;
-          marker.position.x = gaze.x * (planeWidth / 2);
-          marker.position.y = gaze.y * (planeHeight / 2);
-          marker.visible = true;
-          
-          console.log('3초 응시 완료:', { x: gaze.x.toFixed(3), y: gaze.y.toFixed(3) });
           onDwellComplete?.({ x: gaze.x, y: gaze.y });
         }
       } else {
-        // 위치 변경 - 리셋
         dwellRef.current = { x: gaze.x, y: gaze.y, since: now, triggered: false };
       }
 
@@ -261,11 +225,12 @@ export default function StreetView3D({
       renderer.dispose();
       geometry.dispose();
       shaderMaterial.dispose();
+      panoramaTexture.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [colorImage, depthImage, depthScale, onDwellComplete, getGazeInput]);
+  }, [panorama, onDwellComplete, getGazeInput]);
 
   return (
     <div

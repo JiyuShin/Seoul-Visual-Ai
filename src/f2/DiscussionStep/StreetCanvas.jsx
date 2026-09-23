@@ -270,9 +270,7 @@ export default forwardRef(function StreetCanvas(
       <div className={styles.canvas} ref={canvasRef}>
         <div className={styles.imageFrame}>
           <StreetView3D
-            colorImage="/og.png"
-            depthImage="/pn.png"
-            depthScale={0.12}
+            panorama="/2/boulevard-detail-panorama.webp"
             gazePosition={gazePosition}
             className={styles.image}
           />
