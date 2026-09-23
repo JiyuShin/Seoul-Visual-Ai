@@ -20,6 +20,7 @@ export function createVoteState({
   graceMs = VOTE_HIT_GRACE_MS,
   jointWeight = VOTE_JOINT_SCORE_WEIGHT,
   winScoreMs = VOTE_WIN_SCORE_MS,
+  jointOnly = false,
 }) {
   const cards = new Map(
     cardIds.map((id) => [id, { dwellMsByViewer: new Map(), jointMs: 0, score: 0 }])
@@ -93,7 +94,9 @@ export function createVoteState({
           card.jointMs += delta;
         }
 
-        card.score = totalDwellMs(card) + card.jointMs * jointWeight;
+        card.score = jointOnly
+          ? card.jointMs
+          : totalDwellMs(card) + card.jointMs * jointWeight;
 
         if (card.score >= winScoreMs) {
           winnerId = cardId;

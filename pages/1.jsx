@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useEntryFlow } from '../src/shared/EntryFlowContext';
 import { VISION_CARDS } from '../src/shared/gazeConfig';
 import { useMenuJointSelect } from '../src/f1/VoteStep/useMenuJointSelect';
+import { CardHoverOutline } from '../src/f1/VoteStep/CardHoverOutline';
 import styles from './MenuSelectionPage.module.css';
 
 const CARD_OFFSETS = [0, 913.167, 1826.34, 2739.5];
@@ -60,7 +61,7 @@ export default function MenuSelectionPage() {
     [setWinnerCard]
   );
 
-  const { hoveredIndex, selectedIndex, bgIndex, stage, dwellProgress, scale } = useMenuJointSelect({
+  const { hoveredIndex, hoverViewers, selectedIndex, bgIndex, stage, dwellProgress, scale } = useMenuJointSelect({
     gazeRef,
     cardRefs,
     menuCards: MENU_CARDS,
@@ -168,10 +169,9 @@ export default function MenuSelectionPage() {
                   }
                 />
                 {active && (
-                  <img
-                    className={styles.cardHoverOutline}
-                    src="/1/menu-card-hover-outline.svg?v=2"
-                    alt=""
+                  <CardHoverOutline
+                    key={`${MENU_CARDS[index].id}-${hoverViewers.join('-')}`}
+                    viewers={hoverViewers}
                   />
                 )}
               </div>

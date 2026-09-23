@@ -6,7 +6,6 @@ import {
   VOTE_REQUIRED_VIEWERS,
   VOTE_STAGE_SCALES,
   VOTE_SYNC_INTERVAL_MS,
-  VOTE_WIN_SCORE_MS,
 } from '../../shared/gazeConfig';
 import { CAM_KEYS, VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { createVoteState } from '../voteState';
@@ -17,7 +16,7 @@ const BG_SWITCH_MS = 1200;
  * 친구 /1 메뉴 UI 위에 얹는 2인 합의 선택 로직.
  *
  * 카드 레이아웃·카피는 페이지가 그대로 두고, 시선 hit / 점수 / hover stage 만 여기서 계산한다.
- * 보정된 카메라가 1대면 1인 체류로 폴백한다.
+ * 두 커서가 같은 카드를 같이 볼 때만 확정한다.
  */
 export function useMenuJointSelect({
   gazeRef,
@@ -28,6 +27,7 @@ export function useMenuJointSelect({
   onSelect,
 }) {
   const [hoveredIndex, setHoveredIndex] = useState(-1);
+  const [hoverViewers, setHoverViewers] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [bgIndex, setBgIndex] = useState(0);
   const [stage, setStage] = useState(0);
@@ -40,26 +40,21 @@ export function useMenuJointSelect({
   useEffect(() => {
     if (!enabled || completedRef.current) return undefined;
 
-    const requiredViewers = Math.min(
-      VOTE_REQUIRED_VIEWERS,
-      Math.max(1, calibrated.length || 1)
-    );
-
-    // 1명이면 친구 원래 체감(약 3초), 2명이면 합의 가중치로 더 빨리 찬다.
-    const winScoreMs =
-      requiredViewers <= 1 ? GAZE_VOTE_DWELL_MS : Math.round(VOTE_WIN_SCORE_MS * 0.5);
+    const requiredViewers = VOTE_REQUIRED_VIEWERS;
 
     const vote = createVoteState({
       cardIds: menuCards.map((card) => card.id),
       requiredViewers,
       graceMs: VOTE_HIT_GRACE_MS,
       jointWeight: VOTE_JOINT_SCORE_WEIGHT,
-      winScoreMs,
+      winScoreMs: GAZE_VOTE_DWELL_MS,
+      jointOnly: true,
     });
 
     let rafId;
     let lastPublishedAt = 0;
     let lastHover = -1;
+    let lastViewersKey = '';
     let lastStage = 0;
     let lastProgress = 0;
     let hoverStartedAt = 0;
@@ -116,10 +111,18 @@ export function useMenuJointSelect({
         }
       });
 
+      const viewers = hover >= 0 ? snap.cards[menuCards[hover].id]?.viewers || [] : [];
+      const viewersKey = viewers.join(',');
+
       if (hover !== lastHover) {
         lastHover = hover;
+        lastViewersKey = viewersKey;
         hoverStartedAt = hover >= 0 ? now : 0;
         setHoveredIndex(hover);
+        setHoverViewers(viewers);
+      } else if (viewersKey !== lastViewersKey) {
+        lastViewersKey = viewersKey;
+        setHoverViewers(viewers);
       }
 
       if (bestStage !== lastStage) {
@@ -149,6 +152,7 @@ export function useMenuJointSelect({
         const index = menuCards.findIndex((card) => card.id === snap.winnerId);
         setSelectedIndex(index);
         setHoveredIndex(index);
+        setHoverViewers(snap.cards[snap.winnerId]?.viewers || []);
         setStage(requiredViewers);
         setDwellProgress(1);
         onSelectRef.current?.(menuCards[index], index);
@@ -163,6 +167,7 @@ export function useMenuJointSelect({
 
   return {
     hoveredIndex,
+    hoverViewers,
     selectedIndex,
     bgIndex,
     stage,
