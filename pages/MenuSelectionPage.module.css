@@ -28,7 +28,7 @@
   position: fixed;
   top: 65px;
   left: 50%;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -39,22 +39,20 @@
 }
 
 .titleBlur {
-  position: absolute;
+  position: fixed;
   left: 50%;
-  top: -62px;
-  z-index: 0;
-  width: min(140vw, 1600px);
-  height: 280px;
+  top: -60px;
+  z-index: 1;
+  width: 112vw;
+  height: auto;
   transform: translateX(-50%);
-  background: linear-gradient(0.09deg, rgba(255, 255, 255, 0) 0.08%, #ffffff 99.92%);
-  filter: blur(53.45px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.7s ease;
 }
 
 .titleBlurVisible {
-  opacity: 1;
+  opacity: 0.55;
 }
 
 .titleStack {

@@ -14,7 +14,6 @@ const CARD_IMAGE_SRCS = ['/1/menu-card-1.svg?v=6', '/1/menu-cards.svg?v=6'];
 const CARD_SVG_W = 800.537;
 const SELECT_ADVANCE_MS = 3000;
 const SPLIT_SCALE = 1.03;
-const SPLIT_HOLD_MS = 1000;
 const CARD_COPY = [
   '탁한 일상을 비우고 맑은 초록으로 채우는 서울',
   '초록 사이로 선명한 햇살이 스며드는 서울',
@@ -36,7 +35,6 @@ export default function MenuSelectionPage() {
   const cardRefs = useRef([]);
   const bgVideoRefs = useRef([]);
   const [cardsReady, setCardsReady] = useState(false);
-  const [splitScale, setSplitScale] = useState(1);
 
   // 보정은 /app 에서 MediaPipe 엔진으로 진행한다.
   useEffect(() => {
@@ -67,6 +65,7 @@ export default function MenuSelectionPage() {
   const {
     cardViewers,
     isSplit,
+    splitGrown,
     selectedIndex,
     bgIndex,
     dwellProgress,
@@ -80,21 +79,9 @@ export default function MenuSelectionPage() {
     onSelect: handleSelect,
   });
 
-  const occupiedKey = (cardViewers || []).map((ids) => (ids.length ? '1' : '0')).join('');
-
   useEffect(() => {
     reportDwellProgress?.(dwellProgress);
   }, [dwellProgress, reportDwellProgress]);
-
-  useEffect(() => {
-    if (!isSplit) {
-      setSplitScale(1);
-      return undefined;
-    }
-    setSplitScale(SPLIT_SCALE);
-    const timer = window.setTimeout(() => setSplitScale(1), SPLIT_HOLD_MS);
-    return () => window.clearTimeout(timer);
-  }, [isSplit, occupiedKey]);
 
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
@@ -152,8 +139,47 @@ export default function MenuSelectionPage() {
           aria-hidden="true"
         />
       ))}
+      <svg
+        className={`${styles.titleBlur} ${isSplit ? styles.titleBlurVisible : ''}`}
+        viewBox="-172.9 -168.9 4227.8 1153.8"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <g filter="url(#menuSplitTitleBlur)">
+          <path
+            d="M-66 -62H3948V596.135C2373.49 972.277 1492.74 971.633 -66 596.135V-62Z"
+            fill="url(#menuSplitTitlePaint)"
+          />
+        </g>
+        <defs>
+          <filter
+            id="menuSplitTitleBlur"
+            x="-172.9"
+            y="-168.9"
+            width="4227.8"
+            height="1153.8"
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+            <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+            <feGaussianBlur stdDeviation="53.45" result="effect1_foregroundBlur" />
+          </filter>
+          <linearGradient
+            id="menuSplitTitlePaint"
+            x1="1941"
+            y1="878"
+            x2="1941.36"
+            y2="-62.0001"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="white" stopOpacity="0" />
+            <stop offset="1" stopColor="white" />
+          </linearGradient>
+        </defs>
+      </svg>
       <div className={styles.titleGroup}>
-        <div className={`${styles.titleBlur} ${isSplit ? styles.titleBlurVisible : ''}`} />
         <div className={styles.titleStack}>
           <img
             className={`${styles.pageTitle} ${isSplit ? styles.titleHidden : ''}`}
@@ -176,11 +202,13 @@ export default function MenuSelectionPage() {
           const jointOnCard = viewers.length >= 2;
           const faceScale = jointOnCard
             ? scale
-            : isSplit && active
-              ? splitScale
-              : active
-                ? 1.055
-                : 1;
+            : splitGrown && active
+              ? SPLIT_SCALE
+              : isSplit
+                ? 1
+                : active
+                  ? 1.055
+                  : 1;
 
           return (
             <div

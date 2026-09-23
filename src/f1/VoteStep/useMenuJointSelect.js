@@ -11,6 +11,9 @@ import { CAM_KEYS, VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { createVoteState } from '../voteState';
 
 const BG_SWITCH_MS = 1200;
+const SPLIT_ARM_MS = 500;
+const SPLIT_HOLD_MS = 1000;
+const SPLIT_GAP_MS = 400;
 
 /**
  * 친구 /1 메뉴 UI 위에 얹는 2인 합의 선택 로직.
@@ -30,6 +33,7 @@ export function useMenuJointSelect({
   const [hoverViewers, setHoverViewers] = useState([]);
   const [cardViewers, setCardViewers] = useState([]);
   const [isSplit, setIsSplit] = useState(false);
+  const [splitGrown, setSplitGrown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [bgIndex, setBgIndex] = useState(0);
   const [stage, setStage] = useState(0);
@@ -57,11 +61,16 @@ export function useMenuJointSelect({
     let lastPublishedAt = 0;
     let lastHover = -1;
     let lastViewersKey = '';
-    let lastCardsKey = '';
     let lastStage = 0;
     let lastProgress = 0;
     let hoverStartedAt = 0;
     let bgSwitchedFor = -1;
+    let splitSeenAt = 0;
+    let splitLastRawAt = 0;
+    let splitHoldUntil = 0;
+    let splitLatched = false;
+    let frozenSplitViewers = null;
+    let lastSplitPublish = '';
 
     // 레이아웃 박스만 쓴다. CSS scale/transition 이 붙어 있어도 offset 크기는 안 변하고,
     // transform-origin 이 가운데라 시각적 중심 = 레이아웃 중심이다.
@@ -154,9 +163,38 @@ export function useMenuJointSelect({
       const viewers = hover >= 0 ? snap.cards[menuCards[hover].id]?.viewers || [] : [];
       const viewersKey = viewers.join(',');
       const nextCardViewers = menuCards.map((card) => snap.cards[card.id]?.viewers || []);
-      const cardsKey = nextCardViewers.map((ids) => ids.join(',')).join('|');
       const occupied = nextCardViewers.filter((ids) => ids.length > 0).length;
-      const split = occupied >= 2 && nextCardViewers.every((ids) => ids.length < 2);
+      const rawSplit = occupied >= 2 && nextCardViewers.every((ids) => ids.length < 2);
+
+      if (rawSplit) {
+        if (!splitSeenAt) splitSeenAt = now;
+        splitLastRawAt = now;
+      } else if (!splitLatched && splitSeenAt && now - splitLastRawAt > SPLIT_GAP_MS) {
+        splitSeenAt = 0;
+        splitLastRawAt = 0;
+      }
+
+      if (!splitLatched && splitSeenAt && now - splitSeenAt >= SPLIT_ARM_MS) {
+        splitLatched = true;
+        splitHoldUntil = now + SPLIT_HOLD_MS;
+        frozenSplitViewers = nextCardViewers.map((ids) => ids.slice());
+      }
+
+      if (splitHoldUntil && now >= splitHoldUntil) {
+        splitHoldUntil = 0;
+        frozenSplitViewers = null;
+      }
+
+      if (!rawSplit && !splitHoldUntil && splitLastRawAt && now - splitLastRawAt > SPLIT_GAP_MS) {
+        splitLatched = false;
+        splitSeenAt = 0;
+        splitLastRawAt = 0;
+      }
+
+      const grown = splitHoldUntil > now;
+      const split = rawSplit || grown;
+      const publishedViewers = grown && frozenSplitViewers ? frozenSplitViewers : nextCardViewers;
+      const splitPublish = `${publishedViewers.map((ids) => ids.join(',')).join('|')}|${split ? 1 : 0}|${grown ? 1 : 0}`;
 
       if (hover !== lastHover) {
         lastHover = hover;
@@ -169,10 +207,11 @@ export function useMenuJointSelect({
         setHoverViewers(viewers);
       }
 
-      if (cardsKey !== lastCardsKey) {
-        lastCardsKey = cardsKey;
-        setCardViewers(nextCardViewers);
+      if (splitPublish !== lastSplitPublish) {
+        lastSplitPublish = splitPublish;
+        setCardViewers(publishedViewers);
         setIsSplit(split);
+        setSplitGrown(grown);
       }
 
       if (bestStage !== lastStage) {
@@ -205,6 +244,7 @@ export function useMenuJointSelect({
         setHoverViewers(snap.cards[snap.winnerId]?.viewers || []);
         setCardViewers(menuCards.map((card) => snap.cards[card.id]?.viewers || []));
         setIsSplit(false);
+        setSplitGrown(false);
         setStage(requiredViewers);
         setDwellProgress(1);
         onSelectRef.current?.(menuCards[index], index);
@@ -222,6 +262,7 @@ export function useMenuJointSelect({
     hoverViewers,
     cardViewers,
     isSplit,
+    splitGrown,
     selectedIndex,
     bgIndex,
     stage,
