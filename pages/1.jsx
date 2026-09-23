@@ -152,8 +152,9 @@ export default function MenuSelectionPage() {
               ref={(el) => {
                 cardRefs.current[index] = el;
               }}
+              style={{ transform: `scale(${faceScale})` }}
             >
-              <div className={styles.cardFace} style={{ transform: `scale(${faceScale})` }}>
+              <div className={styles.cardFace}>
                 <div
                   className={styles.cardClip}
                   style={
