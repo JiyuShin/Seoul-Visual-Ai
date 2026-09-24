@@ -6,6 +6,18 @@ const nextConfig = {
     // 상위 디렉토리의 lockfile 때문에 워크스페이스 루트가 잘못 추론되는 것을 막는다.
     outputFileTracingRoot: __dirname,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/street/360/:path*',
+        destination: 'https://quiet-street-360.hello-ccid.chatgpt.site/:path*',
+      },
+      {
+        source: '/street/tower/:path*',
+        destination: 'https://quiet-street-tower.hello-ccid.chatgpt.site/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

@@ -1,14 +1,14 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
 .discussionStep {
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   height: 100dvh;
   min-height: 100vh;
-  padding: 24px 32px 20px;
+  padding: 0;
   box-sizing: border-box;
-  gap: 14px;
+  overflow: hidden;
+  font-family: Pretendard, 'Pretendard Variable', sans-serif;
 }
 
 .header {
@@ -247,8 +247,8 @@
 @media (max-width: 640px) {
   .discussionStep {
     min-height: 100dvh;
-    height: auto;
-    padding: 20px 16px;
+    height: 100dvh;
+    padding: 0;
   }
 
   .canvasArea {
@@ -263,6 +263,25 @@
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 24px rgba(76, 175, 109, 0.08);
+}
+
+.agentRow {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.agentOrb {
+  display: block;
+  width: 88px;
+  height: 88px;
+  flex: none;
+}
+
+.turnNote {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #3d5344;
 }
 
 .agentLabel {
@@ -314,4 +333,400 @@
 
 .micBtn {
   padding: 10px 12px;
+}
+
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.94), rgba(214, 214, 214, 0.88) 62%, rgba(168, 168, 168, 0.72));
+  transition: opacity 1.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.veilOff {
+  opacity: 0;
+}
+
+.hudViewport {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.hudFit {
+  position: relative;
+  flex: none;
+}
+
+.hudStage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3881px;
+  height: 2183px;
+  transform-origin: top left;
+  font-family: Pretendard, 'Pretendard Variable', sans-serif;
+}
+
+.turn {
+  position: absolute;
+  left: 1791px;
+  top: 101px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 34px;
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.turnOn,
+.placeOn,
+.promptOn {
+  opacity: 1;
+}
+
+.pills {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 287px;
+  height: 149px;
+  box-sizing: border-box;
+  border: 3px solid #fff;
+  border-radius: 91px;
+  background: radial-gradient(circle at 18% 18%, rgba(147, 240, 75, 0.22), rgba(255, 255, 255, 0.16) 72%);
+  box-shadow:
+    0 0 14px rgba(255, 255, 255, 0.9),
+    0 0 30px #e1bfff,
+    0 0 9px rgba(0, 0, 0, 0.17),
+    inset 4px 4px 9px rgba(255, 255, 255, 0.7),
+    inset 0 8px 9px rgba(0, 0, 0, 0.12);
+}
+
+.pill {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  opacity: 0.4;
+  transition: opacity 0.45s ease;
+}
+
+.pill img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.pill span {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: 64px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.pillOn {
+  opacity: 1;
+}
+
+.turnLabel {
+  margin: 0;
+  color: #fff;
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.38);
+}
+
+.placeChip {
+  position: absolute;
+  left: 3275px;
+  top: 127px;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  font-size: 39px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.placeOn {
+  opacity: 1;
+}
+
+.placePin {
+  width: 87px;
+  height: 87px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow:
+    0 0 18px rgba(130, 245, 255, 0.54),
+    0 0 7px #ffcfe3;
+}
+
+.placePin img {
+  width: 56px;
+  height: 56px;
+  display: block;
+}
+
+.promptBlock {
+  position: absolute;
+  left: 1142px;
+  top: 1401px;
+  width: 1597px;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.promptOn {
+  opacity: 1;
+  transform: none;
+}
+
+.promptBlock .promptText {
+  max-width: 1597px;
+  margin: 0;
+  padding: 72px 96px;
+  border: 1.5px solid #fff;
+  border-radius: 59px;
+  text-align: center;
+  color: #fff;
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: -1px;
+  text-shadow: 0 1px 2px rgba(40, 60, 20, 0.35);
+  background:
+    linear-gradient(191deg, rgba(193, 234, 150, 0.84) 17%, rgba(255, 255, 255, 0.7) 80%);
+  box-shadow:
+    0 40px 21px rgba(130, 130, 130, 0.25),
+    0 0 26px rgba(255, 255, 255, 0.78),
+    inset 0 30px 29px rgba(255, 255, 255, 0.74),
+    inset -12px 0 20px rgba(114, 61, 196, 0.36),
+    inset 0 11px 7px #fff,
+    inset -48px 0 49px rgba(254, 206, 255, 0.39),
+    inset 22px -31px 51px rgba(255, 255, 255, 0.6),
+    inset 0 12px 29px rgba(255, 203, 129, 0.55),
+    inset -12px -12px 23px rgba(0, 0, 0, 0.18);
+  animation: promptIn 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbSlot {
+  position: absolute;
+  z-index: 2;
+  transition:
+    left 1.15s cubic-bezier(0.22, 1, 0.36, 1),
+    top 1.15s cubic-bezier(0.22, 1, 0.36, 1),
+    width 1.15s cubic-bezier(0.22, 1, 0.36, 1),
+    height 1.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbPulse {
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+
+.orbLive .orbPulse {
+  animation: orbBreathe 2.8s ease-in-out infinite;
+}
+
+.orbHot .orbPulse {
+  animation: orbTalk 1.9s ease-in-out infinite;
+}
+
+.orbCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.visionCard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 563px;
+  height: 567px;
+  margin-left: -281.5px;
+  margin-top: -283.5px;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(156deg, #fff 4%, rgba(34, 195, 139, 0.23) 57%, rgba(0, 0, 0, 0.6) 99%);
+  box-shadow:
+    0 0 56px rgba(139, 249, 146, 0.3),
+    0 0 26px rgba(232, 255, 193, 0.23),
+    0 0 38px #e3fffa,
+    inset -2.6px -2.6px 1.1px #9dfffd,
+    inset 2.6px 2.6px 0 rgba(0, 148, 96, 0.72),
+    inset 0 -12px 86px #71f0ca,
+    inset -43px -74px 86px #d9ee6f,
+    inset 0 9px 35px rgba(217, 63, 132, 0.4),
+    inset 19px 16px 37px #ffd7f6,
+    inset 12px 19px 95px rgba(157, 255, 253, 0.5),
+    inset 25px 31px 70px #69eace,
+    inset 0 -37px 25px rgba(214, 220, 255, 0.13);
+  transform-origin: center center;
+  transition:
+    transform 1.15s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.7s ease;
+}
+
+.orbIsAgent .visionCard {
+  opacity: 0;
+}
+
+.visionGlow {
+  position: absolute;
+  left: -441px;
+  top: -326px;
+  width: 944px;
+  height: 874px;
+  max-width: none;
+  pointer-events: none;
+}
+
+.visionSheen {
+  position: absolute;
+  left: 0;
+  top: -108px;
+  width: 520px;
+  height: 701px;
+  overflow: hidden;
+  transform: scaleX(-1);
+  transform-origin: center center;
+  mix-blend-mode: plus-lighter;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.visionSheen img {
+  position: absolute;
+  left: -115.09%;
+  top: -11.3%;
+  width: 220.75%;
+  height: 111.3%;
+  max-width: none;
+}
+
+.visionPhrase {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 414px;
+  margin: 0;
+  transform: translate(-50%, -52%);
+  text-align: center;
+  color: #414141;
+  font-size: 45px;
+  font-weight: 600;
+  line-height: 1.48;
+  letter-spacing: -0.9px;
+  mix-blend-mode: luminosity;
+}
+
+.agentFace {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.orbIsAgent .agentFace {
+  opacity: 1;
+}
+
+.caption {
+  position: absolute;
+  left: 940px;
+  top: 1360px;
+  width: 2000px;
+  margin: 0;
+  text-align: center;
+  color: #2a312d;
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.65;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.captionOn {
+  opacity: 1;
+}
+
+.composer {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 9;
+  display: flex;
+  gap: 8px;
+  width: min(520px, 72vw);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+@keyframes promptIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes orbBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes orbTalk {
+  0%,
+  100% {
+    transform: scale(1.02);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }

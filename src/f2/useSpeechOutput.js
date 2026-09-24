@@ -1,11 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const NOVELTY_VOICE = /^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/;
+
+function isKoreanVoice(voice) {
+  const lang = (voice.lang || '').toLowerCase().replace('_', '-');
+  return lang === 'ko-kr' || lang.startsWith('ko');
+}
+
 function pickKoreanVoice(synth) {
-  const voices = synth.getVoices();
+  const voices = synth.getVoices().filter(isKoreanVoice);
+  const natural = voices.filter((voice) => !NOVELTY_VOICE.test(voice.name));
   return (
-    voices.find((voice) => voice.lang === 'ko-KR' || voice.lang === 'ko_KR') ||
-    voices.find((voice) => voice.lang?.toLowerCase().startsWith('ko'))
+    natural.find((voice) => voice.name === 'Yuna') ||
+    natural.find((voice) => /sora|google/i.test(voice.name)) ||
+    natural[0] ||
+    voices[0]
   );
+}
+
+function spokenHoldMs(text) {
+  const chars = Array.from(text.replace(/\s/g, '')).length;
+  return Math.max(1600, chars * 240);
 }
 
 export function useSpeechOutput() {
@@ -31,7 +46,7 @@ export function useSpeechOutput() {
     setIsSpeaking(false);
   }, []);
 
-  const speak = useCallback((text, onEnd) => {
+  const speak = useCallback((text, onEnd, onAudioEnd) => {
     if (typeof window === 'undefined' || !window.speechSynthesis || !text?.trim()) {
       onEnd?.();
       return false;
@@ -42,34 +57,35 @@ export function useSpeechOutput() {
     const synth = window.speechSynthesis;
     const spoken = text.trim();
     let finished = false;
-    let started = false;
     let keepAlive = 0;
-    let watch = 0;
 
     const finish = () => {
       if (finished || session !== sessionRef.current) return;
       finished = true;
       window.clearInterval(keepAlive);
-      window.clearInterval(watch);
       setIsSpeaking(false);
       onEnd?.();
     };
 
     const utterance = new SpeechSynthesisUtterance(spoken);
     utterance.lang = 'ko-KR';
-    utterance.rate = 0.92;
+    utterance.rate = 1;
     utterance.pitch = 1;
+    const minHold = spokenHoldMs(spoken);
+    let startedAt = 0;
 
     utterance.onstart = () => {
       if (session !== sessionRef.current) return;
-      started = true;
+      startedAt = Date.now();
       setIsSpeaking(true);
-      watch = window.setInterval(() => {
-        if (finished || session !== sessionRef.current) return;
-        if (!synth.speaking && !synth.pending && !synth.paused) finish();
-      }, 400);
     };
-    utterance.onend = finish;
+    utterance.onend = () => {
+      if (session !== sessionRef.current) return;
+      onAudioEnd?.();
+      const elapsed = startedAt ? Date.now() - startedAt : minHold;
+      const remain = Math.max(0, minHold - elapsed);
+      window.setTimeout(finish, Math.max(0, remain - 300));
+    };
     utterance.onerror = (event) => {
       if (event.error === 'interrupted' || event.error === 'canceled' || event.error === 'cancelled') {
         return;
@@ -81,21 +97,35 @@ export function useSpeechOutput() {
       if (finished || session !== sessionRef.current) return;
       const voice = pickKoreanVoice(synth);
       if (voice) utterance.voice = voice;
+      let queued = false;
+      const startMain = () => {
+        if (queued || finished || session !== sessionRef.current) return;
+        queued = true;
+        synth.resume();
+        synth.speak(utterance);
+      };
       const lead = new SpeechSynthesisUtterance(' ');
       lead.volume = 0;
       lead.lang = 'ko-KR';
       lead.rate = 1;
       if (voice) lead.voice = voice;
-      lead.onend = () => {
+      lead.onend = startMain;
+      const begin = () => {
         if (finished || session !== sessionRef.current) return;
-        synth.speak(utterance);
-      };
-      synth.resume();
-      synth.speak(lead);
-      keepAlive = window.setInterval(() => {
-        if (finished || session !== sessionRef.current || !synth.speaking) return;
         synth.resume();
-      }, 8000);
+        synth.speak(lead);
+        window.setTimeout(startMain, 700);
+        keepAlive = window.setInterval(() => {
+          if (finished || session !== sessionRef.current || !synth.speaking) return;
+          synth.resume();
+        }, 8000);
+      };
+      if (synth.speaking || synth.pending) {
+        synth.cancel();
+        window.setTimeout(begin, 80);
+        return;
+      }
+      begin();
     };
 
     if (synth.getVoices().length === 0) {

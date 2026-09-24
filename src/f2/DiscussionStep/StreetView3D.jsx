@@ -1,6 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { useEntryFlow } from '../../shared/EntryFlowContext';
-import { streetViewUrl } from '../../shared/streetView';
 
 let gazeInputOverride = null;
 
@@ -19,8 +17,6 @@ export default function StreetView3D({
 }) {
   const gazePositionRef = useRef(gazePosition);
   gazePositionRef.current = gazePosition;
-  const { selectedDistrict } = useEntryFlow();
-  const streetSrc = streetViewUrl(selectedDistrict);
 
   useEffect(() => {
     gazeInputOverride = gazePosition
@@ -31,7 +27,7 @@ export default function StreetView3D({
   return (
     <iframe
       className={className}
-      src={streetSrc}
+      src="about:blank"
       allow="fullscreen"
       referrerPolicy="no-referrer"
       style={{

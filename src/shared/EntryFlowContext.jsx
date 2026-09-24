@@ -42,6 +42,9 @@ export function EntryFlowProvider({ children }) {
   const activeStepRef = useRef(null);
   const dwellProgressRef = useRef(0);
   const gazeStateAtRef = useRef(0);
+  const discussionCamRef = useRef('A');
+  const [discussionCam, setDiscussionCam] = useState('A');
+  discussionCamRef.current = discussionCam;
 
   const activeStep =
     router.pathname === '/2'
@@ -77,7 +80,12 @@ export function EntryFlowProvider({ children }) {
       }
     }
 
-    if (viewerId === PRIMARY_VIEWER_ID) {
+    const discussionViewerId = VIEWER_BY_CAM[discussionCamRef.current] || PRIMARY_VIEWER_ID;
+    const publishesPosition = step === 'discussion'
+      ? viewerId === discussionViewerId
+      : viewerId === PRIMARY_VIEWER_ID;
+
+    if (publishesPosition) {
       const now = performance.now();
       if (now - gazeStateAtRef.current >= GAZE_STATE_INTERVAL_MS) {
         gazeStateAtRef.current = now;
@@ -85,8 +93,8 @@ export function EntryFlowProvider({ children }) {
       }
     }
 
-    // 토론(/2)만 1인용. 메뉴(/1)는 두 사람 시선을 모두 핸들러에 넘긴다.
-    if (step === 'discussion' && viewerId !== PRIMARY_VIEWER_ID) {
+    // 토론은 지금 말하는 사람의 시선만 심기 판정에 쓴다.
+    if (step === 'discussion' && viewerId !== discussionViewerId) {
       return;
     }
 
@@ -183,6 +191,8 @@ export function EntryFlowProvider({ children }) {
       setWinnerCard,
       selectedDistrict,
       setSelectedDistrict,
+      discussionCam,
+      setDiscussionCam,
       pins,
       setPins,
       discussionDone,
@@ -205,6 +215,7 @@ export function EntryFlowProvider({ children }) {
       reopenSetup,
       winnerCard,
       selectedDistrict,
+      discussionCam,
       pins,
       discussionDone,
       dwellProgress,

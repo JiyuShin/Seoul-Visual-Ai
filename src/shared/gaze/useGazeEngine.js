@@ -462,7 +462,9 @@ export function useGazeEngine({ onSample } = {}) {
     if (calibRef.current) stepCalibration(fresh, updated, now);
 
     const calibrating = Boolean(calibRef.current);
+    const pointerOwnsGaze = typeof window !== 'undefined' && window.__seoulPointerOwnsGaze > now;
     CAM_KEYS.forEach((key) => {
+      if (pointerOwnsGaze) return;
       const viewerId = VIEWER_BY_CAM[key];
       const model = modelsRef.current[key];
       const cam = camsRef.current[key];
