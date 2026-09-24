@@ -434,7 +434,7 @@ export default function DiscussionStep({
           <object
             className={`${styles.introOrb} ${orbVisible ? styles.introOrbVisible : ''}`}
             type="image/svg+xml"
-            data="/2/intro-orb.svg"
+            data="/2/intro-orb.svg?v=8"
             aria-hidden="true"
             tabIndex={-1}
           />,

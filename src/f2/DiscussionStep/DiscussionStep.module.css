@@ -76,6 +76,7 @@
   opacity: 0;
   pointer-events: none;
   border: 0;
+  background: transparent;
   transition: opacity 1s ease, transform 1s ease;
 }
 

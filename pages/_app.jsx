@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
@@ -31,45 +31,94 @@ const STREET_URL = 'https://quiet-street-360.hello-ccid.chatgpt.site/';
 
 function AppFrame({ Component, pageProps }) {
   const router = useRouter();
+  const pageRef = useRef(null);
+  const streetRef = useRef(null);
+  const [fadeOut, setFadeOut] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const [entering, setEntering] = useState(false);
   const onDiscussion = router.pathname === '/2';
-  const cover = onDiscussion && !cleared;
+  const cover = (onDiscussion || entering) && !cleared;
 
   useEffect(() => {
-    if (!onDiscussion) setCleared(false);
+    if (!onDiscussion) {
+      setFadeOut(false);
+      setCleared(false);
+      setEntering(false);
+    }
   }, [onDiscussion]);
 
   useEffect(() => {
-    const clear = () => setCleared(true);
+    const start = (url) => {
+      const path = url.split('?')[0];
+      if (path !== '/2') return;
+      setEntering(true);
+      document.documentElement.style.background = 'transparent';
+      document.body.style.background = 'transparent';
+      if (streetRef.current) streetRef.current.style.zIndex = '15';
+      if (pageRef.current) pageRef.current.style.zIndex = '1';
+    };
+    router.events.on('routeChangeStart', start);
+    return () => router.events.off('routeChangeStart', start);
+  }, [router.events]);
+
+  useEffect(() => {
+    const clear = () => setFadeOut(true);
     window.addEventListener('street-blur-clear', clear);
     return () => window.removeEventListener('street-blur-clear', clear);
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const { body } = document;
+    if (cover) {
+      root.style.background = 'transparent';
+      body.style.background = 'transparent';
+    } else if (!fadeOut) {
+      root.style.background = '';
+      body.style.background = '';
+    }
+  }, [cover, fadeOut]);
+
+  useEffect(() => {
+    if (!fadeOut) return undefined;
+    const id = window.setTimeout(() => setCleared(true), 1700);
+    return () => window.clearTimeout(id);
+  }, [fadeOut]);
+
   return (
     <>
-      <iframe
-        title="거리뷰"
-        src={STREET_URL}
-        allow="fullscreen"
+      <div
+        ref={streetRef}
         style={{
           position: 'fixed',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          border: 0,
-          zIndex: 4,
+          inset: '-4%',
+          zIndex: cover ? 15 : 0,
           pointerEvents: 'none',
-          filter: 'blur(4px)',
-          transform: 'scale(1.02)',
-          opacity: cleared ? 0 : 1,
+          overflow: 'hidden',
+          filter: fadeOut ? 'blur(0px)' : 'blur(4px)',
+          opacity: fadeOut ? 0 : 1,
+          transition: fadeOut ? 'opacity 1.6s ease, filter 1.6s ease' : 'none',
         }}
-      />
+      >
+        <iframe
+          title="거리뷰"
+          src={STREET_URL}
+          allow="fullscreen"
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 0,
+            transform: 'scale(1.04)',
+          }}
+        />
+      </div>
       <div
+        ref={pageRef}
         style={{
           position: 'relative',
-          zIndex: cover ? 0 : 6,
+          zIndex: cover ? 1 : 6,
           minHeight: '100vh',
-          opacity: cover ? 1 : 0.99,
+          background: cover ? 'transparent' : undefined,
         }}
       >
         <Component {...pageProps} />
