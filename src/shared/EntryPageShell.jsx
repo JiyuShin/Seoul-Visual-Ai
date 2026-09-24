@@ -18,7 +18,7 @@ export default function EntryPageShell({ title, showReticle = true, children }) 
       </Head>
 
       <div className={styles.root}>
-        <DreamyBackground />
+        {router.pathname !== '/2' && <DreamyBackground />}
 
         {!isReady && !error && (
           <div className={styles.loading}>

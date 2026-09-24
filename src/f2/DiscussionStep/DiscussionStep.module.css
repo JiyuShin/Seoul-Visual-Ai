@@ -49,12 +49,6 @@
   position: fixed;
   inset: 0;
   z-index: 1;
-  transition: filter 1.8s ease, transform 1.8s ease;
-}
-
-.canvasAreaVeiled {
-  filter: blur(20px);
-  transform: scale(1.04);
 }
 
 .streetVeil {
@@ -66,29 +60,28 @@
   overflow: hidden;
   opacity: 1;
   pointer-events: auto;
+  background: transparent;
   transition: opacity 1.8s ease;
 }
 
-.streetVeil::before,
-.streetVeil::after {
-  content: '';
-  position: absolute;
-  inset: -32px;
+.introOrb {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  width: min(270px, 36vw);
+  height: min(272px, 36.3vw);
+  aspect-ratio: 675 / 679;
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  transition: opacity 1s ease, transform 1s ease;
 }
 
-.streetVeil::before {
-  background: url('/2/boulevard-detail-street.webp') center / cover no-repeat;
-  filter: blur(20px);
-  transform: scale(1.04);
-}
-
-.streetVeil::after {
-  background: radial-gradient(
-    48.48% 86.17% at 50% 36.95%,
-    rgba(255, 224, 248, 0.16) 42.05%,
-    rgba(128, 112, 124, 0.14) 71.88%,
-    rgba(0, 0, 0, 0.12) 100%
-  );
+.introOrbVisible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .streetVeilGone {

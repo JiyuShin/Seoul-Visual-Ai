@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { fetchFollowUpQuestion } from '../fetchFollowUpQuestion';
 import {
   DISCUSSION_FOLLOWUP_LOADING,
@@ -45,6 +46,7 @@ export default function DiscussionStep({
   const startFollowUpListeningRef = useRef(null);
   const [stepPhase, setStepPhase] = useState(STEP_PHASES.PROMPT);
   const [streetVeil, setStreetVeil] = useState(true);
+  const [orbVisible, setOrbVisible] = useState(false);
   const [activeTag, setActiveTag] = useState(null);
   const [submitHint, setSubmitHint] = useState('');
   const [followUp, setFollowUp] = useState(null);
@@ -144,21 +146,25 @@ export default function DiscussionStep({
   speechOutputRef.current = speechOutput;
 
   useEffect(() => {
-    let timerId;
-    const frameId = window.requestAnimationFrame(() => {
-      timerId = window.setTimeout(() => {
-        if (stepPhaseRef.current === STEP_PHASES.PROMPT) {
-          speechOutputRef.current?.speak(DISCUSSION_PROMPT, () => {
-            setStreetVeil(false);
-          });
-          setStepPhase(STEP_PHASES.GAZE);
-        }
-      }, 300);
-    });
+    let cancelled = false;
+    const showOrbId = window.setTimeout(() => {
+      if (!cancelled) setOrbVisible(true);
+    }, 80);
+    const speakId = window.setTimeout(() => {
+      if (cancelled || stepPhaseRef.current !== STEP_PHASES.PROMPT) return;
+      speechOutputRef.current?.speak(DISCUSSION_PROMPT, () => {
+        if (cancelled) return;
+        setOrbVisible(false);
+        setStreetVeil(false);
+        window.dispatchEvent(new Event('street-blur-clear'));
+        setStepPhase(STEP_PHASES.GAZE);
+      });
+    }, 1500);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
-      clearTimeout(timerId);
+      cancelled = true;
+      window.clearTimeout(showOrbId);
+      window.clearTimeout(speakId);
       speechOutputRef.current?.stopSpeaking();
     };
   }, []);
@@ -423,8 +429,19 @@ export default function DiscussionStep({
         className={`${styles.streetVeil} ${streetVeil ? '' : styles.streetVeilGone}`}
         aria-hidden="true"
       />
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <object
+            className={`${styles.introOrb} ${orbVisible ? styles.introOrbVisible : ''}`}
+            type="image/svg+xml"
+            data="/2/intro-orb.svg"
+            aria-hidden="true"
+            tabIndex={-1}
+          />,
+          document.body
+        )}
       <div
-        className={`${styles.canvasArea} ${streetVeil ? styles.canvasAreaVeiled : ''}`}
+        className={styles.canvasArea}
       >
         <StreetCanvas
           ref={streetCanvasRef}
