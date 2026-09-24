@@ -196,8 +196,20 @@ function StillRoulette({ district }) {
   );
 }
 
-function Background() {
-  return <img className={styles.bg} src="/3/bg.png" alt="" />;
+function Background({ hidden }) {
+  return <img className={`${styles.bg} ${hidden ? styles.isHidden : ''}`} src="/3/bg.png" alt="" />;
+}
+
+function FindingVideo({ hidden }) {
+  return (
+    <video
+      className={`${styles.findingVideo} ${hidden ? styles.isHidden : ''}`}
+      src="/3/f001.mp4"
+      autoPlay
+      muted
+      playsInline
+    />
+  );
 }
 
 const MAP_PINS = [
@@ -234,7 +246,7 @@ function MovingMap({ phase }) {
 
   return (
     <div
-      className={`${styles.mapMotion} ${phase === 'q' ? styles.isGone : ''}`}
+      className={`${styles.mapMotion} ${phase === 'f' || phase === 'q' ? styles.isGone : ''}`}
       style={atResult ? RESULT_MAP : FINDING_MAP}
     >
       <img className={styles.mapScreen} src="/3/map-screen.png" alt="" />
@@ -423,7 +435,8 @@ export default function AreaSelection() {
 
   return (
     <Stage>
-      <Background />
+      <Background hidden={phase === 'f'} />
+      <FindingVideo hidden={phase !== 'f'} />
       <img className={styles.arc} src="/3/arc.svg" alt="" />
       <div className={`${styles.rouletteLayer} ${phase === 'f' ? '' : styles.isHidden}`}>
         <SpinningRoulette onComplete={finishFinding} />
