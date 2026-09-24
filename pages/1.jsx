@@ -86,7 +86,7 @@ export default function MenuSelectionPage() {
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
     const timer = window.setTimeout(() => {
-      router.push('/2');
+      router.push('/3');
     }, SELECT_ADVANCE_MS);
     return () => window.clearTimeout(timer);
   }, [router, selectedIndex]);

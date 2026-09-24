@@ -4,6 +4,7 @@ import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
 import GazeReticle from '../src/shared/GazeReticle';
 import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../src/shared/gaze/participants';
+import { streetViewUrl } from '../src/shared/streetView';
 
 function GlobalGazeCursor() {
   const router = useRouter();
@@ -27,10 +28,10 @@ function GlobalGazeCursor() {
   ));
 }
 
-const STREET_URL = 'https://quiet-street-360.hello-ccid.chatgpt.site/';
-
 function AppFrame({ Component, pageProps }) {
   const router = useRouter();
+  const { selectedDistrict } = useEntryFlow();
+  const streetSrc = streetViewUrl(selectedDistrict);
   const pageRef = useRef(null);
   const streetRef = useRef(null);
   const [fadeOut, setFadeOut] = useState(false);
@@ -102,7 +103,7 @@ function AppFrame({ Component, pageProps }) {
       >
         <iframe
           title="거리뷰"
-          src={STREET_URL}
+          src={streetSrc}
           allow="fullscreen"
           style={{
             width: '100%',

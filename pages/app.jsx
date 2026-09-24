@@ -17,6 +17,7 @@ export default function CalibrationPage() {
     isReady,
     setupComplete,
     completeSetup,
+    enableMouseDev,
     status,
     error,
     running,
@@ -74,6 +75,11 @@ export default function CalibrationPage() {
       <div className={styles.calibration}>
         <div className={styles.panel}>
           <h2 className={styles.title}>시선 추적 준비</h2>
+          {/* DEV ONLY: 최종 파일에서 이 버튼과 enableMouseDev 를 제거한다. */}
+          <button type="button" className={styles.devMouseBtn} onClick={enableMouseDev}>
+            개발자용 마우스 사용하기
+          </button>
+          <p className={styles.devMouseNote}>임시 테스트용입니다. 시선 보정 없이 마우스로 이어집니다.</p>
           <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{error || status}</p>
 
           <div className={styles.cams}>

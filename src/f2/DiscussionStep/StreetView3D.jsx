@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-
-const STREET_URL = 'https://quiet-street-360.hello-ccid.chatgpt.site/';
+import { useEntryFlow } from '../../shared/EntryFlowContext';
+import { streetViewUrl } from '../../shared/streetView';
 
 let gazeInputOverride = null;
 
@@ -19,6 +19,8 @@ export default function StreetView3D({
 }) {
   const gazePositionRef = useRef(gazePosition);
   gazePositionRef.current = gazePosition;
+  const { selectedDistrict } = useEntryFlow();
+  const streetSrc = streetViewUrl(selectedDistrict);
 
   useEffect(() => {
     gazeInputOverride = gazePosition
@@ -29,7 +31,7 @@ export default function StreetView3D({
   return (
     <iframe
       className={className}
-      src={STREET_URL}
+      src={streetSrc}
       allow="fullscreen"
       referrerPolicy="no-referrer"
       style={{

@@ -25,6 +25,7 @@ function clampGazeToRect(x, y, rect) {
 export function EntryFlowProvider({ children }) {
   const router = useRouter();
   const [winnerCard, setWinnerCard] = useState(null);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [pins, setPins] = useState([]);
   const [discussionDone, setDiscussionDone] = useState(false);
   const [dwellProgress, setDwellProgress] = useState(0);
@@ -33,6 +34,8 @@ export function EntryFlowProvider({ children }) {
 
   // 운영자가 카메라를 잡고 보정을 마친 뒤 시작을 누르면 참여 화면으로 넘어간다.
   const [setupComplete, setSetupComplete] = useState(false);
+  // DEV ONLY: 최종 파일에서 제거. 시선 보정 없이 마우스 좌표로 이후 인터랙션을 진행한다.
+  const [mouseDev, setMouseDev] = useState(false);
 
   const gazeHandlersRef = useRef({});
   const gazeClipRef = useRef(null);
@@ -113,6 +116,35 @@ export function EntryFlowProvider({ children }) {
     }
   }, [router.pathname]);
 
+  const publishMousePoint = useCallback((x, y) => {
+    const gaze = engine.gazeRef.current;
+    if (gaze) {
+      gaze[VIEWER_BY_CAM.A] = { x, y };
+      gaze[VIEWER_BY_CAM.B] = { x, y };
+    }
+    registerGazeSample(VIEWER_BY_CAM.A, x, y);
+    registerGazeSample(VIEWER_BY_CAM.B, x, y);
+  }, [engine.gazeRef, registerGazeSample]);
+
+  const enableMouseDev = useCallback((event) => {
+    setMouseDev(true);
+    setSetupComplete(true);
+    if (event?.clientX != null) {
+      publishMousePoint(event.clientX, event.clientY);
+    }
+  }, [publishMousePoint]);
+
+  useEffect(() => {
+    if (!mouseDev) return undefined;
+
+    const onMove = (event) => {
+      publishMousePoint(event.clientX, event.clientY);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [mouseDev, publishMousePoint]);
+
   const completeSetup = useCallback(() => {
     setSetupComplete(true);
   }, []);
@@ -136,7 +168,9 @@ export function EntryFlowProvider({ children }) {
   const value = useMemo(
     () => ({
       ...engine,
-      isReady: engine.ready,
+      isReady: engine.ready || mouseDev,
+      mouseDev,
+      enableMouseDev,
       // 준비가 끝나기 전에는 /1, /2 가 보정 화면으로 돌려보낸다.
       isCalibrating: !setupComplete,
       setupComplete,
@@ -147,6 +181,8 @@ export function EntryFlowProvider({ children }) {
 
       winnerCard,
       setWinnerCard,
+      selectedDistrict,
+      setSelectedDistrict,
       pins,
       setPins,
       discussionDone,
@@ -161,11 +197,14 @@ export function EntryFlowProvider({ children }) {
     }),
     [
       engine,
+      mouseDev,
+      enableMouseDev,
       setupComplete,
       completeSetup,
       finishCalibration,
       reopenSetup,
       winnerCard,
+      selectedDistrict,
       pins,
       discussionDone,
       dwellProgress,

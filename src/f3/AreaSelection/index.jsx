@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEntryFlow } from '../../shared/EntryFlowContext';
 import {
   DISTRICTS,
   ROULETTE_LOGOS,
@@ -11,27 +13,25 @@ import {
 import styles from './AreaSelection.module.css';
 
 function Stage({ children }) {
+  const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
     const fit = () => {
-      const viewport = window.visualViewport;
-      const width = viewport?.width || window.innerWidth;
-      const height = viewport?.height || window.innerHeight;
-      const next = Math.min(width / STAGE.width, height / STAGE.height);
+      const box = viewportRef.current;
+      const width = box?.clientWidth || window.innerWidth;
+      const height = box?.clientHeight || window.innerHeight;
+      // 1·2페이지는 창을 가득 채운다. 3번도 같은 화면을 덮도록 맞춘다.
+      const next = Math.max(width / STAGE.width, height / STAGE.height);
       setScale(next > 0 ? next : 1);
     };
     fit();
     window.addEventListener('resize', fit);
-    window.visualViewport?.addEventListener('resize', fit);
-    return () => {
-      window.removeEventListener('resize', fit);
-      window.visualViewport?.removeEventListener('resize', fit);
-    };
+    return () => window.removeEventListener('resize', fit);
   }, []);
 
   return (
-    <div className={styles.viewport}>
+    <div className={styles.viewport} ref={viewportRef}>
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
         <div className={styles.stage} style={{ transform: `scale(${scale})` }}>
           {children}
@@ -391,21 +391,35 @@ function QrCopy({ phase }) {
   );
 }
 
+const QR_HOLD_MS = 5000;
+
 export default function AreaSelection() {
+  const router = useRouter();
+  const { setSelectedDistrict } = useEntryFlow();
   const [phase, setPhase] = useState('f');
   const [districtIndex, setDistrictIndex] = useState(0);
   const district = DISTRICTS[districtIndex];
 
   const finishFinding = useCallback(() => {
-    setDistrictIndex(Math.floor(Math.random() * DISTRICTS.length));
+    const index = Math.floor(Math.random() * DISTRICTS.length);
+    setDistrictIndex(index);
+    setSelectedDistrict(DISTRICTS[index]);
     setPhase('s');
-  }, []);
+  }, [setSelectedDistrict]);
 
   useEffect(() => {
     if (phase !== 's') return undefined;
     const timeout = setTimeout(() => setPhase('q'), S_DURATION_MS);
     return () => clearTimeout(timeout);
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'q') return undefined;
+    const timeout = setTimeout(() => {
+      router.push('/2');
+    }, QR_HOLD_MS);
+    return () => clearTimeout(timeout);
+  }, [phase, router]);
 
   return (
     <Stage>
