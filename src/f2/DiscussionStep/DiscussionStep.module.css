@@ -49,6 +49,51 @@
   position: fixed;
   inset: 0;
   z-index: 1;
+  transition: filter 1.8s ease, transform 1.8s ease;
+}
+
+.canvasAreaVeiled {
+  filter: blur(20px);
+  transform: scale(1.04);
+}
+
+.streetVeil {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 1.8s ease;
+}
+
+.streetVeil::before,
+.streetVeil::after {
+  content: '';
+  position: absolute;
+  inset: -32px;
+}
+
+.streetVeil::before {
+  background: url('/2/boulevard-detail-street.webp') center / cover no-repeat;
+  filter: blur(20px);
+  transform: scale(1.04);
+}
+
+.streetVeil::after {
+  background: radial-gradient(
+    48.48% 86.17% at 50% 36.95%,
+    rgba(255, 224, 248, 0.16) 42.05%,
+    rgba(128, 112, 124, 0.14) 71.88%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+}
+
+.streetVeilGone {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .promptOverlay {

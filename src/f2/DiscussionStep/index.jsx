@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchFollowUpQuestion } from '../fetchFollowUpQuestion';
 import {
-  DISCUSSION_FOLLOWUP_HINT,
   DISCUSSION_FOLLOWUP_LOADING,
-  DISCUSSION_FOLLOWUP_TITLE,
-  DISCUSSION_GAZE_HINT,
   DISCUSSION_PHASE_MAX_MS,
   DISCUSSION_PROMPT,
-  DISCUSSION_VOICE_PROMPT,
 } from '../../shared/gazeConfig';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
@@ -48,6 +44,7 @@ export default function DiscussionStep({
   const speechOutputRef = useRef(null);
   const startFollowUpListeningRef = useRef(null);
   const [stepPhase, setStepPhase] = useState(STEP_PHASES.PROMPT);
+  const [streetVeil, setStreetVeil] = useState(true);
   const [activeTag, setActiveTag] = useState(null);
   const [submitHint, setSubmitHint] = useState('');
   const [followUp, setFollowUp] = useState(null);
@@ -151,7 +148,10 @@ export default function DiscussionStep({
     const frameId = window.requestAnimationFrame(() => {
       timerId = window.setTimeout(() => {
         if (stepPhaseRef.current === STEP_PHASES.PROMPT) {
-          speechOutputRef.current?.speak(DISCUSSION_PROMPT);
+          speechOutputRef.current?.speak(DISCUSSION_PROMPT, () => {
+            setStreetVeil(false);
+          });
+          setStepPhase(STEP_PHASES.GAZE);
         }
       }, 300);
     });
@@ -388,10 +388,6 @@ export default function DiscussionStep({
 
   const combinedSpeech = speech.getCombinedText();
 
-  const handleStartGaze = useCallback(() => {
-    setStepPhase(STEP_PHASES.GAZE);
-  }, []);
-
   const handleCanvasRect = useCallback(
     (rect) => {
       canvasRectRef.current = rect;
@@ -421,42 +417,15 @@ export default function DiscussionStep({
           ? 'voice'
           : 'followup';
 
-  const phaseHint =
-    stepPhase === STEP_PHASES.PROMPT
-      ? DISCUSSION_PROMPT
-      : stepPhase === STEP_PHASES.GAZE
-        ? DISCUSSION_GAZE_HINT
-        : stepPhase === STEP_PHASES.VOICE
-          ? DISCUSSION_VOICE_PROMPT
-          : DISCUSSION_FOLLOWUP_HINT;
-
-  const titleText =
-    stepPhase === STEP_PHASES.PROMPT
-      ? '어디에 식물을 심을까요?'
-      : stepPhase === STEP_PHASES.GAZE
-        ? '시선으로 위치를 선택하세요'
-        : stepPhase === STEP_PHASES.VOICE
-          ? '의견을 말해 주세요'
-          : DISCUSSION_FOLLOWUP_TITLE;
-
   return (
     <section className={styles.discussionStep}>
-      <div className={styles.header}>
-        <p className={styles.subtitle}>선택된 비전 · {winnerCard.shortLabel}</p>
-        <h2 className={styles.title}>{titleText}</h2>
-        <p className={styles.hint}>{phaseHint}</p>
-      </div>
-
-      <div className={styles.canvasArea}>
-        {stepPhase === STEP_PHASES.PROMPT && (
-          <div className={styles.promptOverlay}>
-            <p className={styles.promptText}>{DISCUSSION_PROMPT}</p>
-            <button type="button" className={styles.promptBtn} onClick={handleStartGaze}>
-              시선으로 선택하기
-            </button>
-          </div>
-        )}
-
+      <div
+        className={`${styles.streetVeil} ${streetVeil ? '' : styles.streetVeilGone}`}
+        aria-hidden="true"
+      />
+      <div
+        className={`${styles.canvasArea} ${streetVeil ? styles.canvasAreaVeiled : ''}`}
+      >
         <StreetCanvas
           ref={streetCanvasRef}
           pins={pins}

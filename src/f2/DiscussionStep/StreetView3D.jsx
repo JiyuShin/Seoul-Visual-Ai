@@ -29,7 +29,6 @@ export default function StreetView3D({
   return (
     <iframe
       className={className}
-      title="Quiet Street 360"
       src={STREET_URL}
       allow="fullscreen"
       referrerPolicy="no-referrer"
