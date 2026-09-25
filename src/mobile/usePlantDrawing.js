@@ -8,7 +8,7 @@ export function usePlantDrawing(canvasRef, color) {
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -126,7 +126,7 @@ export function usePlantDrawing(canvasRef, color) {
     canvas.height = Math.floor(h * dpr);
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     redraw();
     setTick((n) => n + 1);

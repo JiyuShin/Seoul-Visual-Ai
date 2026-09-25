@@ -26,6 +26,7 @@ export default function MobileScreen() {
   const completedRef = useRef(false);
 
   const [drawingMounted, setDrawingMounted] = useState(false);
+  const [drawingEnterFromLoading, setDrawingEnterFromLoading] = useState(false);
   const [drawingExit, setDrawingExit] = useState(false);
 
   const [saveMounted, setSaveMounted] = useState(false);
@@ -43,11 +44,13 @@ export default function MobileScreen() {
     setBgBrighten(true);
     setLoadingExit(true);
     setPhase(MOBILE_PHASE.DRAWING);
+    setDrawingEnterFromLoading(true);
     setDrawingMounted(true);
     window.setTimeout(() => {
       setLoadingMounted(false);
       setLoadingExit(false);
       setBgBrighten(false);
+      setDrawingEnterFromLoading(false);
     }, LOADING_TO_DRAWING_MS);
   }, []);
 
@@ -130,7 +133,11 @@ export default function MobileScreen() {
               drawingExit ? styles.layerDrawingExit : ''
             }`}
           >
-            <MobileDrawingPage enterFromLoading exiting={drawingExit} onNext={goSave} />
+            <MobileDrawingPage
+              enterFromLoading={drawingEnterFromLoading}
+              exiting={drawingExit}
+              onNext={goSave}
+            />
           </div>
         )}
         {saveMounted && (

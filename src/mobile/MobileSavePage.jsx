@@ -1,4 +1,5 @@
 import { DRAWING_TAGS } from './drawingConfig';
+import MobileDrawingBoard from './MobileDrawingBoard';
 import drawingStyles from './MobileDrawingPage.module.css';
 import MobileStatusBar from './MobileStatusBar';
 import styles from './MobileSavePage.module.css';
@@ -18,7 +19,11 @@ export default function MobileSavePage({
       } ${exiting ? styles.artboardExiting : ''}`}
       data-figma-node="1693:965"
     >
-      <div className={styles.gradient} aria-hidden="true" data-figma-node="1693:970" />
+      <div
+        className={`${drawingStyles.gradient} ${styles.saveGradientSlot}`}
+        aria-hidden="true"
+        data-figma-node="1693:970"
+      />
       <div className={styles.statusBarSlot}>
         <MobileStatusBar />
       </div>
@@ -41,25 +46,21 @@ export default function MobileSavePage({
           </span>
         ))}
       </div>
-      <div
-        className={`${drawingStyles.canvasPanelShell} ${styles.savePanelShell}`}
-        data-figma-node="1693:973"
+      <MobileDrawingBoard
+        shellClassName={styles.savePanelShell}
+        dataFigmaShell="1693:973"
+        dataFigmaPanel="1693:973"
       >
-        <div className={drawingStyles.canvasPanel}>
-          <div className={drawingStyles.canvasPanelFrostFull} aria-hidden="true" />
-          <div className={drawingStyles.drawSurface}>
-            {drawingUrl ? (
-              <img
-                className={styles.previewImg}
-                src={drawingUrl}
-                alt="내가 그린 식물"
-                decoding="async"
-                draggable={false}
-              />
-            ) : null}
-          </div>
-        </div>
-      </div>
+        {drawingUrl ? (
+          <img
+            className={drawingStyles.drawSurfacePreview}
+            src={drawingUrl}
+            alt=""
+            decoding="async"
+            draggable={false}
+          />
+        ) : null}
+      </MobileDrawingBoard>
       <button
         type="button"
         className={`${drawingStyles.nextBtn} ${styles.completeBtn}`}

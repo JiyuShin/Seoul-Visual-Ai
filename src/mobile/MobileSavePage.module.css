@@ -5,22 +5,6 @@
   overflow: hidden;
 }
 
-/* Figma 1693:970 */
-.gradient {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(
-    167.648deg,
-    rgb(213, 255, 185) 2.26%,
-    rgba(255, 255, 255, 0) 33.43%,
-    rgba(255, 255, 255, 0.22) 76.25%,
-    rgba(177, 214, 154, 0.5) 100%,
-    rgba(162, 180, 151, 0.77) 100%
-  );
-}
-
 .copy {
   position: absolute;
   left: 38px;
@@ -78,15 +62,6 @@
 
 .tagMuted {
   opacity: 0.9;
-}
-
-.previewImg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  pointer-events: none;
 }
 
 .statusBarSlot {
@@ -147,7 +122,11 @@
 }
 
 /* 드로잉 → 세이브: 배경 영상 유지, UI만 블러 인 */
-.artboardEnter .gradient {
+.saveGradientSlot {
+  /* 그라디언트 스타일은 MobileDrawingPage.module.css 와 공유 */
+}
+
+.artboardEnter .saveGradientSlot {
   opacity: 0;
   animation: saveGradientIn 0.95s ease 0.05s forwards;
 }
@@ -225,7 +204,7 @@
 }
 
 /* 세이브 → 태그: 텍스트·패널 블러 아웃 (배경 블러는 MobileScreen) */
-.artboardExiting .gradient {
+.artboardExiting .saveGradientSlot {
   animation: gradientFadeOut 0.85s ease forwards;
 }
 
@@ -241,7 +220,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .artboardEnter .gradient,
+  .artboardEnter .saveGradientSlot,
   .artboardEnter .district,
   .artboardEnter .lead,
   .artboardEnter .tags,
@@ -253,7 +232,7 @@
     transform: none;
   }
 
-  .artboardExiting .gradient,
+  .artboardExiting .saveGradientSlot,
   .artboardExiting .copy,
   .artboardExiting .tags,
   .artboardExiting .savePanelShell,
