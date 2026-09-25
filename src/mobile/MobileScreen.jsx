@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useEntryFlow } from '../shared/EntryFlowContext';
 import MobileDrawingPage from './MobileDrawingPage';
 import MobileEndPage from './MobileEndPage';
 import MobileLoadingPage from './MobileLoadingPage';
@@ -16,11 +17,18 @@ import {
   TAG_TO_END_MS,
 } from './mobileTransition';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
+import { resolveMobileDistrictCopy } from './mobileDistrictCopy';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
   const { districtFromKiosk } = useMobileLink();
-  const districtName = districtFromKiosk?.name ?? '용산구';
+  const { selectedDistrict } = useEntryFlow();
+  const districtName =
+    districtFromKiosk?.name ?? selectedDistrict?.name ?? '용산구';
+  const districtCopy = useMemo(
+    () => resolveMobileDistrictCopy(districtName),
+    [districtName]
+  );
   const [phase, setPhase] = useState(MOBILE_PHASE.LOADING);
   const [loadingMounted, setLoadingMounted] = useState(true);
   const [loadingExit, setLoadingExit] = useState(false);
@@ -131,7 +139,11 @@ export default function MobileScreen() {
               loadingExit ? styles.layerLoadingExit : ''
             }`}
           >
-            <MobileLoadingPage districtName={districtName} exiting={loadingExit} />
+            <MobileLoadingPage
+              districtName={districtName}
+              loadingLead={districtCopy.loadingLead}
+              exiting={loadingExit}
+            />
           </div>
         )}
         {drawingMounted && (
@@ -142,6 +154,8 @@ export default function MobileScreen() {
           >
             <MobileDrawingPage
               districtName={districtName}
+              drawingLeadLines={districtCopy.drawingLeadLines}
+              tags={districtCopy.tags}
               enterFromLoading={drawingEnterFromLoading}
               exiting={drawingExit}
               onNext={goSave}
@@ -154,6 +168,8 @@ export default function MobileScreen() {
           >
             <MobileSavePage
               districtName={districtName}
+              drawingLeadLines={districtCopy.drawingLeadLines}
+              tags={districtCopy.tags}
               enterFromDrawing={!saveExit}
               exiting={saveExit}
               drawingUrl={plantDrawingUrl}
