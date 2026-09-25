@@ -1,12 +1,16 @@
 import { useRef, useState } from 'react';
-import { DRAWING_COLORS, DRAWING_TAGS } from './drawingConfig';
+import { DRAWING_COLORS } from './drawingConfig';
 import MobileDrawingBoard from './MobileDrawingBoard';
+import MobileDrawingLead from './MobileDrawingLead';
+import { DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED } from './mobileDistrictCopy';
 import { usePlantDrawing } from './usePlantDrawing';
 import styles from './MobileDrawingPage.module.css';
 
 /** Figma 1672:833 — 드로잉 인풋 */
 export default function MobileDrawingPage({
   districtName = '용산구',
+  drawingLeadLines = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.drawingLeadLines,
+  tags = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.tags,
   enterFromLoading = false,
   exiting = false,
   onNext,
@@ -30,18 +34,17 @@ export default function MobileDrawingPage({
     >
       <header className={styles.copy} data-figma-node="1672:1111">
         <h1 className={styles.district}>{districtName}</h1>
-        <p className={styles.lead}>
-          <span className={styles.leadStrong}>녹지 가득한 {districtName}</span>
-          를 만들기 위해
-          <br />
-          나만의 식물을 자유롭게 그려주세요
-        </p>
+        <MobileDrawingLead
+          lines={drawingLeadLines}
+          leadClassName={styles.lead}
+          strongClassName={styles.leadStrong}
+        />
       </header>
       <div className={styles.tags} data-figma-node="1672:861">
-        {DRAWING_TAGS.map((label, index) => (
+        {tags.map((label, index) => (
           <span
             key={label}
-            className={`${styles.tag} ${index === DRAWING_TAGS.length - 1 ? styles.tagMuted : ''}`}
+            className={`${styles.tag} ${index === tags.length - 1 ? styles.tagMuted : ''}`}
           >
             {label}
           </span>
