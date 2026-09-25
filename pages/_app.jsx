@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
+import { MobileLinkProvider } from '../src/shared/mobileLink/MobileLinkContext';
 import GazeReticle from '../src/shared/GazeReticle';
 import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../src/shared/gaze/participants';
 
@@ -45,7 +46,9 @@ function AppFrame({ Component, pageProps }) {
 export default function App({ Component, pageProps }) {
   return (
     <EntryFlowProvider>
-      <AppFrame Component={Component} pageProps={pageProps} />
+      <MobileLinkProvider>
+        <AppFrame Component={Component} pageProps={pageProps} />
+      </MobileLinkProvider>
     </EntryFlowProvider>
   );
 }

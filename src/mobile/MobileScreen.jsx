@@ -15,9 +15,12 @@ import {
   SAVE_TO_TAG_MS,
   TAG_TO_END_MS,
 } from './mobileTransition';
+import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
+  const { districtFromKiosk } = useMobileLink();
+  const districtName = districtFromKiosk?.name ?? '용산구';
   const [phase, setPhase] = useState(MOBILE_PHASE.LOADING);
   const [loadingMounted, setLoadingMounted] = useState(true);
   const [loadingExit, setLoadingExit] = useState(false);
@@ -128,7 +131,7 @@ export default function MobileScreen() {
               loadingExit ? styles.layerLoadingExit : ''
             }`}
           >
-            <MobileLoadingPage exiting={loadingExit} />
+            <MobileLoadingPage districtName={districtName} exiting={loadingExit} />
           </div>
         )}
         {drawingMounted && (
@@ -138,6 +141,7 @@ export default function MobileScreen() {
             }`}
           >
             <MobileDrawingPage
+              districtName={districtName}
               enterFromLoading={drawingEnterFromLoading}
               exiting={drawingExit}
               onNext={goSave}
@@ -149,6 +153,7 @@ export default function MobileScreen() {
             className={`${styles.layer} ${styles.layerSave} ${saveExit ? styles.layerSaveExit : ''}`}
           >
             <MobileSavePage
+              districtName={districtName}
               enterFromDrawing={!saveExit}
               exiting={saveExit}
               drawingUrl={plantDrawingUrl}

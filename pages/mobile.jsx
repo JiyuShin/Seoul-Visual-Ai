@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import MobileLinkStatus from '../src/mobile/MobileLinkStatus';
 import MobileViewport from '../src/mobile/MobileViewport';
 import MobileScreen from '../src/mobile/MobileScreen';
 import mobileStyles from '../src/mobile/mobilePage.module.css';
@@ -20,6 +21,7 @@ export default function MobilePage() {
         />
       </Head>
       <div className={mobileStyles.shell}>
+        <MobileLinkStatus />
         <MobileViewport>
           <MobileScreen />
         </MobileViewport>

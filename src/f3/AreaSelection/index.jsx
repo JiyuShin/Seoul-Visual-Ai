@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
+import {
+  buildMobileJoinUrl,
+  getMobilePublicOriginSync,
+  isLikelyLocalhostQr,
+} from '../../shared/mobileLink/publicOrigin';
+import DynamicQrCode from '../../shared/mobileLink/DynamicQrCode';
+import { useMobileLink } from '../../shared/mobileLink/MobileLinkContext';
 import {
   DISTRICTS,
   ROULETTE_LOGOS,
@@ -379,8 +386,28 @@ function QrBorder() {
   return <div ref={borderRef} className={styles.qrGlow} />;
 }
 
-function QrCopy({ phase }) {
+function QrCopy({ phase, qrUrl, linkStatus, isPaired, holdSecondsLeft, mobilePublicOrigin }) {
   const motion = copyClass(phase, 'q');
+  const localhostHint =
+    phase === 'q' && isLikelyLocalhostQr(mobilePublicOrigin)
+      ? 'LAN IP를 찾지 못했습니다. PC와 폰이 같은 Wi‑Fi인지 확인하고 yarn dev(server.js)로 실행해 주세요.'
+      : null;
+
+  let statusLine = null;
+  if (phase === 'q' && !qrUrl) {
+    statusLine = 'QR 링크를 준비하는 중…';
+  } else if (linkStatus === 'error') {
+    statusLine = '연결 오류 · yarn dev(node server.js) 실행 여부를 확인해 주세요.';
+  } else if (linkStatus === 'connecting') {
+    statusLine = '키오스크 세션 연결 중…';
+  } else if (isPaired) {
+    statusLine = '휴대폰과 연결되었어요. 모바일 화면에서 식물을 그려 주세요.';
+  } else if (linkStatus === 'waiting_mobile') {
+    statusLine =
+      holdSecondsLeft > 0
+        ? `QR을 스캔해 /mobile 로 연결하세요. ${holdSecondsLeft}초 후 다음 화면으로 이동합니다.`
+        : 'QR을 스캔하면 /mobile 페이지로 연결됩니다.';
+  }
 
   return (
     <>
@@ -393,9 +420,26 @@ function QrCopy({ phase }) {
         이제 모든 준비는 끝났어요! 화면 속 QR를 인식해 휴대폰으로 직접 식물을 그려볼 차례예요.
         여러분이 원하는 서울 속 나만의 식물을 심으러 가볼까요?
       </p>
+      {statusLine ? (
+        <p className={`${styles.qrStatus} ${isPaired ? styles.qrStatusPaired : ''}`}>{statusLine}</p>
+      ) : null}
+      {localhostHint ? <p className={styles.qrDevHint}>{localhostHint}</p> : null}
+      {phase === 'q' && qrUrl ? (
+        <p className={styles.qrLinkPreview} title={qrUrl}>
+          {qrUrl}
+        </p>
+      ) : null}
       <div className={`${styles.qrFrame} ${phase === 'q' ? styles.qrOn : ''}`}>
-        <div className={styles.qrImage}>
-          <img src="/3/qr.png" alt="QR 코드" />
+        <div className={phase === 'q' ? styles.qrImageLive : styles.qrImage}>
+          {phase === 'q' ? (
+            qrUrl ? (
+              <DynamicQrCode url={qrUrl} alt="모바일 연결 QR 코드" />
+            ) : (
+              <div className={styles.qrImageLiveLoading} aria-hidden="true" />
+            )
+          ) : (
+            <img src="/3/qr.png" alt="" aria-hidden="true" />
+          )}
         </div>
         <QrBorder />
       </div>
@@ -403,14 +447,21 @@ function QrCopy({ phase }) {
   );
 }
 
-const QR_HOLD_MS = 5000;
+/** QR 단계 최소 노출 후 키오스크 /2 로 이동 (모바일 WS 는 유지) */
+const QR_HOLD_MS = 10000;
 
 export default function AreaSelection() {
   const router = useRouter();
   const { setSelectedDistrict } = useEntryFlow();
+  const { startKioskSession, qrTargetUrl, mobilePublicOrigin, status: linkStatus, isPaired } =
+    useMobileLink();
+  const kioskSessionRef = useRef(false);
+  const [qrHoldSecondsLeft, setQrHoldSecondsLeft] = useState(0);
+  const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
   const [districtIndex, setDistrictIndex] = useState(0);
   const district = DISTRICTS[districtIndex];
+  const displayQrUrl = qrTargetUrl || localQrUrl;
 
   const finishFinding = useCallback(() => {
     const index = Math.floor(Math.random() * DISTRICTS.length);
@@ -425,12 +476,48 @@ export default function AreaSelection() {
     return () => clearTimeout(timeout);
   }, [phase]);
 
+  useLayoutEffect(() => {
+    if (phase === 'f') {
+      kioskSessionRef.current = false;
+      setLocalQrUrl('');
+      return undefined;
+    }
+    if (phase !== 's' && phase !== 'q') return undefined;
+    if (kioskSessionRef.current) return undefined;
+
+    kioskSessionRef.current = true;
+    try {
+      const id = startKioskSession(district);
+      const origin = mobilePublicOrigin || getMobilePublicOriginSync();
+      setLocalQrUrl(buildMobileJoinUrl(id, origin));
+    } catch {
+      kioskSessionRef.current = false;
+    }
+    return undefined;
+  }, [phase, district, startKioskSession, mobilePublicOrigin]);
+
+  useEffect(() => {
+    if (phase !== 'q') {
+      setQrHoldSecondsLeft(0);
+    }
+  }, [phase]);
+
   useEffect(() => {
     if (phase !== 'q') return undefined;
-    const timeout = setTimeout(() => {
+
+    setQrHoldSecondsLeft(Math.ceil(QR_HOLD_MS / 1000));
+    const tick = setInterval(() => {
+      setQrHoldSecondsLeft((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+
+    const advance = setTimeout(() => {
       router.push('/2');
     }, QR_HOLD_MS);
-    return () => clearTimeout(timeout);
+
+    return () => {
+      clearInterval(tick);
+      clearTimeout(advance);
+    };
   }, [phase, router]);
 
   return (
@@ -448,7 +535,14 @@ export default function AreaSelection() {
       <MovingMap phase={phase} />
       <SelectedCopy district={district} phase={phase} />
       {phase !== 'f' && <DistrictGlow district={district} hidden={phase !== 's'} />}
-      <QrCopy phase={phase} />
+      <QrCopy
+        phase={phase}
+        qrUrl={displayQrUrl}
+        linkStatus={linkStatus}
+        isPaired={isPaired}
+        holdSecondsLeft={qrHoldSecondsLeft}
+        mobilePublicOrigin={mobilePublicOrigin}
+      />
     </Stage>
   );
 }
