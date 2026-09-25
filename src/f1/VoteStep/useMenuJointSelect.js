@@ -11,8 +11,8 @@ import { CAM_KEYS, VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { createVoteState } from '../voteState';
 
 const BG_SWITCH_MS = 1200;
-const SPLIT_ARM_MS = 500;
-const SPLIT_HOLD_MS = 1000;
+const SPLIT_ARM_MS = 0;
+const SPLIT_HOLD_MS = 3000;
 const SPLIT_GAP_MS = 400;
 
 /**

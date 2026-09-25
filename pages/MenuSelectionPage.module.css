@@ -41,7 +41,7 @@
 .titleBlur {
   position: fixed;
   left: 50%;
-  top: -60px;
+  top: -80px;
   z-index: 1;
   width: 112vw;
   height: auto;
@@ -200,7 +200,7 @@
   --card-h: calc(var(--card-w) * 1135.83 / 800.537);
   position: fixed;
   left: 50%;
-  top: calc(50% + 26px + var(--card-h) / 2 + 48px);
+  top: calc(50% + 26px + var(--card-h) / 2 + 74px);
   z-index: 1;
   width: min(72vw, 980px);
   margin: 0;

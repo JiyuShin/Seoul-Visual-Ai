@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CAM_COLOR, CAM_KEYS, PERSON_LABEL, VIEWER_BY_CAM } from './participants';
 import { createFaceLandmarker } from './faceLandmarker';
 import { extractFeatures, gazeVector, LM } from './features';
@@ -12,6 +12,7 @@ import {
   isIntro,
   step as stepSession,
 } from './calibrationSession';
+import { clearGazeSession, loadGazeSession, saveGazeSession } from './gazeSession';
 
 const MOVE_MS = 800;
 const COLLECT_MS = 1000;
@@ -108,6 +109,7 @@ export function useGazeEngine({ onSample } = {}) {
 
   const camsRef = useRef({ A: makeCam(), B: makeCam() });
   const modelsRef = useRef({});
+  const resumedRef = useRef(false);
   const filtersRef = useRef({
     A: new OneEuroPoint(ONE_EURO),
     B: new OneEuroPoint(ONE_EURO),
@@ -148,6 +150,19 @@ export function useGazeEngine({ onSample } = {}) {
   const [stats, setStats] = useState({ A: { fps: 0, face: false }, B: { fps: 0, face: false } });
 
   gridCountRef.current = gridCount;
+
+  const persistModels = useCallback(() => {
+    saveGazeSession({ models: modelsRef.current });
+  }, []);
+
+  // 페이지를 나갔다 들어와도 같은 탭의 보정 모델을 다시 쓴다.
+  useLayoutEffect(() => {
+    const session = loadGazeSession();
+    if (!session?.models) return;
+    modelsRef.current = session.models;
+    setCalibrated(Object.keys(session.models));
+    if (session.deviceIds) setDeviceIds(session.deviceIds);
+  }, []);
 
   useEffect(() => {
     CAM_KEYS.forEach((key) => filtersRef.current[key].setParams(smoothing));
@@ -271,6 +286,7 @@ export function useGazeEngine({ onSample } = {}) {
 
     modelsRef.current[cam] = fit.model;
     filtersRef.current[cam].reset();
+    saveGazeSession({ models: modelsRef.current });
 
     return [{ key: cam, cam, value: Math.sqrt(sum / fit.X.length), samples: fit.X.length }];
   }, []);
@@ -413,6 +429,7 @@ export function useGazeEngine({ onSample } = {}) {
       const cam = camsRef.current[key];
       const video = videoRefs[key].current;
       if (!cam.stream || !cam.landmarker || !video) return;
+      if (video.paused) video.play().catch(() => {});
       if (video.readyState < 2 || !video.videoWidth) return;
       if (video.currentTime === cam.lastVideoTime) return;
 
@@ -615,6 +632,7 @@ export function useGazeEngine({ onSample } = {}) {
     setStatus(
       `카메라 ${live.length}대 동작 중${errors.length ? ` · 실패 ${errors.join(' / ')}` : ''}`
     );
+    saveGazeSession({ running: true, deviceIds });
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
@@ -628,6 +646,17 @@ export function useGazeEngine({ onSample } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceIds]);
 
+  // 새로고침이나 페이지 재진입으로 엔진이 다시 떠도, 이미 보정이 있으면 카메라를 다시 연다.
+  useEffect(() => {
+    if (!ready || resumedRef.current) return undefined;
+    const session = loadGazeSession();
+    const hasModel = session?.models && Object.keys(session.models).length > 0;
+    if (!session?.running || !hasModel) return undefined;
+    resumedRef.current = true;
+    startCameras();
+    return undefined;
+  }, [ready, startCameras]);
+
   const stopAll = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
@@ -635,6 +664,7 @@ export function useGazeEngine({ onSample } = {}) {
     calibRef.current = null;
     setCalibUi(null);
     setRunning(false);
+    saveGazeSession({ running: false });
     setStatus('카메라 정지');
   }, [stopCamera]);
 
@@ -677,12 +707,13 @@ export function useGazeEngine({ onSample } = {}) {
         // 이번에 다시 찍는 사람의 모델만 버린다 (한 명만 재보정 가능)
         stages.forEach((cam) => delete modelsRef.current[cam]);
         setCalibrated(Object.keys(modelsRef.current));
+        persistModels();
       }
 
       setCalibUi(uiFor(session));
       setStatus(mode === 'validate' ? '정확도 측정 대기 중' : '보정 대기 중');
     },
-    [running, uiFor]
+    [persistModels, running, uiFor]
   );
 
   const startStage = useCallback(() => {
@@ -711,6 +742,7 @@ export function useGazeEngine({ onSample } = {}) {
     });
     setCalibrated([]);
     setResult(null);
+    clearGazeSession();
     setStatus('보정 초기화됨');
   }, []);
 

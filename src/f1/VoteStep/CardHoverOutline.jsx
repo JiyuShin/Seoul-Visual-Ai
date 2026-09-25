@@ -3,9 +3,9 @@ import { VOTE_VIEWER_IDS } from '../../shared/gazeConfig';
 import styles from './CardHoverOutline.module.css';
 
 const DRAW_MS = 1400;
-const REF_W = 800.537;
-const REF_STROKE = 6;
-const REF_RADIUS = 44.151;
+const REF_W = 667;
+const REF_STROKE = 8;
+const REF_RADIUS = 41.1825;
 
 const VERT = `
 attribute vec2 aPos;
@@ -23,7 +23,6 @@ precision mediump float;
 
 uniform vec2 uRes;
 uniform float uProgress;
-uniform float uVariant;
 uniform float uStroke;
 uniform float uRadius;
 
@@ -89,35 +88,31 @@ void main() {
   float r = min(uRadius, min(b.x, b.y) - 1.0);
   float d = sdRoundBox(p, b, r);
   float halfW = stroke * 0.5;
-  float core = 1.0 - smoothstep(halfW * 0.2, halfW, abs(d));
-  float glow = exp(-(d * d) / (halfW * halfW * 3.4));
-  float band = max(core, glow * 0.42);
+  float aa = max(1.25, halfW * 0.35);
+  float core = 1.0 - smoothstep(halfW - aa, halfW + aa, abs(d));
   float s = arc01(p, b, r);
-  float head = uProgress > 0.985 ? 1.0 : smoothstep(0.0, 0.14, uProgress - s);
-  float drawn = step(s, uProgress + 0.001);
-  float along = band * head * drawn;
-  if (along < 0.004) {
+  float travel = uProgress;
+  float fade = smoothstep(0.0, 0.72, travel);
+  float head = fract(s - travel + 1.0);
+  float wave = smoothstep(0.5, 0.0, head);
+  float settle = smoothstep(0.62, 1.0, travel);
+  float presence = mix(mix(0.42, 1.0, wave), 1.0, settle);
+  float along = core * fade * presence;
+  if (along < 0.001) {
     gl_FragColor = vec4(0.0);
     return;
   }
 
-  vec3 green = vec3(0.396078, 1.0, 0.0);
-  vec3 purple = vec3(0.486275, 0.125490, 0.800000);
-  vec2 corner = vec2(-b.x, -b.y);
-  float dist = length(p - corner) / max(length(b * 2.0), 1.0);
-  float strength = mix(1.0, 0.16, smoothstep(0.0, 0.92, dist));
-  vec3 col = green;
-  if (uVariant > 1.5) {
-    float xMix = clamp((p.x + b.x) / max(b.x * 2.0, 1.0), 0.0, 1.0);
-    vec3 white = vec3(1.0);
-    col = xMix < 0.5 ? mix(green, white, xMix * 2.0) : mix(white, purple, (xMix - 0.5) * 2.0);
-    strength = 1.0;
-  } else if (uVariant > 0.5) {
-    col = purple;
-  }
+  vec3 topCol = vec3(220.0, 146.0, 255.0) / 255.0;
+  vec3 midCol = vec3(1.0);
+  vec3 botCol = vec3(212.0, 138.0, 255.0) / 255.0;
+  float y01 = clamp((p.y + b.y) / max(b.y * 2.0, 1.0), 0.0, 1.0);
+  float mid = 0.498362;
+  vec3 col = y01 <= mid
+    ? mix(topCol, midCol, y01 / mid)
+    : mix(midCol, botCol, (y01 - mid) / (1.0 - mid));
 
-  float alpha = along * strength;
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col, along);
 }
 `;
 
@@ -184,7 +179,6 @@ export function CardHoverOutline({ viewers }) {
     const pos = gl.getAttribLocation(program, 'aPos');
     const uRes = gl.getUniformLocation(program, 'uRes');
     const uProgress = gl.getUniformLocation(program, 'uProgress');
-    const uVariant = gl.getUniformLocation(program, 'uVariant');
     const uStroke = gl.getUniformLocation(program, 'uStroke');
     const uRadius = gl.getUniformLocation(program, 'uRadius');
 
@@ -221,7 +215,6 @@ export function CardHoverOutline({ viewers }) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, w, h);
       gl.uniform1f(uProgress, progress);
-      gl.uniform1f(uVariant, variant);
       gl.uniform1f(uStroke, REF_STROKE * scale);
       gl.uniform1f(uRadius, REF_RADIUS * scale);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

@@ -1,9 +1,19 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter } from 'next/router';
 import { useGazeEngine } from './gaze/useGazeEngine';
 import { VIEWER_BY_CAM } from './gaze/participants';
 import GazeCameraFeeds from './gaze/GazeCameraFeeds';
 import GazeDebugHud from './gaze/GazeDebugHud';
+import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
 
 const EntryFlowContext = createContext(null);
 
@@ -34,6 +44,11 @@ export function EntryFlowProvider({ children }) {
 
   // 운영자가 카메라를 잡고 보정을 마친 뒤 시작을 누르면 참여 화면으로 넘어간다.
   const [setupComplete, setSetupComplete] = useState(false);
+
+  // 자식 페이지의 보정 화면 이동보다 먼저 복원해야, 1페이지가 보정을 다시 요구하지 않는다.
+  useLayoutEffect(() => {
+    if (loadGazeSession()?.setupComplete) setSetupComplete(true);
+  }, []);
   // DEV ONLY: 최종 파일에서 제거. 시선 보정 없이 마우스 좌표로 이후 인터랙션을 진행한다.
   const [mouseDev, setMouseDev] = useState(false);
 
@@ -154,10 +169,12 @@ export function EntryFlowProvider({ children }) {
   }, [mouseDev, publishMousePoint]);
 
   const completeSetup = useCallback(() => {
+    saveGazeSession({ setupComplete: true });
     setSetupComplete(true);
   }, []);
 
   const reopenSetup = useCallback(() => {
+    saveGazeSession({ setupComplete: false });
     setSetupComplete(false);
   }, []);
 
