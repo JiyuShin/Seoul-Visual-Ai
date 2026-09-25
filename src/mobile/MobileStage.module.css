@@ -1,9 +1,10 @@
 .viewport {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  position: relative;
-  composes: backdrop from './mobileArtboard.module.css';
+  background: transparent;
 }
 
 .stageOuter {

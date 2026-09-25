@@ -1,5 +1,4 @@
 import drawingStyles from './MobileDrawingPage.module.css';
-import MobileStatusBar from './MobileStatusBar';
 import styles from './MobileEndPage.module.css';
 
 /** Figma 1693:989 — 전송 확인 */
@@ -14,10 +13,6 @@ export default function MobileEndPage({
       className={`${styles.artboard} ${enterFromTag ? styles.artboardEnter : ''}`}
       data-figma-node="1693:989"
     >
-      <div className={styles.gradient} aria-hidden="true" data-figma-node="1693:994" />
-      <div className={styles.statusBarSlot}>
-        <MobileStatusBar />
-      </div>
       <header className={styles.copy} data-figma-node="1693:997">
         <h1 className={styles.title}>전송할까요?</h1>
         <div className={styles.lead}>

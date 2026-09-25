@@ -1,7 +1,6 @@
 import { DRAWING_TAGS } from './drawingConfig';
 import MobileDrawingBoard from './MobileDrawingBoard';
 import drawingStyles from './MobileDrawingPage.module.css';
-import MobileStatusBar from './MobileStatusBar';
 import styles from './MobileSavePage.module.css';
 
 /** Figma 1693:965 — 세이브(미리보기) */
@@ -10,8 +9,11 @@ export default function MobileSavePage({
   drawingUrl = null,
   enterFromDrawing = false,
   exiting = false,
+  drawingLayerVisible = false,
   onComplete,
 }) {
+  const handoffFromDrawing = enterFromDrawing && drawingLayerVisible;
+  const showSaveBoard = !handoffFromDrawing;
   return (
     <div
       className={`${styles.artboard} ${enterFromDrawing ? styles.artboardEnter : ''} ${
@@ -19,14 +21,6 @@ export default function MobileSavePage({
       } ${exiting ? styles.artboardExiting : ''}`}
       data-figma-node="1693:965"
     >
-      <div
-        className={`${drawingStyles.gradient} ${styles.saveGradientSlot}`}
-        aria-hidden="true"
-        data-figma-node="1693:970"
-      />
-      <div className={styles.statusBarSlot}>
-        <MobileStatusBar />
-      </div>
       <header className={styles.copy} data-figma-node="1693:982">
         <h1 className={styles.district}>{districtName}</h1>
         <p className={styles.lead}>
@@ -46,21 +40,33 @@ export default function MobileSavePage({
           </span>
         ))}
       </div>
-      <MobileDrawingBoard
-        shellClassName={styles.savePanelShell}
-        dataFigmaShell="1693:973"
-        dataFigmaPanel="1693:973"
-      >
-        {drawingUrl ? (
-          <img
-            className={drawingStyles.drawSurfacePreview}
-            src={drawingUrl}
-            alt=""
-            decoding="async"
-            draggable={false}
-          />
-        ) : null}
-      </MobileDrawingBoard>
+      {drawingUrl && handoffFromDrawing ? (
+        <img
+          className={styles.savePreviewPreload}
+          src={drawingUrl}
+          alt=""
+          decoding="sync"
+          draggable={false}
+          aria-hidden="true"
+        />
+      ) : null}
+      {showSaveBoard ? (
+        <MobileDrawingBoard
+          shellClassName={styles.savePanelShell}
+          dataFigmaShell="1693:973"
+          dataFigmaPanel="1693:973"
+        >
+          {drawingUrl ? (
+            <img
+              className={drawingStyles.drawSurfacePreview}
+              src={drawingUrl}
+              alt=""
+              decoding="sync"
+              draggable={false}
+            />
+          ) : null}
+        </MobileDrawingBoard>
+      ) : null}
       <button
         type="button"
         className={`${drawingStyles.nextBtn} ${styles.completeBtn}`}

@@ -1,14 +1,20 @@
+import { useRef } from 'react';
 import styles from './MobileViewport.module.css';
+import { useMobileViewportLayout } from './useMobileViewportLayout';
 
 /**
- * 모바일 작업용 뷰포트. 데스크톱에서는 390×844 프레임, 실제 폭이 좁으면 전체 화면.
- * 다른 페이지·전역 스타일과 분리된 CSS Module 만 사용한다.
+ * 실기기(iPhone·Galaxy 등) visualViewport + 회전에 맞춘 전체 화면 프레임.
  */
 export default function MobileViewport({ children }) {
+  const safeRef = useRef(null);
+  useMobileViewportLayout(safeRef);
+
   return (
     <div className={styles.chrome}>
       <div className={styles.frame}>
-        <div className={styles.safe}>{children}</div>
+        <div className={styles.safe} ref={safeRef}>
+          {children}
+        </div>
       </div>
     </div>
   );

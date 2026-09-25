@@ -162,6 +162,22 @@
   animation: none;
 }
 
+.artboardEnterFromDrawing .saveGradientSlot {
+  opacity: 1;
+  animation: none;
+}
+
+/* 드로잉 보드 handoff 동안 미리 디코드 (화면 밖) */
+.savePreviewPreload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
 .artboardEnter .completeBtn {
   opacity: 0;
   animation: completeBtnIn 0.9s ease-out 0.34s forwards;

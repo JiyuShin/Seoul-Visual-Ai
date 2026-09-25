@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import MobileStatusBar from './MobileStatusBar';
 import tagStyles from './MobileTagPage.module.css';
 import styles from './MobileTag2Page.module.css';
 
@@ -35,9 +34,6 @@ export default function MobileTag2Page({
         aria-hidden="true"
         data-figma-node="1693:915"
       />
-      <div className={tagStyles.statusBarSlot}>
-        <MobileStatusBar />
-      </div>
       <header className={`${tagStyles.copy} ${styles.tagCopy}`} data-figma-node="1693:917">
         <h1 className={tagStyles.title}>
           <span className={tagStyles.titleLine}>멋진 식물이에요!</span>

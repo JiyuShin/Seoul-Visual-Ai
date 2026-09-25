@@ -127,7 +127,8 @@ export function EntryFlowProvider({ children }) {
     }
   }, []);
 
-  const engine = useGazeEngine({ onSample: registerGazeSample });
+  const gazeEnabled = router.pathname !== '/mobile';
+  const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
 
   const handleGazeClipChange = useCallback((clip) => {
     setGazeClip(clip);
@@ -245,10 +246,9 @@ export function EntryFlowProvider({ children }) {
 
   return (
     <EntryFlowContext.Provider value={value}>
-      {/* 페이지가 바뀌어도 추적이 끊기지 않도록 비디오는 페이지 밖에서 계속 살려 둔다. */}
-      <GazeCameraFeeds videoRefs={engine.videoRefs} />
+      {gazeEnabled ? <GazeCameraFeeds videoRefs={engine.videoRefs} /> : null}
       {children}
-      <GazeDebugHud diagRef={engine.diagRef} gazeRef={engine.gazeRef} />
+      {gazeEnabled ? <GazeDebugHud diagRef={engine.diagRef} gazeRef={engine.gazeRef} /> : null}
     </EntryFlowContext.Provider>
   );
 }

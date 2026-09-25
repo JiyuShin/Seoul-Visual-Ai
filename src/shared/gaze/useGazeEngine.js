@@ -102,8 +102,9 @@ function makeCam() {
  * 다시 그려지므로, 좌표를 읽어야 하는 쪽이 자기 루프에서 ref 를 읽어가게 한다.
  *
  * @param {(viewerId: string, x: number, y: number) => void} [onSample]
+ * @param {boolean} [enabled] — false면 모델·카메라 초기화 생략 (예: /mobile)
  */
-export function useGazeEngine({ onSample } = {}) {
+export function useGazeEngine({ onSample, enabled = true } = {}) {
   const videoRefs = useRef({ A: { current: null }, B: { current: null } }).current;
   const canvasRefs = useRef({ A: { current: null }, B: { current: null } }).current;
 
@@ -132,7 +133,7 @@ export function useGazeEngine({ onSample } = {}) {
 
   onSampleRef.current = onSample;
 
-  const [status, setStatus] = useState('모델 로딩 대기 중');
+  const [status, setStatus] = useState(enabled ? '모델 로딩 대기 중' : '시선 추적 사용 안 함');
   const [ready, setReady] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState(null);
@@ -170,6 +171,13 @@ export function useGazeEngine({ onSample } = {}) {
 
   // ── 모델 로딩 ────────────────────────────────────────────────
   useEffect(() => {
+    if (!enabled) {
+      setReady(false);
+      setError(null);
+      setStatus('시선 추적 사용 안 함');
+      return undefined;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -192,7 +200,7 @@ export function useGazeEngine({ onSample } = {}) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(
     () => () => {
@@ -206,13 +214,18 @@ export function useGazeEngine({ onSample } = {}) {
   );
 
   const refreshDevices = useCallback(async () => {
+    if (!enabled || !navigator.mediaDevices?.enumerateDevices) {
+      setDevices([]);
+      return;
+    }
     const list = await navigator.mediaDevices.enumerateDevices();
     setDevices(list.filter((device) => device.kind === 'videoinput'));
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     refreshDevices();
-  }, [refreshDevices]);
+  }, [enabled, refreshDevices]);
 
   const setDeviceId = useCallback((key, id) => {
     setDeviceIds((current) => ({ ...current, [key]: id }));
@@ -572,6 +585,11 @@ export function useGazeEngine({ onSample } = {}) {
   );
 
   const startCameras = useCallback(async () => {
+    if (!enabled) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus('이 환경에서는 카메라 API를 사용할 수 없습니다 (HTTPS·권한 확인)');
+      return;
+    }
     if (startingRef.current) return; // 재시작 요청이 겹치면 같은 장치를 두 번 열게 된다
     if (deviceIds.B && deviceIds.B === deviceIds.A) {
       setStatus('1번과 2번 참가자에게 서로 다른 카메라를 지정하세요');
@@ -636,7 +654,7 @@ export function useGazeEngine({ onSample } = {}) {
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
-  }, [deviceIds, refreshDevices, stopCamera, tick, videoRefs]);
+  }, [deviceIds, enabled, refreshDevices, stopCamera, tick, videoRefs]);
 
   // 권한을 허용한 뒤에야 장치 목록이 채워지므로, 동작 중에 카메라를 바꾸면 바로 다시 연다.
   useEffect(() => {

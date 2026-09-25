@@ -1,3 +1,57 @@
+.mobileRoot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 식물 영상·전역 블러 — 스테이지 스케일 밖, 화면 전체 */
+.backdropLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.backdropGradient {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  composes: backdrop from './mobileArtboard.module.css';
+}
+
+/* Figma 1690:707 — 로딩 그라디언트는 아트보드(480px)가 아니라 화면 전체 */
+.backdropGradientLoading.backdropGradient {
+  background: linear-gradient(
+    167.648deg,
+    rgb(213, 255, 185) 0%,
+    rgba(255, 255, 255, 0.35) 18%,
+    rgba(255, 255, 255, 0) 28%,
+    rgba(255, 255, 255, 0.12) 72%,
+    rgba(177, 214, 154, 0.45) 100%
+  );
+}
+
+.backdropGradientLoadingExit {
+  animation: backdropGradientFadeOut 0.9s ease forwards;
+}
+
+@keyframes backdropGradientFadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 .session {
   position: relative;
   width: 480px;
@@ -9,7 +63,7 @@
 .bgBrighten {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 2;
   pointer-events: none;
   opacity: 0;
   background: linear-gradient(
@@ -86,7 +140,7 @@
 .bgHeavyBlur {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   opacity: 0;
   backdrop-filter: blur(34px) saturate(1.05);

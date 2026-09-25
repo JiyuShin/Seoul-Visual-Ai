@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { DRAWING_COLORS, DRAWING_TAGS } from './drawingConfig';
 import MobileDrawingBoard from './MobileDrawingBoard';
-import MobileStatusBar from './MobileStatusBar';
 import { usePlantDrawing } from './usePlantDrawing';
 import styles from './MobileDrawingPage.module.css';
 
@@ -29,8 +28,6 @@ export default function MobileDrawingPage({
       }`}
       data-figma-node="1672:833"
     >
-      <div className={styles.gradient} aria-hidden="true" data-figma-node="1672:836" />
-      <MobileStatusBar />
       <header className={styles.copy} data-figma-node="1672:1111">
         <h1 className={styles.district}>{districtName}</h1>
         <p className={styles.lead}>
@@ -90,7 +87,7 @@ export default function MobileDrawingPage({
       >
         <canvas
           ref={canvasRef}
-          className={`${styles.drawSurfacePreview} ${styles.drawCanvas}`}
+          className={styles.drawCanvas}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}

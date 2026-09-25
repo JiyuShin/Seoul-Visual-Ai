@@ -1,4 +1,3 @@
-import MobileStatusBar from './MobileStatusBar';
 import styles from './MobileTagPage.module.css';
 
 /** Figma 1693:892 — 식물 이름(태그) */
@@ -9,9 +8,6 @@ export default function MobileTagPage({ enterFromSave = false, onStartNaming }) 
       data-figma-node="1693:892"
     >
       <div className={`${styles.blurVeil} ${styles.blurVeilSoft}`} aria-hidden="true" data-figma-node="1693:898" />
-      <div className={styles.statusBarSlot}>
-        <MobileStatusBar />
-      </div>
       <header className={styles.copy} data-figma-node="1693:900">
         <h1 className={styles.title}>
           <span className={styles.titleLine}>멋진 식물이에요!</span>

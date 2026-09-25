@@ -13,8 +13,9 @@
   pointer-events: none;
   background: linear-gradient(
     167.648deg,
-    rgb(213, 255, 185) 2.26%,
-    rgba(255, 255, 255, 0) 33.43%,
+    rgb(213, 255, 185) 0%,
+    rgba(213, 255, 185, 0.45) 4%,
+    rgba(255, 255, 255, 0) 13%,
     rgba(255, 255, 255, 0.22) 76.25%,
     rgba(177, 214, 154, 0.5) 100%,
     rgba(162, 180, 151, 0.77) 100%
@@ -196,6 +197,9 @@
 }
 
 .drawCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
   cursor: crosshair;
   touch-action: none;
   pointer-events: auto;
@@ -500,9 +504,10 @@
   }
 }
 
-/* 드로잉 → 세이브: 배경·캔vas 유지, 텍스트·크롬만 블러 아웃 */
+/* 드로잉 → 세이브: 배경·보드 유지, 텍스트·크롬만 블러 아웃 (그라디언트 페이드 아웃 시 하얀 번쌈 방지) */
 .artboardExiting .gradient {
-  animation: gradientFadeOut 0.9s ease forwards;
+  animation: none;
+  opacity: 1;
 }
 
 .artboardExiting .lead,
@@ -515,6 +520,12 @@
   opacity: 1;
   filter: none;
   transform: none;
+}
+
+.artboardExiting .canvasPanelShell {
+  opacity: 1;
+  filter: none;
+  animation: none;
 }
 
 .artboardExiting .undoBtn,

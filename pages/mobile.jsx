@@ -10,7 +10,7 @@ export default function MobilePage() {
         <title>Plant Your Seoul — Mobile</title>
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+          content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, interactive-widget=overlays-content"
         />
         <meta name="theme-color" content="#000000" />
         <meta name="mobile-web-app-capable" content="yes" />

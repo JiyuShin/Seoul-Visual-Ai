@@ -103,21 +103,25 @@ export default function MobileScreen() {
     phase === MOBILE_PHASE.END;
 
   return (
-    <MobileStage width={width} height={height} fit="contain">
-      <div className={styles.session}>
+    <div className={styles.mobileRoot}>
+      <div className={styles.backdropLayer} aria-hidden="true">
         {showPlantVideo && <MobilePlantVideo onEnded={goDrawing} />}
         <div
-          className={`${styles.bgBrighten} ${bgBrighten ? styles.bgBrightenActive : ''}`}
-          aria-hidden="true"
+          className={`${styles.backdropGradient} ${
+            loadingMounted ? styles.backdropGradientLoading : ''
+          } ${loadingExit ? styles.backdropGradientLoadingExit : ''}`}
         />
+        <div className={`${styles.bgBrighten} ${bgBrighten ? styles.bgBrightenActive : ''}`} />
         <div
           className={`${styles.bgHeavyBlur} ${bgHeavyBlur ? styles.bgHeavyBlurActive : ''} ${
             phase === MOBILE_PHASE.TAG || phase === MOBILE_PHASE.TAG2
               ? styles.bgHeavyBlurSoft
               : ''
           }`}
-          aria-hidden="true"
         />
+      </div>
+      <MobileStage width={width} height={height} fit="contain">
+        <div className={styles.session}>
         {loadingMounted && (
           <div
             className={`${styles.layer} ${styles.layerLoading} ${
@@ -148,6 +152,7 @@ export default function MobileScreen() {
               enterFromDrawing={!saveExit}
               exiting={saveExit}
               drawingUrl={plantDrawingUrl}
+              drawingLayerVisible={drawingMounted}
               onComplete={goTag}
             />
           </div>
@@ -181,7 +186,8 @@ export default function MobileScreen() {
             />
           </div>
         )}
-      </div>
-    </MobileStage>
+        </div>
+      </MobileStage>
+    </div>
   );
 }
