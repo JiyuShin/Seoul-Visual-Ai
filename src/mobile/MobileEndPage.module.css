@@ -1,0 +1,249 @@
+.artboard {
+  position: relative;
+  width: 480px;
+  height: 1044px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.gradient {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    167.648deg,
+    rgb(213, 255, 185) 2.26%,
+    rgba(255, 255, 255, 0) 33.43%,
+    rgba(255, 255, 255, 0.22) 76.25%,
+    rgba(177, 214, 154, 0.5) 100%,
+    rgba(162, 180, 151, 0.77) 100%
+  );
+}
+
+.statusBarSlot {
+  position: relative;
+  z-index: 4;
+}
+
+.copy {
+  position: absolute;
+  left: 38px;
+  top: 89px;
+  width: 382px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  color: #3c4b38;
+  word-break: keep-all;
+}
+
+.title {
+  margin: 0;
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.8px;
+}
+
+.lead {
+  margin: 0;
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.44px;
+}
+
+.leadLine {
+  margin: 0;
+}
+
+.leadStrong {
+  font-weight: 700;
+}
+
+/* Figma 1693:1000 */
+.namePanelShell {
+  position: absolute;
+  left: 20px;
+  top: 307px;
+  width: 439px;
+  height: 668px;
+  z-index: 3;
+  border-radius: 45px;
+}
+
+.namePanel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  border: 1px solid #fff;
+  box-sizing: border-box;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.6) 100%),
+    radial-gradient(
+      ellipse 79% 72% at 50% 50%,
+      rgba(246, 246, 246, 0.3) 0%,
+      rgba(255, 255, 255, 0.093) 100%
+    ),
+    linear-gradient(
+      205.28deg,
+      rgba(154, 251, 181, 0.036) 9.78%,
+      rgba(255, 255, 255, 0.12) 43.27%,
+      rgba(68, 194, 0, 0.3) 96.54%
+    );
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 29px 0 96px;
+  box-sizing: border-box;
+}
+
+.namePanelLabel {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 28px;
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.44px;
+  color: #323e2f;
+  text-align: center;
+}
+
+.namePanelDrawing {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 28px 8px;
+  box-sizing: border-box;
+}
+
+.namePanelDrawingImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+}
+
+/* Figma 1693:1002 — 74px 전송 버튼 */
+.sendBtn {
+  position: absolute;
+  left: 36px;
+  top: 881px;
+  width: 409px;
+  height: 74px;
+  z-index: 4;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sendBtnBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  object-fit: fill;
+  object-position: center 46%;
+}
+
+.sendBtnLabel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(calc(-50% - 2px));
+  text-align: center;
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 20.728px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.41px;
+  color: #485943;
+}
+
+@keyframes textBlurIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes contentBlurIn {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes endGradientIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.artboardEnter .gradient {
+  opacity: 0;
+  animation: endGradientIn 0.85s ease 0.05s forwards;
+}
+
+.artboardEnter .copy {
+  opacity: 0;
+  filter: blur(10px);
+  animation: textBlurIn 0.9s ease-out 0.1s forwards;
+}
+
+.artboardEnter .namePanelShell {
+  opacity: 0;
+  filter: blur(8px);
+  animation: contentBlurIn 0.9s ease-out 0.2s forwards;
+}
+
+.artboardEnter .sendBtn {
+  opacity: 0;
+  filter: blur(8px);
+  animation: contentBlurIn 0.85s ease-out 0.28s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artboardEnter .gradient,
+  .artboardEnter .copy,
+  .artboardEnter .namePanelShell,
+  .artboardEnter .sendBtn {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
