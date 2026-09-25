@@ -1,0 +1,4 @@
+.shell {
+  min-height: 100dvh;
+  composes: backdrop from './mobileArtboard.module.css';
+}

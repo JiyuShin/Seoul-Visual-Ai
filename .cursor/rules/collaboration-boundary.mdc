@@ -11,7 +11,18 @@ alwaysApply: true
 
 ## 이 계정이 만져도 되는 파일
 
-시선 추적과 그 연결부만 담당한다.
+시선 추적·그 연결부, **모바일 전용 페이지**를 담당한다.
+
+### 모바일 (`/mobile`)
+
+- 작업 범위는 **`pages/mobile.jsx`** 와 **`src/mobile/**`** 만이다. 새 컴포넌트·스타일도 `src/mobile/` 아래에만 둔다.
+- 웹소켓·QR·키오스크(`EntryFlowContext`, `/1`·`/2`·`/3` 등) **연동은 아직 하지 않는다.** 연동 때문에 `_app.jsx`, `EntryFlowContext`, `f2`/`f3`, 다른 `pages/*.jsx` 를 “ついでに” 수정하지 않는다.
+- 모바일 UX만 필요할 때 전역 시선 커서를 끄려면 `_app.jsx` 등 **허용 목록 밖** 수정이 필요하므로, 사용자 허락 없이 하지 않는다.
+
+- `pages/mobile.jsx`
+- `src/mobile/**`
+
+### 시선·키오스크 연결부
 
 - `src/shared/gaze/**`
 - `src/calibration/**`
@@ -51,4 +62,8 @@ src/f2/DiscussionStep 에 gazeRef 를 직접 심음
 // 허용: 목록 안만 고치고, 밖이 필요하면 질문
 src/shared/gaze/useGazeEngine.js 만 수정
 pages/1.jsx 가 필요하면 “이 파일을 건드려도 되나?” 라고 물음
+
+// 모바일: src/mobile/ 만 확장. 다른 라우트·f2·f3 는 읽기만
+src/mobile/PlantCanvas.jsx 추가 OK
+EntryFlowContext 에 mobileSession 붙이기 → 먼저 허락 받기
 ```

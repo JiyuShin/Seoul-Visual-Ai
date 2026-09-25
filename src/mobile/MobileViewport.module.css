@@ -1,0 +1,21 @@
+.chrome {
+  width: 100%;
+  min-height: 100dvh;
+  composes: backdrop from './mobileArtboard.module.css';
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: transparent;
+}
+
+.safe {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}

@@ -1,0 +1,38 @@
+.slot {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #fff;
+  pointer-events: none;
+}
+
+.video {
+  position: absolute;
+  right: -5%;
+  bottom: -8%;
+  width: 104%;
+  height: 104%;
+  object-fit: cover;
+  object-position: 58% 58%;
+  background: rgb(213, 255, 185);
+  opacity: 0;
+  animation: plantVideoFadeIn 1.75s ease-out 0.15s forwards;
+}
+
+@keyframes plantVideoFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video {
+    animation: none;
+    opacity: 1;
+  }
+}
