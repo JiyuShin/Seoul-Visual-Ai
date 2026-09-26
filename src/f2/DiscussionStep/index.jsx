@@ -4,6 +4,7 @@ import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import { streetSceneForDistrict } from '../../shared/streetView';
 import AgentOrb from '../AgentOrb';
+import VisionOrb from '../VisionOrb';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
 import StreetCanvas from './StreetCanvas';
@@ -24,17 +25,11 @@ const CARD_PHRASE = {
   rest: '어디든 편히 앉거나 누울 수 있는 서울',
 };
 
-const CARD_LINES = {
-  shade: ['탁한 일상을 비우고', '맑은 초록으로 채우는 서울'],
-  water: ['초록 사이로 선명한', '햇살이 스며드는 서울'],
-  food: ['지친 걸음을 품어주는', '넉넉한 초록 그늘의 서울'],
-  scent: ['자연의 형태가 도심 곳곳에', '녹아드는 서울'],
-  rest: ['어디든 편히 앉거나', '누울 수 있는 서울'],
-};
-
 const STAGE_W = 3881;
 const STAGE_H = 2183;
 const AFTER_LINE_MS = 0;
+const VEIL_FADE_MS = 1150;
+const AFTER_VEIL_MS = 1000;
 
 function spokenHoldMs(text) {
   const chars = Array.from(text.replace(/\s/g, '')).length;
@@ -121,6 +116,7 @@ export default function DiscussionStep({
   const pumpingRef = useRef(false);
   const hangRef = useRef(0);
   const saidRef = useRef(new Set());
+  const veilRef = useRef(null);
   const aliveRef = useRef(true);
   const phraseRef = useRef('');
   const speechOutput = useSpeechOutput();
@@ -131,14 +127,10 @@ export default function DiscussionStep({
   beatRef.current = beat;
   speakerRef.current = speaker;
   const cardPhrase = CARD_PHRASE[winnerCard?.id] || winnerCard?.label || CARD_PHRASE.food;
-  const cardLineKey = CARD_LINES[winnerCard?.id]
-    ? winnerCard.id
-    : Object.keys(CARD_PHRASE).find((key) => CARD_PHRASE[key] === cardPhrase);
-  const cardLines = CARD_LINES[cardLineKey] || [cardPhrase];
   phraseRef.current = cardPhrase;
 
   const showChrome = !['intro', 'shrink', 'dock'].includes(beat);
-  const showPrompt = !['intro', 'shrink', 'done'].includes(beat);
+  const showPrompt = Boolean(agentLine) && !['intro', 'shrink', 'done'].includes(beat);
   const docked = beat !== 'intro' && beat !== 'shrink';
   const showUser = USER_BEATS.has(beat);
 
@@ -235,10 +227,32 @@ export default function DiscussionStep({
 
   useEffect(() => {
     if (beat === 'dock') {
-      say('dock', LINE_83, () => {
-        if (beatRef.current === 'dock') setBeat('gaze');
-      });
-      return undefined;
+      let started = false;
+      let delayTimer = 0;
+      const startLine = () => {
+        if (started || beatRef.current !== 'dock') return;
+        started = true;
+        say('dock', LINE_83, () => {
+          if (beatRef.current === 'dock') setBeat('gaze');
+        });
+      };
+      const arm = () => {
+        window.clearTimeout(delayTimer);
+        delayTimer = window.setTimeout(startLine, AFTER_VEIL_MS);
+      };
+      const veil = veilRef.current;
+      const onFade = (event) => {
+        if (event.target !== veil || event.propertyName !== 'opacity') return;
+        veil.removeEventListener('transitionend', onFade);
+        arm();
+      };
+      veil?.addEventListener('transitionend', onFade);
+      const fallback = window.setTimeout(arm, VEIL_FADE_MS);
+      return () => {
+        window.clearTimeout(fallback);
+        window.clearTimeout(delayTimer);
+        veil?.removeEventListener('transitionend', onFade);
+      };
     }
     if (beat === 'gaze') {
       const cam = speakerRef.current.cam;
@@ -413,7 +427,7 @@ export default function DiscussionStep({
         />
       </div>
 
-      <div className={`${styles.veil} ${docked ? styles.veilOff : ''}`} />
+      <div ref={veilRef} className={`${styles.veil} ${docked ? styles.veilOff : ''}`} />
 
       <div className={styles.hudViewport}>
         <div className={styles.hudFit} style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
@@ -456,18 +470,7 @@ export default function DiscussionStep({
               style={{ left: orbPose.left, top: orbPose.top, width: orbPose.size, height: orbPose.size }}
             >
               <div className={styles.visionCard} style={{ transform: `scale(${cardScale})` }}>
-                <img className={styles.visionGlow} src="/2/vision-card-lines.svg" alt="" />
-                <span className={styles.visionSheen}>
-                  <img src="/2/vision-card-sheen.png" alt="" />
-                </span>
-                <p className={styles.visionPhrase}>
-                  {cardLines.map((line, index) => (
-                    <span key={line}>
-                      {index > 0 && <br />}
-                      {line}
-                    </span>
-                  ))}
-                </p>
+                {showVisionCard && <VisionOrb className={styles.visionOrb} />}
               </div>
               <div className={styles.agentFace}>
                 <div className={styles.orbPulse}>

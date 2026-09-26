@@ -582,85 +582,31 @@
   left: 50%;
   top: 50%;
   z-index: 1;
-  width: 563px;
-  height: 567px;
-  margin-left: -281.5px;
-  margin-top: -283.5px;
-  border-radius: 50%;
-  overflow: hidden;
+  width: 675px;
+  height: 679px;
+  margin-left: -337.5px;
+  margin-top: -339.5px;
+  overflow: visible;
   pointer-events: none;
-  background: linear-gradient(156deg, #fff 4%, rgba(34, 195, 139, 0.23) 57%, rgba(0, 0, 0, 0.6) 99%);
-  box-shadow:
-    0 0 56px rgba(139, 249, 146, 0.3),
-    0 0 26px rgba(232, 255, 193, 0.23),
-    0 0 38px #e3fffa,
-    inset -2.6px -2.6px 1.1px #9dfffd,
-    inset 2.6px 2.6px 0 rgba(0, 148, 96, 0.72),
-    inset 0 -12px 86px #71f0ca,
-    inset -43px -74px 86px #d9ee6f,
-    inset 0 9px 35px rgba(217, 63, 132, 0.4),
-    inset 19px 16px 37px #ffd7f6,
-    inset 12px 19px 95px rgba(157, 255, 253, 0.5),
-    inset 25px 31px 70px #69eace,
-    inset 0 -37px 25px rgba(214, 220, 255, 0.13);
   transform-origin: center center;
   transition:
     transform 1.15s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.7s ease;
 }
 
+.visionOrb {
+  width: 675px;
+  height: 679px;
+}
+
+.visionOrb svg {
+  display: block;
+  width: 675px;
+  height: 679px;
+}
+
 .orbIsAgent .visionCard {
   opacity: 0;
-}
-
-.visionGlow {
-  position: absolute;
-  left: -441px;
-  top: -326px;
-  width: 944px;
-  height: 874px;
-  max-width: none;
-  pointer-events: none;
-}
-
-.visionSheen {
-  position: absolute;
-  left: 0;
-  top: -108px;
-  width: 520px;
-  height: 701px;
-  overflow: hidden;
-  transform: scaleX(-1);
-  transform-origin: center center;
-  mix-blend-mode: plus-lighter;
-  opacity: 0.65;
-  pointer-events: none;
-}
-
-.visionSheen img {
-  position: absolute;
-  left: -115.09%;
-  top: -11.3%;
-  width: 220.75%;
-  height: 111.3%;
-  max-width: none;
-}
-
-.visionPhrase {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 2;
-  width: 414px;
-  margin: 0;
-  transform: translate(-50%, -52%);
-  text-align: center;
-  color: #414141;
-  font-size: 45px;
-  font-weight: 600;
-  line-height: 1.48;
-  letter-spacing: -0.9px;
-  mix-blend-mode: luminosity;
 }
 
 .agentFace {
