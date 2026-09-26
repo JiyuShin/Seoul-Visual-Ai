@@ -304,7 +304,7 @@ function FindingCopy({ phase }) {
       <p className={`${styles.fBody} ${styles.fadeLayer} ${hidden ? styles.isHidden : ''}`}>
         토론 데이터를 기반으로, 서울특별시 25개 자치구 중
         <br />
-        <strong>여러분의 초록빛 서울</strong>에 가장 적합한 구를 선별하고 있어요
+        <strong>여러분이 상상하는 초록빛 서울</strong>에 가장 적합한 구를 선별하고 있어요
       </p>
       <p className={`${styles.fWait} ${styles.fadeLayer} ${hidden ? styles.isHidden : ''}`}>잠시만 기다려 주세요...</p>
     </>

@@ -25,6 +25,13 @@ const CARD_PHRASE = {
   rest: '어디든 편히 앉거나 누울 수 있는 서울',
 };
 
+const CARD_LINES = {
+  shade: ['탁한 일상을 비우고', '맑은 초록으로 채우는 서울'],
+  water: ['초록 사이로 선명한', '햇살이 스며드는 서울'],
+  food: ['지친 걸음을 품어주는', '넉넉한 초록 그늘의 서울'],
+  scent: ['자연의 형태가 도심', '곳곳에 녹아드는 서울'],
+};
+
 const STAGE_W = 3881;
 const STAGE_H = 2183;
 const AFTER_LINE_MS = 0;
@@ -484,7 +491,7 @@ export default function DiscussionStep({
               <span className={styles.placePin} aria-hidden="true">
                 <img src="/2/location-on.svg" alt="" />
               </span>
-              <span>{scene.name}를 둘러보고 있어요</span>
+              <span>서울의 한 거리를 보고 있어요</span>
             </div>
 
             <div className={`${styles.promptBlock} ${showPrompt ? styles.promptOn : ''}`}>
@@ -506,6 +513,7 @@ export default function DiscussionStep({
                 {showVisionCard && (
                   <VisionOrb
                     className={styles.visionOrb}
+                    lines={CARD_LINES[winnerCard?.id] || CARD_LINES.food}
                     voiceLive={speechOutput.voiceLive}
                     voiceMark={speechOutput.voiceMark}
                   />

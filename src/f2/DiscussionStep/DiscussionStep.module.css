@@ -461,7 +461,7 @@
 
 .placeChip {
   position: absolute;
-  left: 3275px;
+  left: 3060px;
   top: 127px;
   display: flex;
   align-items: center;
@@ -485,10 +485,6 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  box-shadow:
-    0 0 18px rgba(130, 245, 255, 0.54),
-    0 0 7px #ffcfe3;
 }
 
 .placePin img {

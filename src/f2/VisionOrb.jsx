@@ -93,8 +93,29 @@ function colorLayerMarkup(group, sourceSvg) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 }) {
+function orbLabel(lines) {
+  const text = document.createElementNS(SVG_NS, 'text');
+  text.setAttribute('x', String(VIEW_W / 2));
+  text.setAttribute('y', '336');
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('fill', '#414141');
+  text.setAttribute('font-family', 'Pretendard, sans-serif');
+  text.setAttribute('font-size', '40');
+  text.setAttribute('font-weight', '700');
+  lines.forEach((line, index) => {
+    const row = document.createElementNS(SVG_NS, 'tspan');
+    row.setAttribute('x', String(VIEW_W / 2));
+    row.setAttribute('dy', index === 0 ? '0' : '67');
+    row.textContent = line;
+    text.appendChild(row);
+  });
+  return text;
+}
+
+export default function VisionOrb({ className, lines = [], voiceLive = false, voiceMark = 0 }) {
   const hostRef = useRef(null);
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
   const voiceRef = useRef({ mark: 0, seen: 0, aim: 0, level: 0 });
   voiceRef.current.live = voiceLive;
   voiceRef.current.mark = voiceMark;
@@ -113,6 +134,8 @@ export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 
 
     const markup = colorLayerMarkup(colorGroup, svg);
     const base = document.importNode(svg, true);
+    const bakedNow = base.querySelector('path[fill="#414141"]');
+    if (bakedNow) bakedNow.remove();
     host.style.position = 'relative';
     host.replaceChildren(base);
 
@@ -181,7 +204,9 @@ export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 
 
       const liveColor = base.querySelector('g[filter="url(#filter2_f_1581_291)"]');
       const sheen = base.querySelector('rect[fill="url(#pattern0_1581_291)"]');
-      const text = base.querySelector('path[fill="#414141"]');
+      const baked = base.querySelector('path[fill="#414141"]');
+      if (baked) baked.remove();
+      const label = orbLabel(linesRef.current.length ? linesRef.current : ['지친 걸음을 품어주는', '넉넉한 초록 그늘의 서울']);
       if (liveColor) liveColor.remove();
 
       const top = document.createElementNS(SVG_NS, 'svg');
@@ -196,7 +221,7 @@ export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 
         sheen.style.mixBlendMode = '';
         clipWrap.appendChild(sheen);
       }
-      if (text) clipWrap.appendChild(text);
+      if (label) clipWrap.appendChild(label);
       const defs = document.createElementNS(SVG_NS, 'defs');
       const clip = base.querySelector('#clip0_1581_291').cloneNode(true);
       clip.id = 'clipTop';
@@ -218,10 +243,10 @@ export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 
       textLayer.setAttribute('viewBox', `0 0 ${VIEW_W} ${VIEW_H}`);
       place(textLayer);
       textLayer.style.zIndex = '3';
-      if (text) {
+      if (label) {
         const textClip = document.createElementNS(SVG_NS, 'g');
         textClip.setAttribute('clip-path', 'url(#clipText)');
-        textClip.appendChild(text);
+        textClip.appendChild(label);
         const textDefs = document.createElementNS(SVG_NS, 'defs');
         const textClipPath = clip.cloneNode(true);
         textClipPath.id = 'clipText';
