@@ -7,7 +7,7 @@ import AgentOrb from '../AgentOrb';
 import VisionOrb from '../VisionOrb';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
-import StreetCanvas from './StreetCanvas';
+import StreetCanvas, { FOLD_MS } from './StreetCanvas';
 import styles from './DiscussionStep.module.css';
 
 const SPEAKERS = [
@@ -36,43 +36,59 @@ function spokenHoldMs(text) {
   return Math.max(1600, chars * 240);
 }
 const AFTER_USER_MS = 1800;
-const FOLD_HOLD_MS = 2600;
 const LINE_80_B = '삭막한 지금의 거리 위에 식물이 필요한 곳을 차례대로 바라보아 어떻게 바뀌어야 할지 의견을 나눠주세요.';
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
 
 const PROMPT_CHARS_PER_LINE = 27;
 
-function promptLines(text) {
-  const value = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!value) return [];
-  const chars = Array.from(value);
-  if (chars.length <= PROMPT_CHARS_PER_LINE * 2) return [value];
+function nearestBreak(chars, pattern) {
   const mid = Math.round(chars.length / 2);
-  let splitAt = mid;
+  let splitAt = -1;
   let best = Infinity;
   chars.forEach((ch, index) => {
     if (index < 4 || index > chars.length - 5) return;
-    if (!/[.?!。？！,]/.test(ch) && ch !== ' ') return;
+    if (!pattern.test(ch)) return;
     const dist = Math.abs(index + 1 - mid);
     if (dist < best) {
       best = dist;
       splitAt = index + 1;
     }
   });
+  return splitAt;
+}
+
+function splitPrompt(chars, splitAt) {
   const first = chars.slice(0, splitAt).join('').trim();
   const second = chars.slice(splitAt).join('').trim();
   return second ? [first, second] : [first];
 }
 
+function promptLines(text) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!value) return [];
+  const chars = Array.from(value);
+  if (chars.length <= PROMPT_CHARS_PER_LINE) return [value];
+  const sentenceAt = nearestBreak(chars, /[.?!。？！]/);
+  if (sentenceAt > 0) return splitPrompt(chars, sentenceAt);
+
+  const pauseAt = nearestBreak(chars, /,/);
+  if (pauseAt > 0) return splitPrompt(chars, pauseAt);
+
+  if (chars.length <= PROMPT_CHARS_PER_LINE * 2) return [value];
+  const spaceAt = nearestBreak(chars, /\s/);
+  if (spaceAt > 0) return splitPrompt(chars, spaceAt);
+  return splitPrompt(chars, Math.round(chars.length / 2));
+}
+
 function gazeLine(cam) {
-  return `안녕하세요 ${cam}님. 이 광경에서 당신만의 식물을 어디에 심으면 좋을까요? 선택 후 3초간 응시해주세요.`;
+  return `안녕하세요 ${cam}님. 이 광경에서 당신만의 식물을 어디에 심으면 좋을까요? 시선으로 선택 후 3초간 응시해주세요.`;
 }
 
 function fallbackAsk(history) {
   const last = [...history].reverse().find((item) => item.role === 'user');
-  const bit = last?.text ? `“${last.text.slice(0, 18)}”` : '그 자리';
-  return `${bit}라면, 그 식물은 어떤 분위기로 거리를 바꿀 수 있을까요?`;
+  if (!last?.text) return '좋은 생각이에요. 그 자리에 어떤 식물이 있으면 좋을까요?';
+  return '좋은 의견이에요. 그 장면이 거리에서는 어떻게 보일까요?';
 }
 
 async function fetchAgentLine(payload) {
@@ -117,6 +133,7 @@ export default function DiscussionStep({
   const hangRef = useRef(0);
   const saidRef = useRef(new Set());
   const veilRef = useRef(null);
+  const streetRef = useRef(null);
   const aliveRef = useRef(true);
   const phraseRef = useRef('');
   const speechOutput = useSpeechOutput();
@@ -275,15 +292,36 @@ export default function DiscussionStep({
     }
     if (beat === 'fold') {
       const markId = activeMarkRef.current;
+      const cam = speakerRef.current.cam;
+      const label = speakerRef.current.label;
       const foldTimer = window.setTimeout(() => {
         setMarks((prev) => prev.map((mark) => (
           mark.id === markId ? { ...mark, folded: true } : mark
         )));
       }, AFTER_USER_MS);
-      const timer = window.setTimeout(advanceAfterFold, AFTER_USER_MS + FOLD_HOLD_MS);
+      const lineTimer = window.setTimeout(() => {
+        if (beatRef.current !== 'fold') return;
+        say(`collected-${cam}`, `${label}의 의견을 수집했어요!`, () => {
+          if (beatRef.current !== 'fold') return;
+          if (cam !== 'A') {
+            advanceAfterFold();
+            return;
+          }
+          let moved = false;
+          let fallback = 0;
+          const go = () => {
+            if (moved || !aliveRef.current || beatRef.current !== 'fold') return;
+            moved = true;
+            window.clearTimeout(fallback);
+            advanceAfterFold();
+          };
+          fallback = window.setTimeout(go, 4500);
+          if (!streetRef.current?.recenter(go)) go();
+        });
+      }, AFTER_USER_MS + FOLD_MS + 40);
       return () => {
         window.clearTimeout(foldTimer);
-        window.clearTimeout(timer);
+        window.clearTimeout(lineTimer);
       };
     }
     return undefined;
@@ -298,6 +336,7 @@ export default function DiscussionStep({
     const run = async () => {
       const line = await fetchAgentLine({
         beat: 'ask',
+        followUp: beat === 'ask1' ? 1 : 2,
         speakerLabel: speakerRef.current.label,
         districtName: scene.name,
         visionLabel: phraseRef.current,
@@ -410,6 +449,7 @@ export default function DiscussionStep({
     <section className={styles.discussionStep}>
       <div className={styles.canvasArea}>
         <StreetCanvas
+          ref={streetRef}
           imageUrl={scene.pending ? '' : scene.image}
           yawSpan={scene.yawSpan || 360}
           zoom={scene.zoom || 1}

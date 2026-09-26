@@ -50,12 +50,16 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
   const canvasRef = useRef(null);
   const viewRef = useRef({ yaw: 0, pitch: 0, fov: viewFov(16 / 9), aspect: 16 / 9 });
   const marksRef = useRef(marks);
+  const homeRef = useRef(null);
   marksRef.current = marks;
 
   useImperativeHandle(ref, () => ({
     directionAt(nx, ny) {
       const view = viewRef.current;
       return screenToWorld(nx, ny, view.yaw, view.pitch, view.fov, view.aspect);
+    },
+    recenter(onDone) {
+      homeRef.current = typeof onDone === 'function' ? onDone : () => {};
     },
   }), []);
 
@@ -135,13 +139,17 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       if (dead || !ready) return;
       const dt = last ? Math.min(50, time - last) : 16.7;
       last = time;
+      const homing = Boolean(homeRef.current);
       const look = lookRef.current;
-      if (look) {
+      if (homing) {
+        target.yaw = 0;
+        target.pitch = 0;
+      } else if (look) {
         const next = lookFromPointer(look.nx, look.ny);
         target.yaw = next.yaw;
         target.pitch = next.pitch;
       }
-      const follow = 1 - Math.exp(-dt / 160);
+      const follow = 1 - Math.exp(-dt / (homing ? 520 : 160));
       current.yaw += (target.yaw - current.yaw) * follow;
       current.pitch += (target.pitch - current.pitch) * follow;
 
@@ -159,6 +167,13 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       const yawCap = yawSpan < 359 ? Math.max(0, spanRad * 0.5 - halfH - (2 * Math.PI) / 180) : Infinity;
       target.yaw = clamp(target.yaw, -yawCap, yawCap);
       current.yaw = clamp(current.yaw, -yawCap, yawCap);
+      if (homeRef.current && Math.abs(current.yaw) < 0.012 && Math.abs(current.pitch) < 0.012) {
+        const done = homeRef.current;
+        homeRef.current = null;
+        current.yaw = 0;
+        current.pitch = 0;
+        done();
+      }
       viewRef.current = { yaw: current.yaw, pitch: current.pitch, fov, aspect };
       gl.viewport(0, 0, w, h);
       gl.uniform2f(sizeUniform, w, h);

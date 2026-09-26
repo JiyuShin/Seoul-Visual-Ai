@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import StreetPanorama from './StreetPanorama';
 import styles from './StreetCanvas.module.css';
@@ -15,7 +15,7 @@ function lineText(line) {
   return typeof line === 'string' ? line : line?.text || '';
 }
 
-const FOLD_MS = 1500;
+export const FOLD_MS = 1500;
 const FOLD_EASE = 'cubic-bezier(0.4, 0, 0.15, 1)';
 
 function clearFoldStyles(node) {
@@ -194,7 +194,7 @@ function FoldReplies({ folded, children }) {
   );
 }
 
-export default function StreetCanvas({
+const StreetCanvas = forwardRef(function StreetCanvas({
   imageUrl,
   pendingLabel,
   yawSpan = 360,
@@ -207,11 +207,12 @@ export default function StreetCanvas({
   onCanvasRect,
   revealed = true,
   repeatDwell = false,
-}) {
+}, ref) {
   const canvasRef = useRef(null);
   const panoramaRef = useRef(null);
   const markRefs = useRef({});
   const lookRef = useRef(null);
+  const holdLookRef = useRef(false);
   const pendingRef = useRef(null);
   const phaseRef = useRef(phase);
   const plantedRef = useRef(false);
@@ -224,6 +225,25 @@ export default function StreetCanvas({
   const [pendingCircle, setPendingCircle] = useState(null);
 
   viewerRef.current = activeViewerId;
+
+  useImperativeHandle(ref, () => ({
+    recenter(onDone) {
+      holdLookRef.current = true;
+      lookRef.current = { nx: 0.5, ny: 0.5 };
+      const panorama = panoramaRef.current;
+      if (!panorama?.recenter) {
+        holdLookRef.current = false;
+        onDone?.();
+        return false;
+      }
+      panorama.recenter(() => {
+        lookRef.current = { nx: 0.5, ny: 0.5 };
+        holdLookRef.current = false;
+        onDone?.();
+      });
+      return true;
+    },
+  }), []);
 
   phaseRef.current = phase;
   repeatRef.current = repeatDwell;
@@ -284,7 +304,7 @@ export default function StreetCanvas({
 
   const applyPoint = useCallback((x, y) => {
       const norm = screenToNormalized(x, y);
-      if (norm) lookRef.current = { nx: norm.x, ny: norm.y };
+      if (norm && !holdLookRef.current) lookRef.current = { nx: norm.x, ny: norm.y };
       if (!norm || phaseRef.current !== 'gaze' || (!repeatRef.current && plantedRef.current)) {
         if (phaseRef.current !== 'gaze') clearPending();
         return { dwellProgress: 0, target: null };
@@ -490,4 +510,6 @@ export default function StreetCanvas({
       </div>
     </div>
   );
-}
+});
+
+export default StreetCanvas;

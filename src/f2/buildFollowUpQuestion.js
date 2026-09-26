@@ -45,6 +45,8 @@ export function buildFollowUpQuestion(opinion, visionLabel = '') {
 
   const seed = text.length + (text.charCodeAt(0) || 0);
   const question = pool[seed % pool.length];
+  const reactions = ['좋은 의견이에요.', '그 장면이 그려져요.', '그 생각, 마음에 들어요.'];
+  const reaction = reactions[seed % reactions.length];
 
-  return `「${opinion.slice(0, 48)}${opinion.length > 48 ? '…' : ''}」에 대해 조금 더 상상해 볼게요. ${question}`;
+  return `${reaction} ${question}`;
 }
