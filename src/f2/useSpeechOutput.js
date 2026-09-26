@@ -26,6 +26,8 @@ function spokenHoldMs(text) {
 export function useSpeechOutput() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [voiceLive, setVoiceLive] = useState(false);
+  const [voiceMark, setVoiceMark] = useState(0);
   const sessionRef = useRef(0);
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function useSpeechOutput() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
+    setVoiceLive(false);
   }, []);
 
   const speak = useCallback((text, onEnd, onAudioEnd) => {
@@ -63,7 +66,9 @@ export function useSpeechOutput() {
       if (finished || session !== sessionRef.current) return;
       finished = true;
       window.clearInterval(keepAlive);
+      clearWords();
       setIsSpeaking(false);
+      setVoiceLive(false);
       onEnd?.();
     };
 
@@ -73,14 +78,31 @@ export function useSpeechOutput() {
     utterance.pitch = 1;
     const minHold = spokenHoldMs(spoken);
     let startedAt = 0;
+    let wordTimers = [];
+    const clearWords = () => {
+      wordTimers.forEach((id) => window.clearTimeout(id));
+      wordTimers = [];
+    };
+    const nudge = () => {
+      if (finished || session !== sessionRef.current) return;
+      setVoiceMark((mark) => mark + 1);
+    };
 
     utterance.onstart = () => {
       if (session !== sessionRef.current) return;
       startedAt = Date.now();
       setIsSpeaking(true);
+      setVoiceLive(true);
+    };
+    utterance.onboundary = (event) => {
+      if (session !== sessionRef.current) return;
+      if (event.name && event.name !== 'word') return;
+      setVoiceMark((mark) => mark + 1);
     };
     utterance.onend = () => {
       if (session !== sessionRef.current) return;
+      clearWords();
+      setVoiceLive(false);
       onAudioEnd?.();
       const elapsed = startedAt ? Date.now() - startedAt : minHold;
       const remain = Math.max(0, minHold - elapsed);
@@ -93,9 +115,12 @@ export function useSpeechOutput() {
       finish();
     };
 
-    const run = () => {
-      if (finished || session !== sessionRef.current) return;
+    let ran = false;
+    const run = (force) => {
+      if (ran || finished || session !== sessionRef.current) return;
       const voice = pickKoreanVoice(synth);
+      if (!voice && !force) return;
+      ran = true;
       if (voice) utterance.voice = voice;
       let queued = false;
       const startMain = () => {
@@ -103,6 +128,14 @@ export function useSpeechOutput() {
         queued = true;
         synth.resume();
         synth.speak(utterance);
+        setVoiceLive(true);
+        clearWords();
+        let at = 90;
+        spoken.split(/\s+/).filter(Boolean).forEach((word) => {
+          const delay = at;
+          at += Math.max(340, Array.from(word).length * 175);
+          wordTimers.push(window.setTimeout(nudge, delay));
+        });
       };
       const lead = new SpeechSynthesisUtterance(' ');
       lead.volume = 0;
@@ -128,12 +161,9 @@ export function useSpeechOutput() {
       begin();
     };
 
-    if (synth.getVoices().length === 0) {
-      synth.addEventListener('voiceschanged', run, { once: true });
-      window.setTimeout(run, 700);
-    } else {
-      run();
-    }
+    if (pickKoreanVoice(synth)) run(false);
+    else synth.addEventListener('voiceschanged', () => run(false), { once: true });
+    window.setTimeout(() => run(true), 700);
 
     return true;
   }, []);
@@ -143,5 +173,7 @@ export function useSpeechOutput() {
     stopSpeaking,
     isSpeaking,
     isSupported,
+    voiceLive,
+    voiceMark,
   };
 };

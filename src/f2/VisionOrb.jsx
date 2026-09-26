@@ -23,10 +23,18 @@ precision highp float;
 varying vec2 vUv;
 uniform sampler2D uMap;
 uniform vec2 uOrigin;
-uniform vec2 uSize;
-uniform vec2 uOffset;
+uniform vec2 uView;
+uniform vec2 uTex;
+uniform float uAngle;
+uniform float uZoom;
+uniform vec2 uRipple;
 void main() {
-  gl_FragColor = texture2D(uMap, uOrigin + vUv * uSize - uOffset);
+  vec2 center = uView * 0.5;
+  vec2 p = vUv * uView - center;
+  float c = cos(uAngle);
+  float s = sin(uAngle);
+  vec2 rot = vec2(c * p.x + s * p.y, -s * p.x + c * p.y) * uZoom + center + uRipple;
+  gl_FragColor = texture2D(uMap, uOrigin + rot / uTex);
 }
 `;
 
@@ -61,16 +69,35 @@ function colorLayerMarkup(group, sourceSvg) {
   filter.setAttribute('y', '-900');
   filter.setAttribute('width', '2200');
   filter.setAttribute('height', '2200');
+  const blur = filter.querySelector('feGaussianBlur');
+  if (blur) blur.setAttribute('stdDeviation', '58');
+  const gradient = sourceSvg.querySelector('#paint1_radial_1581_291').cloneNode(false);
+  const mix = (from, to, t) => from.map((channel, index) => Math.round(channel + (to[index] - channel) * t));
+  const blue = [11, 180, 254];
+  const mint = [100, 248, 194];
+  const yellow = [244, 238, 95];
+  for (let step = 0; step <= 12; step += 1) {
+    const t = step / 12;
+    const color = t < 0.5 ? mix(blue, mint, t / 0.5) : mix(mint, yellow, (t - 0.5) / 0.5);
+    const stop = document.createElementNS(SVG_NS, 'stop');
+    stop.setAttribute('offset', String(t));
+    stop.setAttribute('stop-color', `#${color.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`);
+    stop.setAttribute('stop-opacity', '1');
+    gradient.appendChild(stop);
+  }
   const defs = document.createElementNS(SVG_NS, 'defs');
   defs.appendChild(filter);
-  defs.appendChild(sourceSvg.querySelector('#paint1_radial_1581_291').cloneNode(true));
+  defs.appendChild(gradient);
   svg.appendChild(group.cloneNode(true));
   svg.appendChild(defs);
   return new XMLSerializer().serializeToString(svg);
 }
 
-export default function VisionOrb({ className }) {
+export default function VisionOrb({ className, voiceLive = false, voiceMark = 0 }) {
   const hostRef = useRef(null);
+  const voiceRef = useRef({ mark: 0, seen: 0, aim: 0, level: 0 });
+  voiceRef.current.live = voiceLive;
+  voiceRef.current.mark = voiceMark;
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -131,11 +158,12 @@ export default function VisionOrb({ className }) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 
-    const originLoc = gl.getUniformLocation(program, 'uOrigin');
-    const sizeLoc = gl.getUniformLocation(program, 'uSize');
-    const offsetLoc = gl.getUniformLocation(program, 'uOffset');
-    gl.uniform2f(originLoc, PAD / TEX_W, PAD / TEX_H);
-    gl.uniform2f(sizeLoc, VIEW_W / TEX_W, VIEW_H / TEX_H);
+    const angleLoc = gl.getUniformLocation(program, 'uAngle');
+    const rippleLoc = gl.getUniformLocation(program, 'uRipple');
+    gl.uniform2f(gl.getUniformLocation(program, 'uOrigin'), PAD / TEX_W, PAD / TEX_H);
+    gl.uniform2f(gl.getUniformLocation(program, 'uView'), VIEW_W, VIEW_H);
+    gl.uniform2f(gl.getUniformLocation(program, 'uTex'), TEX_W, TEX_H);
+    gl.uniform1f(gl.getUniformLocation(program, 'uZoom'), 0.9);
 
     let frame = 0;
     let stopped = false;
@@ -207,9 +235,22 @@ export default function VisionOrb({ className }) {
       const draw = (now) => {
         if (stopped) return;
         const t = (now - started) / 1000;
-        const x = Math.sin(t * 1.7) * 160 + Math.sin(t * 0.75) * 40;
-        const y = Math.sin(t * 1.2) * 110 + Math.sin(t * 0.48) * 30;
-        gl.uniform2f(offsetLoc, x / TEX_W, y / TEX_H);
+        const voice = voiceRef.current;
+        if (voice.mark !== voice.seen) {
+          voice.seen = voice.mark;
+          voice.aim = Math.min(1, voice.aim + 0.45);
+        }
+        voice.aim += (0 - voice.aim) * 0.006;
+        voice.level += (voice.aim - voice.level) * 0.03;
+        const swell = 1 + voice.level * 1.35;
+        const turn = (Math.PI * 2) / 16;
+        const breathe = Math.sin(t * 0.55) * 0.1 + Math.sin(t * 1.05) * (0.045 + voice.level * 0.08);
+        gl.uniform1f(angleLoc, t * turn + breathe);
+        gl.uniform2f(
+          rippleLoc,
+          (Math.sin(t * 1.55) * 18 + Math.sin(t * 2.45 + 0.7) * 10) * swell,
+          (Math.cos(t * 1.2) * 15 + Math.cos(t * 2.05 + 1.3) * 9) * swell,
+        );
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

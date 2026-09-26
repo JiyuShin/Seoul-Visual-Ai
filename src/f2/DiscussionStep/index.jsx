@@ -156,7 +156,7 @@ export default function DiscussionStep({
         if (aliveRef.current) setBeat('dock');
       }, 2600);
     };
-    speechOutputRef.current.speak(`${LINE_83} ${LINE_80_B}`, beginUnveil, beginUnveil);
+    speechOutputRef.current.speak(LINE_80_B, beginUnveil, beginUnveil);
     return () => window.clearTimeout(dockTimer);
   }, []);
 
@@ -470,7 +470,13 @@ export default function DiscussionStep({
               style={{ left: orbPose.left, top: orbPose.top, width: orbPose.size, height: orbPose.size }}
             >
               <div className={styles.visionCard} style={{ transform: `scale(${cardScale})` }}>
-                {showVisionCard && <VisionOrb className={styles.visionOrb} />}
+                {showVisionCard && (
+                  <VisionOrb
+                    className={styles.visionOrb}
+                    voiceLive={speechOutput.voiceLive}
+                    voiceMark={speechOutput.voiceMark}
+                  />
+                )}
               </div>
               <div className={styles.agentFace}>
                 <div className={styles.orbPulse}>
