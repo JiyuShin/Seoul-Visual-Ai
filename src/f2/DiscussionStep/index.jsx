@@ -154,11 +154,18 @@ export default function DiscussionStep({
   }, []);
 
   useEffect(() => {
-    const timers = [
-      window.setTimeout(() => setBeat('shrink'), 5200),
-      window.setTimeout(() => setBeat('dock'), 7800),
-    ];
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+    let started = false;
+    let dockTimer = 0;
+    const beginUnveil = () => {
+      if (started || !aliveRef.current) return;
+      started = true;
+      setBeat('shrink');
+      dockTimer = window.setTimeout(() => {
+        if (aliveRef.current) setBeat('dock');
+      }, 2600);
+    };
+    speechOutputRef.current.speak(`${LINE_83} ${LINE_80_B}`, beginUnveil, beginUnveil);
+    return () => window.clearTimeout(dockTimer);
   }, []);
 
   useEffect(() => {
@@ -243,12 +250,28 @@ export default function DiscussionStep({
       return undefined;
     }
     if (beat === 'speak') {
-      say(`speak-${speakerRef.current.cam}`, MIC_LINE);
+      let micArmed = false;
+      const openMic = () => {
+        if (micArmed || beatRef.current !== 'speak') return;
+        micArmed = true;
+        speechRef.current.clearTranscript();
+        speechRef.current.startListening();
+      };
+      say(`speak-${speakerRef.current.cam}`, MIC_LINE, openMic, openMic);
       return undefined;
     }
     if (beat === 'fold') {
-      const timer = window.setTimeout(advanceAfterFold, FOLD_HOLD_MS);
-      return () => window.clearTimeout(timer);
+      const markId = activeMarkRef.current;
+      const foldTimer = window.setTimeout(() => {
+        setMarks((prev) => prev.map((mark) => (
+          mark.id === markId ? { ...mark, folded: true } : mark
+        )));
+      }, AFTER_USER_MS);
+      const timer = window.setTimeout(advanceAfterFold, AFTER_USER_MS + FOLD_HOLD_MS);
+      return () => {
+        window.clearTimeout(foldTimer);
+        window.clearTimeout(timer);
+      };
     }
     return undefined;
   }, [advanceAfterFold, beat, say, speakerIndex]);
@@ -270,9 +293,13 @@ export default function DiscussionStep({
       if (cancelled) return;
       const spoken = line || fallbackAsk(historyRef.current);
       historyRef.current = [...historyRef.current, { role: 'assistant', text: spoken }];
-      say(key, spoken, () => {
-        if (!cancelled && beatRef.current === beat) setBeat(next);
-      });
+      let micArmed = false;
+      const openReply = () => {
+        if (micArmed || cancelled || beatRef.current !== beat) return;
+        micArmed = true;
+        setBeat(next);
+      };
+      say(key, spoken, openReply, openReply);
     };
 
     run();
@@ -292,7 +319,7 @@ export default function DiscussionStep({
     const entry = { text: trimmed, cam: author };
     setMarks((prev) => prev.map((mark) => (
       mark.id === markId
-        ? { ...mark, lines: [...mark.lines, entry], folded: current === 'reply2' }
+        ? { ...mark, lines: [...mark.lines, entry] }
         : mark
     )));
     historyRef.current = [...historyRef.current, { role: 'user', text: trimmed }];
@@ -320,6 +347,9 @@ export default function DiscussionStep({
     if (!USER_BEATS.has(beat)) {
       speechRef.current.stopListening();
       return undefined;
+    }
+    if (beat === 'speak') {
+      return () => speechRef.current.stopListening();
     }
     speechRef.current.clearTranscript();
     speechRef.current.startListening();
