@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  GAZE_VOTE_DWELL_MS,
   VOTE_HIT_GRACE_MS,
   VOTE_JOINT_SCORE_WEIGHT,
   VOTE_REQUIRED_VIEWERS,
@@ -11,8 +10,9 @@ import { CAM_KEYS, VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { createVoteState } from '../voteState';
 
 const BG_SWITCH_MS = 1200;
-const SPLIT_ARM_MS = 0;
-const SPLIT_HOLD_MS = 3000;
+const SPLIT_ARM_MS = 2000;
+const SPLIT_HOLD_MS = 3500;
+const JOINT_SELECT_MS = 400;
 const SPLIT_GAP_MS = 400;
 
 /**
@@ -53,7 +53,7 @@ export function useMenuJointSelect({
       requiredViewers,
       graceMs: VOTE_HIT_GRACE_MS,
       jointWeight: VOTE_JOINT_SCORE_WEIGHT,
-      winScoreMs: GAZE_VOTE_DWELL_MS,
+      winScoreMs: JOINT_SELECT_MS,
       jointOnly: true,
     });
 

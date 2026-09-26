@@ -1,7 +1,7 @@
 const DEG = Math.PI / 180;
 
-// 거리 사진은 270도 범위로 둘러본다. 사이트 줌의 최대 광각은 화각 84도다.
-export const YAW_LIMIT = 135 * DEG;
+// 거리 사진은 200도 범위로 둘러본다. 사이트 줌의 최대 광각은 화각 84도다.
+export const YAW_LIMIT = 100 * DEG;
 export const PITCH_LIMIT = 32 * DEG;
 export const MAX_FOV = 84 * DEG;
 

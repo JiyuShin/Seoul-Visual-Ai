@@ -14,6 +14,7 @@ const CARD_IMAGE_SRCS = ['/1/menu-card-1.svg?v=6', '/1/menu-cards.svg?v=6'];
 const CARD_SVG_W = 800.537;
 const SELECT_ADVANCE_MS = 3000;
 const SPLIT_SCALE = 1.03;
+const SPLIT_SHRINK = 0.97;
 const CARD_COPY = [
   '탁한 일상을 비우고 맑은 초록으로 채우는 서울',
   '초록 사이로 선명한 햇살이 스며드는 서울',
@@ -86,7 +87,7 @@ export default function MenuSelectionPage() {
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
     const timer = window.setTimeout(() => {
-      router.push('/3');
+      router.push('/2');
     }, SELECT_ADVANCE_MS);
     return () => window.clearTimeout(timer);
   }, [router, selectedIndex]);
@@ -204,11 +205,14 @@ export default function MenuSelectionPage() {
             ? scale
             : splitGrown && active
               ? SPLIT_SCALE
-              : isSplit
-                ? 1
-                : active
-                  ? 1.055
-                  : 1;
+              : splitGrown
+                ? SPLIT_SHRINK
+                : isSplit
+                  ? 1
+                  : active
+                    ? 1.055
+                    : 1;
+          const faceOpacity = splitGrown && !active ? 0.65 : 1;
 
           return (
             <div
@@ -221,7 +225,7 @@ export default function MenuSelectionPage() {
             >
               <div
                 className={styles.cardFace}
-                style={{ transform: `scale(${faceScale})` }}
+                style={{ transform: `scale(${faceScale})`, opacity: faceOpacity }}
               >
                 <div
                   className={styles.cardClip}

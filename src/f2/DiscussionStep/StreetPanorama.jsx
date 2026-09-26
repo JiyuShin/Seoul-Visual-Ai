@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { lookFromPointer, screenToWorld, viewFov, worldToScreen } from './streetLook';
+import { clamp, lookFromPointer, screenToWorld, viewFov, worldToScreen } from './streetLook';
 import styles from './StreetCanvas.module.css';
 
 const VERTEX = `
@@ -16,6 +16,7 @@ varying vec2 screenUV;
 uniform sampler2D panorama;
 uniform vec2 viewport;
 uniform vec3 view;
+uniform float yawSpan;
 const float PI = 3.141592653589793;
 void main() {
   float a = viewport.x / viewport.y;
@@ -28,9 +29,9 @@ void main() {
   float cy = cos(view.x);
   float sy = sin(view.x);
   ray = vec3(cy * ray.x + sy * ray.z, ray.y, -sy * ray.x + cy * ray.z);
-  vec2 uv = vec2(fract(0.5 + atan(ray.x, ray.z) / (2.0 * PI)),
+  float span = max(yawSpan, 0.001);
+  vec2 uv = vec2(clamp(0.5 + atan(ray.x, ray.z) / span, 0.0, 1.0),
                  0.5 - asin(clamp(ray.y, -1.0, 1.0)) / PI);
-  uv.y += 0.12 * sin(PI * uv.y);
   gl_FragColor = vec4(texture2D(panorama, uv).rgb, 1.0);
 }`;
 
@@ -45,7 +46,7 @@ function compile(gl, type, source) {
   return shader;
 }
 
-export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs, marks }, ref) {
+export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs, marks, yawSpan = 360, zoom = 1 }, ref) {
   const canvasRef = useRef(null);
   const viewRef = useRef({ yaw: 0, pitch: 0, fov: viewFov(16 / 9), aspect: 16 / 9 });
   const marksRef = useRef(marks);
@@ -101,6 +102,7 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
     gl.uniform1i(gl.getUniformLocation(program, 'panorama'), 0);
     const sizeUniform = gl.getUniformLocation(program, 'viewport');
     const viewUniform = gl.getUniformLocation(program, 'view');
+    const spanUniform = gl.getUniformLocation(program, 'yawSpan');
 
     let ready = false;
     let dead = false;
@@ -148,10 +150,16 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
         canvas.height = h;
       }
       const aspect = w / h;
-      const fov = viewFov(aspect);
+      const fov = viewFov(aspect) * zoom;
+      const spanRad = (yawSpan * Math.PI) / 180;
+      const halfH = Math.atan(Math.max(aspect, 0.2) * Math.tan(fov * 0.5));
+      const yawCap = yawSpan < 359 ? Math.max(0, spanRad * 0.5 - halfH - (2 * Math.PI) / 180) : Infinity;
+      target.yaw = clamp(target.yaw, -yawCap, yawCap);
+      current.yaw = clamp(current.yaw, -yawCap, yawCap);
       viewRef.current = { yaw: current.yaw, pitch: current.pitch, fov, aspect };
       gl.viewport(0, 0, w, h);
       gl.uniform2f(sizeUniform, w, h);
+      gl.uniform1f(spanUniform, (yawSpan * Math.PI) / 180);
       gl.uniform3f(viewUniform, current.yaw, current.pitch, fov);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       placeMarks();
@@ -182,7 +190,7 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       gl.deleteShader(fragment);
       gl.deleteProgram(program);
     };
-  }, [imageUrl, lookRef, markRefs]);
+  }, [imageUrl, lookRef, markRefs, yawSpan, zoom]);
 
   return <canvas ref={canvasRef} className={styles.panorama} />;
 });

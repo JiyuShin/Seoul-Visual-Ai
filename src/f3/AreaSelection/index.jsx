@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import {
   buildMobileJoinUrl,
@@ -11,6 +10,7 @@ import { useMobileLink } from '../../shared/mobileLink/MobileLinkContext';
 import {
   DISTRICTS,
   ROULETTE_LOGOS,
+  F_TOTAL_DURATION,
   S_DURATION_MS,
   STAGE,
   placementForLogo,
@@ -208,9 +208,17 @@ function Background({ hidden }) {
 }
 
 function FindingVideo({ hidden }) {
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (hidden) return undefined;
+    const timer = setTimeout(() => setFading(true), Math.max(0, F_TOTAL_DURATION - 1600));
+    return () => clearTimeout(timer);
+  }, [hidden]);
+
   return (
     <video
-      className={`${styles.findingVideo} ${hidden ? styles.isHidden : ''}`}
+      className={`${styles.findingVideo} ${hidden || fading ? styles.isHidden : ''}`}
       src="/3/f001.mp4"
       autoPlay
       muted
@@ -447,16 +455,11 @@ function QrCopy({ phase, qrUrl, linkStatus, isPaired, holdSecondsLeft, mobilePub
   );
 }
 
-/** QR 단계 최소 노출 후 키오스크 /2 로 이동 (모바일 WS 는 유지) */
-const QR_HOLD_MS = 10000;
-
 export default function AreaSelection() {
-  const router = useRouter();
   const { setSelectedDistrict } = useEntryFlow();
   const { startKioskSession, qrTargetUrl, mobilePublicOrigin, status: linkStatus, isPaired } =
     useMobileLink();
   const kioskSessionRef = useRef(false);
-  const [qrHoldSecondsLeft, setQrHoldSecondsLeft] = useState(0);
   const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
   const [districtIndex, setDistrictIndex] = useState(0);
@@ -496,30 +499,6 @@ export default function AreaSelection() {
     return undefined;
   }, [phase, district, startKioskSession, mobilePublicOrigin]);
 
-  useEffect(() => {
-    if (phase !== 'q') {
-      setQrHoldSecondsLeft(0);
-    }
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== 'q') return undefined;
-
-    setQrHoldSecondsLeft(Math.ceil(QR_HOLD_MS / 1000));
-    const tick = setInterval(() => {
-      setQrHoldSecondsLeft((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
-
-    const advance = setTimeout(() => {
-      router.push('/2');
-    }, QR_HOLD_MS);
-
-    return () => {
-      clearInterval(tick);
-      clearTimeout(advance);
-    };
-  }, [phase, router]);
-
   return (
     <Stage>
       <Background hidden={phase === 'f'} />
@@ -540,7 +519,7 @@ export default function AreaSelection() {
         qrUrl={displayQrUrl}
         linkStatus={linkStatus}
         isPaired={isPaired}
-        holdSecondsLeft={qrHoldSecondsLeft}
+        holdSecondsLeft={0}
         mobilePublicOrigin={mobilePublicOrigin}
       />
     </Stage>

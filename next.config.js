@@ -16,6 +16,14 @@ const nextConfig = {
         source: '/street/tower/:path*',
         destination: 'https://quiet-street-tower.hello-ccid.chatgpt.site/:path*',
       },
+      {
+        source: '/street/brick/:path*',
+        destination: 'https://quiet-street-brick-alley.hello-ccid.chatgpt.site/:path*',
+      },
+      {
+        source: '/street/red/:path*',
+        destination: 'https://quiet-street-red-road.hello-ccid.chatgpt.site/:path*',
+      },
     ];
   },
 };

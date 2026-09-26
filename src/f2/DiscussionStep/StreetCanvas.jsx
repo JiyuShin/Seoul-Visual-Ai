@@ -18,6 +18,8 @@ function lineText(line) {
 export default function StreetCanvas({
   imageUrl,
   pendingLabel,
+  yawSpan = 360,
+  zoom = 1,
   registerGazeHandler,
   phase = 'idle',
   activeViewerId,
@@ -233,6 +235,8 @@ export default function StreetCanvas({
             <StreetPanorama
               ref={panoramaRef}
               imageUrl={imageUrl}
+              yawSpan={yawSpan}
+              zoom={zoom}
               lookRef={lookRef}
               markRefs={markRefs}
               marks={marks}

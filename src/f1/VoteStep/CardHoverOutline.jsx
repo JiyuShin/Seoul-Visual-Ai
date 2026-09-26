@@ -23,6 +23,7 @@ precision mediump float;
 
 uniform vec2 uRes;
 uniform float uProgress;
+uniform float uVariant;
 uniform float uStroke;
 uniform float uRadius;
 
@@ -103,9 +104,16 @@ void main() {
     return;
   }
 
-  vec3 topCol = vec3(220.0, 146.0, 255.0) / 255.0;
   vec3 midCol = vec3(1.0);
+  vec3 topCol = vec3(220.0, 146.0, 255.0) / 255.0;
   vec3 botCol = vec3(212.0, 138.0, 255.0) / 255.0;
+  if (uVariant < 0.5) {
+    topCol = vec3(182.0, 255.0, 106.0) / 255.0;
+    botCol = vec3(101.0, 255.0, 0.0) / 255.0;
+  } else if (uVariant > 1.5) {
+    topCol = vec3(101.0, 255.0, 0.0) / 255.0;
+    botCol = vec3(124.0, 32.0, 204.0) / 255.0;
+  }
   float y01 = clamp((p.y + b.y) / max(b.y * 2.0, 1.0), 0.0, 1.0);
   float mid = 0.498362;
   vec3 col = y01 <= mid
@@ -179,6 +187,7 @@ export function CardHoverOutline({ viewers }) {
     const pos = gl.getAttribLocation(program, 'aPos');
     const uRes = gl.getUniformLocation(program, 'uRes');
     const uProgress = gl.getUniformLocation(program, 'uProgress');
+    const uVariant = gl.getUniformLocation(program, 'uVariant');
     const uStroke = gl.getUniformLocation(program, 'uStroke');
     const uRadius = gl.getUniformLocation(program, 'uRadius');
 
@@ -215,6 +224,7 @@ export function CardHoverOutline({ viewers }) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, w, h);
       gl.uniform1f(uProgress, progress);
+      gl.uniform1f(uVariant, variant);
       gl.uniform1f(uStroke, REF_STROKE * scale);
       gl.uniform1f(uRadius, REF_RADIUS * scale);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

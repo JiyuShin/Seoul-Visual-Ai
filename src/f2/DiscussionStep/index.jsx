@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import { streetSceneForDistrict } from '../../shared/streetView';
@@ -77,6 +78,7 @@ export default function DiscussionStep({
   registerGazeHandler,
   onGazeClipChange,
 }) {
+  const router = useRouter();
   const { selectedDistrict, setDiscussionCam } = useEntryFlow();
   const scene = streetSceneForDistrict(selectedDistrict);
   const [speakerIndex, setSpeakerIndex] = useState(0);
@@ -175,6 +177,12 @@ export default function DiscussionStep({
   useEffect(() => {
     setDiscussionCam(speaker.cam);
   }, [setDiscussionCam, speaker.cam]);
+
+  useEffect(() => {
+    if (beat !== 'done') return undefined;
+    const timer = window.setTimeout(() => router.push('/3'), 1200);
+    return () => window.clearTimeout(timer);
+  }, [beat, router]);
 
   useEffect(() => {
     committedRef.current = false;
@@ -338,6 +346,8 @@ export default function DiscussionStep({
       <div className={styles.canvasArea}>
         <StreetCanvas
           imageUrl={scene.pending ? '' : scene.image}
+          yawSpan={scene.yawSpan || 360}
+          zoom={scene.zoom || 1}
           pendingLabel={scene.name}
           registerGazeHandler={registerGazeHandler}
           phase={beat === 'gaze' && gazeOpen ? 'gaze' : 'look'}
