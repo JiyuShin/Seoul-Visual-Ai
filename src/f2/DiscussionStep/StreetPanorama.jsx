@@ -149,7 +149,7 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
         target.yaw = next.yaw;
         target.pitch = next.pitch;
       }
-      const follow = 1 - Math.exp(-dt / (homing ? 520 : 160));
+      const follow = 1 - Math.exp(-dt / (homing ? 980 : 160));
       current.yaw += (target.yaw - current.yaw) * follow;
       current.pitch += (target.pitch - current.pitch) * follow;
 

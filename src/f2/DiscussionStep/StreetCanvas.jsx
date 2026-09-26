@@ -227,18 +227,18 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   viewerRef.current = activeViewerId;
 
   useImperativeHandle(ref, () => ({
-    recenter(onDone) {
+    recenter(onDone, { release = true } = {}) {
       holdLookRef.current = true;
       lookRef.current = { nx: 0.5, ny: 0.5 };
       const panorama = panoramaRef.current;
       if (!panorama?.recenter) {
-        holdLookRef.current = false;
+        if (release) holdLookRef.current = false;
         onDone?.();
         return false;
       }
       panorama.recenter(() => {
         lookRef.current = { nx: 0.5, ny: 0.5 };
-        holdLookRef.current = false;
+        if (release) holdLookRef.current = false;
         onDone?.();
       });
       return true;

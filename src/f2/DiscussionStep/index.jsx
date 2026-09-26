@@ -36,7 +36,7 @@ function spokenHoldMs(text) {
   return Math.max(1600, chars * 240);
 }
 const AFTER_USER_MS = 1800;
-const LINE_80_B = '삭막한 지금의 거리 위에 식물이 필요한 곳을 차례대로 바라보아 어떻게 바뀌어야 할지 의견을 나눠주세요.';
+const INTRO_LINE = '함께 선택해주신 이 서울을 실현하기 위해, 삭막한 지금의 거리에서 식물이 필요한 곳을 차례대로 바라보며 토론을 통해 의견을 나눠볼게요.';
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
 
@@ -172,7 +172,7 @@ export default function DiscussionStep({
         if (aliveRef.current) setBeat('dock');
       }, 2600);
     };
-    speechOutputRef.current.speak(LINE_80_B, beginUnveil, beginUnveil);
+    speechOutputRef.current.speak(INTRO_LINE, beginUnveil, beginUnveil);
     return () => window.clearTimeout(dockTimer);
   }, []);
 
@@ -303,10 +303,6 @@ export default function DiscussionStep({
         if (beatRef.current !== 'fold') return;
         say(`collected-${cam}`, `${label}의 의견을 수집했어요!`, () => {
           if (beatRef.current !== 'fold') return;
-          if (cam !== 'A') {
-            advanceAfterFold();
-            return;
-          }
           let moved = false;
           let fallback = 0;
           const go = () => {
@@ -315,8 +311,8 @@ export default function DiscussionStep({
             window.clearTimeout(fallback);
             advanceAfterFold();
           };
-          fallback = window.setTimeout(go, 4500);
-          if (!streetRef.current?.recenter(go)) go();
+          fallback = window.setTimeout(go, 7000);
+          if (!streetRef.current?.recenter(go, { release: cam === 'A' })) go();
         });
       }, AFTER_USER_MS + FOLD_MS + 40);
       return () => {
@@ -527,9 +523,9 @@ export default function DiscussionStep({
             </div>
 
             <p className={`${styles.caption} ${beat === 'intro' ? styles.captionOn : ''}`}>
-              {LINE_83}
+              함께 선택해주신 이 서울을 실현하기 위해,
               <br />
-              {LINE_80_B}
+              삭막한 지금의 거리에서 식물이 필요한 곳을 차례대로 바라보며 토론을 통해 의견을 나눠볼게요.
             </p>
           </div>
         </div>
