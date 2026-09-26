@@ -281,7 +281,7 @@
 .mapMotion {
   position: absolute;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .mapMotion.isGone {
@@ -289,12 +289,18 @@
   transition: opacity 1.8s cubic-bezier(0.33, 0, 0.2, 1);
 }
 
-.mapMotion img {
+.mapMotion img,
+.mapSvg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  overflow: visible;
+}
+
+.mapSvg {
+  z-index: 1;
 }
 
 .fTitle,
@@ -370,12 +376,6 @@
 
 .videoOutline {
   pointer-events: none;
-}
-
-.pin {
-  position: absolute;
-  background: #fff;
-  transition: opacity 0.6s ease;
 }
 
 .resultTitle {
@@ -559,56 +559,6 @@
   min-height: 280px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
-}
-
-.qrStatus {
-  position: absolute;
-  left: 120px;
-  top: 1180px;
-  width: 880px;
-  margin: 0;
-  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.45;
-  letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.88);
-  text-align: center;
-  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.35);
-}
-
-.qrStatusPaired {
-  color: #d5ffb9;
-}
-
-.qrDevHint {
-  position: absolute;
-  left: 120px;
-  top: 1240px;
-  width: 880px;
-  margin: 0;
-  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: rgba(255, 230, 160, 0.95);
-  text-align: center;
-}
-
-.qrLinkPreview {
-  position: absolute;
-  left: 120px;
-  top: 1288px;
-  width: 880px;
-  margin: 0;
-  padding: 0 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.82);
-  text-align: center;
-  word-break: break-all;
 }
 
 .qrGlow {

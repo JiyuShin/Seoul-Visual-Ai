@@ -3,7 +3,6 @@ import { useEntryFlow } from '../../shared/EntryFlowContext';
 import {
   buildMobileJoinUrl,
   getMobilePublicOriginSync,
-  isLikelyLocalhostQr,
 } from '../../shared/mobileLink/publicOrigin';
 import DynamicQrCode from '../../shared/mobileLink/DynamicQrCode';
 import { useMobileLink } from '../../shared/mobileLink/MobileLinkContext';
@@ -227,28 +226,26 @@ function FindingVideo({ hidden }) {
   );
 }
 
-const MAP_PINS = [
-  [1177.28, 0],
-  [1392.39, 36.9],
-  [698.45, 225.92],
-  [360.92, 387.93],
-  [939.47, 423],
-  [1036.87, 454.53],
-  [1224.98, 539.14],
-  [1560.7, 576.95],
-  [839.74, 711.96],
-  [237.61, 726.35],
-  [491.43, 961.28],
-  [770.45, 1037.78],
-  [1414.88, 1059.38],
-  [667.84, 1126.88],
-  [1199.77, 1169.19],
-];
-
 const FINDING_MAP = { left: 1143, top: 749, width: 1544, height: 1108 };
 const RESULT_MAP = { left: 1765, top: 526, width: 1904, height: 1269 };
-const PIN_SCALE = FINDING_MAP.width / 1903.629;
-const PIN_MAP_TOP = (FINDING_MAP.height - 1288 * PIN_SCALE) / 2;
+
+const MAP_MARKERS = [
+  [1177.28, 0, 42.3047],
+  [698.445, 225.918, 268.219],
+  [360.924, 387.934, 430.23],
+  [237.609, 726.352, 768.66],
+  [491.43, 961.277, 1003.57],
+  [1560.7, 576.945, 619.25],
+  [1392.39, 36.9023, 79.2109],
+  [1224.98, 539.137, 581.445],
+  [1414.88, 1059.38, 1101.69],
+  [1036.87, 454.531, 496.84],
+  [1011.47, 717, 759.309],
+  [839.744, 711.961, 754.258],
+  [1199.77, 1169.2, 1211.49],
+  [770.453, 1037.79, 1080.08],
+  [667.838, 1126.88, 1169.19],
+];
 
 function copyClass(phase, scene) {
   if (phase === scene) return styles.copyShow;
@@ -264,21 +261,34 @@ function MovingMap({ phase }) {
       className={`${styles.mapMotion} ${phase === 'f' || phase === 'q' ? styles.isGone : ''}`}
       style={atResult ? RESULT_MAP : FINDING_MAP}
     >
-      <img className={styles.mapScreen} src="/3/map-screen.png" alt="" />
-      <img src="/3/map.png" alt="" />
-      {MAP_PINS.map(([x, y]) => (
-        <span
-          key={`${x}-${y}`}
-          className={styles.pin}
-          style={{
-            left: `${(x * PIN_SCALE / FINDING_MAP.width) * 100}%`,
-            top: `${((PIN_MAP_TOP + y * PIN_SCALE) / FINDING_MAP.height) * 100}%`,
-            width: `${(25.2 * PIN_SCALE / FINDING_MAP.width) * 100}%`,
-            height: `${(74.9 * PIN_SCALE / FINDING_MAP.height) * 100}%`,
-            opacity: phase === 'f' ? 1 : 0,
-          }}
+      <svg
+        className={styles.mapSvg}
+        viewBox="0 0 1904 1288"
+        preserveAspectRatio="xMidYMid meet"
+        overflow="visible"
+      >
+        <image
+          href="/3/map1.png"
+          x="6.29297"
+          y="20.7031"
+          width="1892.83"
+          height="1261.9"
+          preserveAspectRatio="none"
         />
-      ))}
+        <rect x="6.29297" y="20.7031" width="1892.83" height="1261.9" fill="url(#seoulMapLine)" />
+        {MAP_MARKERS.map(([x, headY, stemY]) => (
+          <g key={`${x}-${headY}`}>
+            <rect x={x} y={headY} width="25.2018" height="49.5037" fill="white" />
+            <rect x={x} y={stemY} width="6.06358" height="32.5919" fill="white" />
+          </g>
+        ))}
+        <defs>
+          <pattern id="seoulMapLine" patternContentUnits="objectBoundingBox" width="1" height="1">
+            <use href="#seoulMapLineImage" transform="scale(0.000791772 0.00118765)" />
+          </pattern>
+          <image id="seoulMapLineImage" href="/3/map.png" width="1263" height="842" preserveAspectRatio="none" />
+        </defs>
+      </svg>
     </div>
   );
 }
@@ -366,6 +376,7 @@ const QR_BORDER_SHADOWS = [
   { x: -8.905, y: -8.905, blur: 16.83, color: 'rgba(0, 0, 0, 0.25)' },
 ];
 const QR_BORDER_TURN_MS = 5000;
+const MAP_FADE_OUT_MS = 1800;
 
 function QrBorder() {
   const borderRef = useRef(null);
@@ -394,28 +405,19 @@ function QrBorder() {
   return <div ref={borderRef} className={styles.qrGlow} />;
 }
 
-function QrCopy({ phase, qrUrl, linkStatus, isPaired, holdSecondsLeft, mobilePublicOrigin }) {
-  const motion = copyClass(phase, 'q');
-  const localhostHint =
-    phase === 'q' && isLikelyLocalhostQr(mobilePublicOrigin)
-      ? 'LAN IP를 찾지 못했습니다. PC와 폰이 같은 Wi‑Fi인지 확인하고 yarn dev(server.js)로 실행해 주세요.'
-      : null;
+function QrCopy({ phase, qrUrl }) {
+  const [revealed, setRevealed] = useState(false);
 
-  let statusLine = null;
-  if (phase === 'q' && !qrUrl) {
-    statusLine = 'QR 링크를 준비하는 중…';
-  } else if (linkStatus === 'error') {
-    statusLine = '연결 오류 · yarn dev(node server.js) 실행 여부를 확인해 주세요.';
-  } else if (linkStatus === 'connecting') {
-    statusLine = '키오스크 세션 연결 중…';
-  } else if (isPaired) {
-    statusLine = '휴대폰과 연결되었어요. 모바일 화면에서 식물을 그려 주세요.';
-  } else if (linkStatus === 'waiting_mobile') {
-    statusLine =
-      holdSecondsLeft > 0
-        ? `QR을 스캔해 /mobile 로 연결하세요. ${holdSecondsLeft}초 후 다음 화면으로 이동합니다.`
-        : 'QR을 스캔하면 /mobile 페이지로 연결됩니다.';
-  }
+  useEffect(() => {
+    if (phase !== 'q') {
+      setRevealed(false);
+      return undefined;
+    }
+    const timeout = setTimeout(() => setRevealed(true), MAP_FADE_OUT_MS);
+    return () => clearTimeout(timeout);
+  }, [phase]);
+
+  const motion = revealed ? styles.copyShow : styles.copyHide;
 
   return (
     <>
@@ -428,16 +430,7 @@ function QrCopy({ phase, qrUrl, linkStatus, isPaired, holdSecondsLeft, mobilePub
         이제 모든 준비는 끝났어요! 화면 속 QR를 인식해 휴대폰으로 직접 식물을 그려볼 차례예요.
         여러분이 원하는 서울 속 나만의 식물을 심으러 가볼까요?
       </p>
-      {statusLine ? (
-        <p className={`${styles.qrStatus} ${isPaired ? styles.qrStatusPaired : ''}`}>{statusLine}</p>
-      ) : null}
-      {localhostHint ? <p className={styles.qrDevHint}>{localhostHint}</p> : null}
-      {phase === 'q' && qrUrl ? (
-        <p className={styles.qrLinkPreview} title={qrUrl}>
-          {qrUrl}
-        </p>
-      ) : null}
-      <div className={`${styles.qrFrame} ${phase === 'q' ? styles.qrOn : ''}`}>
+      <div className={`${styles.qrFrame} ${revealed ? styles.qrOn : ''}`}>
         <div className={phase === 'q' ? styles.qrImageLive : styles.qrImage}>
           {phase === 'q' ? (
             qrUrl ? (
@@ -457,8 +450,7 @@ function QrCopy({ phase, qrUrl, linkStatus, isPaired, holdSecondsLeft, mobilePub
 
 export default function AreaSelection() {
   const { setSelectedDistrict } = useEntryFlow();
-  const { startKioskSession, qrTargetUrl, mobilePublicOrigin, status: linkStatus, isPaired } =
-    useMobileLink();
+  const { startKioskSession, qrTargetUrl, mobilePublicOrigin } = useMobileLink();
   const kioskSessionRef = useRef(false);
   const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
@@ -514,14 +506,7 @@ export default function AreaSelection() {
       <MovingMap phase={phase} />
       <SelectedCopy district={district} phase={phase} />
       {phase !== 'f' && <DistrictGlow district={district} hidden={phase !== 's'} />}
-      <QrCopy
-        phase={phase}
-        qrUrl={displayQrUrl}
-        linkStatus={linkStatus}
-        isPaired={isPaired}
-        holdSecondsLeft={0}
-        mobilePublicOrigin={mobilePublicOrigin}
-      />
+      <QrCopy phase={phase} qrUrl={displayQrUrl} />
     </Stage>
   );
 }

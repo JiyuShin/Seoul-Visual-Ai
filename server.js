@@ -10,6 +10,7 @@ const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
+const handleUpgrade = app.getUpgradeHandler();
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -20,14 +21,17 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (req, socket, head) => {
-    const { pathname } = parse(req.url);
+    const { pathname } = parse(req.url || '', true);
     if (pathname === '/ws/mobile') {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });
       return;
     }
-    socket.destroy();
+    handleUpgrade(req, socket, head).catch((err) => {
+      console.error('Failed to handle upgrade', err);
+      socket.destroy();
+    });
   });
 
   wss.on('connection', (ws) => {

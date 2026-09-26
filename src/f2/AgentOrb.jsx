@@ -56,6 +56,7 @@ const fragmentShader = `
     if (mask <= 0.001) discard;
 
     float t = time;
+    float lively = 1.0 + max(motion - 1.0, 0.0) * 0.45;
     float sway = 0.22 + motion * 0.08;
     vec2 warp = vec2(
       fbm(p * 1.7 + vec2(t * 0.31, t * 0.22)),
@@ -71,10 +72,10 @@ const fragmentShader = `
     vec3 col = mix(blue, mint, smoothstep(0.0, 0.490385, g));
     col = mix(col, yellow, smoothstep(0.490385, 1.0, g));
 
-    vec2 warmC = vec2(0.34, 0.18) + 0.28 * vec2(sin(t * 0.72), cos(t * 0.51));
-    vec2 pinkC = vec2(-0.36, -0.16) + 0.26 * vec2(cos(t * 0.46), sin(t * 0.63));
-    vec2 mintC = vec2(0.02, -0.08) + 0.22 * vec2(sin(t * 0.38), cos(t * 0.41));
-    vec2 cyanC = vec2(-0.04, 0.32) + 0.2 * vec2(cos(t * 0.88), sin(t * 0.47));
+    vec2 warmC = vec2(0.34, 0.18) + 0.28 * lively * vec2(sin(t * 0.72), cos(t * 0.51));
+    vec2 pinkC = vec2(-0.36, -0.16) + 0.26 * lively * vec2(cos(t * 0.46), sin(t * 0.63));
+    vec2 mintC = vec2(0.02, -0.08) + 0.22 * lively * vec2(sin(t * 0.38), cos(t * 0.41));
+    vec2 cyanC = vec2(-0.04, 0.32) + 0.2 * lively * vec2(cos(t * 0.88), sin(t * 0.47));
 
     float warm = blob(q, warmC, vec2(0.62, 0.42));
     float pink = blob(q, pinkC, vec2(0.5, 0.58));
@@ -85,7 +86,7 @@ const fragmentShader = `
     float pinkN = fbm(q * 2.6 + vec2(-t * 0.36, t * 0.27) + 8.0);
 
     vec3 orange = mix(vec3(1.0, 0.702, 0.2784), vec3(1.0, 0.6157, 0.2784), warmN);
-    vec3 pinkCol = mix(vec3(1.0, 0.2784, 0.9765), vec3(1.0, 0.6235, 0.851), pinkN);
+    vec3 pinkCol = mix(vec3(0.7882, 0.6510, 1.0), vec3(0.8627, 0.7765, 1.0), pinkN);
     vec3 mintGlow = vec3(0.7843, 1.0, 0.8353);
     vec3 cyanCol = mix(vec3(0.6157, 1.0, 0.9922), vec3(0.8353, 1.0, 0.9961), 0.45);
 
@@ -105,10 +106,14 @@ const fragmentShader = `
   }
 `;
 
-export default function AgentOrb({ speaking = false, className }) {
+export default function AgentOrb({ agentSpeaking = false, userLevelRef, className }) {
   const canvasRef = useRef(null);
-  const speakingRef = useRef(speaking);
-  speakingRef.current = speaking;
+  const rootRef = useRef(null);
+  const haloBlurRef = useRef(null);
+  const agentSpeakingRef = useRef(agentSpeaking);
+  const levelSourceRef = useRef(userLevelRef);
+  agentSpeakingRef.current = agentSpeaking;
+  levelSourceRef.current = userLevelRef;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -145,6 +150,8 @@ export default function AgentOrb({ speaking = false, className }) {
 
     let frame = 0;
     let last = 0;
+    let haloPhase = 0;
+    let haloBlur = 8;
 
     const resize = () => {
       const size = canvas.clientWidth || 148;
@@ -159,9 +166,23 @@ export default function AgentOrb({ speaking = false, className }) {
       if (Math.abs(canvas.width - size * ratio) > 2) resize();
       const dt = Math.min((now - (last || now)) / 1000, 0.05);
       last = now;
-      const target = speakingRef.current ? 1.45 : 1;
-      uniforms.motion.value += (target - uniforms.motion.value) * 0.05;
-      uniforms.time.value += dt * (0.85 + uniforms.motion.value * 0.35) * 2.15;
+      const level = levelSourceRef.current?.current || 0;
+      const target = 1 + level * 0.65;
+      uniforms.motion.value += (target - uniforms.motion.value) * 0.12;
+      uniforms.time.value += dt * 2.58 * (1 + level * 0.42);
+      if (rootRef.current) {
+        rootRef.current.style.transform = `scale(${(1 + level * 0.07).toFixed(4)})`;
+      }
+      if (agentSpeakingRef.current) {
+        haloPhase += dt / 3.6;
+        const cycle = haloPhase % 1;
+        const tri = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
+        const eased = tri * tri * (3 - 2 * tri);
+        haloBlur = 8 + eased * 19;
+      } else {
+        haloBlur += (8 - haloBlur) * 0.08;
+      }
+      if (haloBlurRef.current) haloBlurRef.current.setAttribute('stdDeviation', haloBlur.toFixed(2));
       renderer.render(scene, camera);
     };
 
@@ -179,7 +200,10 @@ export default function AgentOrb({ speaking = false, className }) {
   }, []);
 
   return (
-    <span style={{ position: 'relative', display: 'block', width: '100%', height: '100%' }}>
+    <span
+      ref={rootRef}
+      style={{ position: 'relative', display: 'block', width: '100%', height: '100%', transformOrigin: 'center center' }}
+    >
       <canvas ref={canvasRef} className={className} aria-hidden="true" />
       <svg
         viewBox="0 0 253 215"
@@ -217,17 +241,7 @@ export default function AgentOrb({ speaking = false, className }) {
         </g>
         <defs>
           <filter id="agentHalo" x="-100" y="-120" width="460" height="460" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="14.8082" result="blur">
-              <animate
-                attributeName="stdDeviation"
-                values="8 8;27 27;8 8"
-                keyTimes="0;0.5;1"
-                calcMode="spline"
-                keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-                dur="3.6s"
-                repeatCount="indefinite"
-              />
-            </feGaussianBlur>
+            <feGaussianBlur ref={haloBlurRef} in="SourceAlpha" stdDeviation="8" result="blur" />
             <feComposite in="blur" in2="SourceAlpha" operator="out" result="outside" />
             <feComponentTransfer in="outside" result="strong">
               <feFuncA type="gamma" amplitude="1" exponent="0.55" />
@@ -319,9 +333,9 @@ export default function AgentOrb({ speaking = false, className }) {
             <stop offset="1" stopColor="#EEEA6F" />
           </radialGradient>
           <radialGradient id="agentPinkPaint" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(95.8136 118.455) rotate(-90) scale(72.2914 99.8451)">
-            <stop stopColor="#FF47F9" />
-            <stop offset="0.490385" stopColor="#FF9FD9" />
-            <stop offset="1" stopColor="#FFA8D3" />
+            <stop stopColor="#C9A6FF" />
+            <stop offset="0.490385" stopColor="#DCC6FF" />
+            <stop offset="1" stopColor="#E8D6FF" />
           </radialGradient>
           <radialGradient id="agentMintPaint" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(117.629 118.389) rotate(-90) scale(28.2979 174.398)">
             <stop stopColor="#C8FFD5" stopOpacity="0.5" />

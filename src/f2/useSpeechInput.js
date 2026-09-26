@@ -13,6 +13,61 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
   const transcriptRef = useRef('');
   const interimRef = useRef('');
   const isListeningRef = useRef(false);
+  const levelRef = useRef(0);
+  const meterRef = useRef(null);
+  const meterGenRef = useRef(0);
+
+  const stopMeter = useCallback(() => {
+    meterGenRef.current += 1;
+    const meter = meterRef.current;
+    meterRef.current = null;
+    levelRef.current = 0;
+    if (!meter) return;
+    window.cancelAnimationFrame(meter.frame);
+    meter.stream.getTracks().forEach((track) => track.stop());
+    meter.ctx.close();
+  }, []);
+
+  const startMeter = useCallback(async () => {
+    if (meterRef.current || typeof navigator === 'undefined' || !navigator.mediaDevices) return;
+    const gen = meterGenRef.current + 1;
+    meterGenRef.current = gen;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: false,
+      });
+      if (meterGenRef.current !== gen || !shouldListenRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      void ctx.resume();
+      const data = new Uint8Array(analyser.fftSize);
+      const meter = { stream, ctx, frame: 0 };
+      meterRef.current = meter;
+      const tick = () => {
+        if (meterRef.current !== meter) return;
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) {
+          const sample = (data[i] - 128) / 128;
+          sum += sample * sample;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        const next = Math.min(1, Math.max(0, rms - 0.018) / 0.14);
+        const prev = levelRef.current;
+        levelRef.current = prev + (next - prev) * (next > prev ? 0.48 : 0.2);
+        meter.frame = window.requestAnimationFrame(tick);
+      };
+      meter.frame = window.requestAnimationFrame(tick);
+    } catch {
+      levelRef.current = 0;
+    }
+  }, []);
 
   useEffect(() => {
     onFinalRef.current = onFinalTranscript;
@@ -97,8 +152,9 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     return () => {
       shouldListenRef.current = false;
       recognition.stop();
+      stopMeter();
     };
-  }, [emitTranscriptUpdate]);
+  }, [emitTranscriptUpdate, stopMeter]);
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
@@ -123,15 +179,17 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
       }
     };
 
+    startMeter();
     return tryStart();
-  }, []);
+  }, [startMeter]);
 
   const stopListening = useCallback(() => {
     shouldListenRef.current = false;
     recognitionRef.current?.stop();
     isListeningRef.current = false;
     setIsListening(false);
-  }, []);
+    stopMeter();
+  }, [stopMeter]);
 
   const getIsListening = useCallback(() => isListeningRef.current, []);
 
@@ -170,5 +228,6 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     setManualText,
     getCombinedText,
     getIsListening,
+    levelRef,
   };
 }

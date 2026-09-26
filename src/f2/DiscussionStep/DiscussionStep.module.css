@@ -561,14 +561,6 @@
   transform-origin: center center;
 }
 
-.orbLive .orbPulse {
-  animation: orbBreathe 2.8s ease-in-out infinite;
-}
-
-.orbHot .orbPulse {
-  animation: orbTalk 1.9s ease-in-out infinite;
-}
-
 .orbCanvas {
   width: 100%;
   height: 100%;
@@ -662,25 +654,5 @@
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes orbBreathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-@keyframes orbTalk {
-  0%,
-  100% {
-    transform: scale(1.02);
-  }
-  50% {
-    transform: scale(1.1);
   }
 }

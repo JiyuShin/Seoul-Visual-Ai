@@ -132,7 +132,6 @@ export default function DiscussionStep({
   const showChrome = !['intro', 'shrink', 'dock'].includes(beat);
   const showPrompt = Boolean(agentLine) && !['intro', 'shrink', 'done'].includes(beat);
   const docked = beat !== 'intro' && beat !== 'shrink';
-  const showUser = USER_BEATS.has(beat);
 
   useEffect(() => {
     const fit = () => {
@@ -394,8 +393,6 @@ export default function DiscussionStep({
     else onGazeClipChange?.(null);
   }, [onGazeClipChange]);
 
-  const hearing = showUser && (speech.isListening || Boolean(speech.interimTranscript));
-  const hearingHot = showUser && Boolean(speech.interimTranscript);
   const orbSize = 400;
   const showVisionCard = beat === 'intro' || beat === 'shrink';
   const cardScale = (beat === 'intro' ? 563 : 306) / 563;
@@ -466,7 +463,7 @@ export default function DiscussionStep({
             </div>
 
             <div
-              className={`${styles.orbSlot} ${showVisionCard ? '' : styles.orbIsAgent} ${hearing ? styles.orbLive : ''} ${hearingHot ? styles.orbHot : ''}`}
+              className={`${styles.orbSlot} ${showVisionCard ? '' : styles.orbIsAgent}`}
               style={{ left: orbPose.left, top: orbPose.top, width: orbPose.size, height: orbPose.size }}
             >
               <div className={styles.visionCard} style={{ transform: `scale(${cardScale})` }}>
@@ -480,7 +477,11 @@ export default function DiscussionStep({
               </div>
               <div className={styles.agentFace}>
                 <div className={styles.orbPulse}>
-                  <AgentOrb speaking={speechOutput.isSpeaking || hearingHot} className={styles.orbCanvas} />
+                  <AgentOrb
+                    agentSpeaking={speechOutput.isSpeaking}
+                    userLevelRef={speech.levelRef}
+                    className={styles.orbCanvas}
+                  />
                 </div>
               </div>
             </div>

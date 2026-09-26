@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import StreetPanorama from './StreetPanorama';
 import styles from './StreetCanvas.module.css';
@@ -13,6 +13,185 @@ function distance(x1, y1, x2, y2) {
 
 function lineText(line) {
   return typeof line === 'string' ? line : line?.text || '';
+}
+
+const FOLD_MS = 1500;
+const FOLD_EASE = 'cubic-bezier(0.4, 0, 0.15, 1)';
+
+function clearFoldStyles(node) {
+  [
+    'position',
+    'left',
+    'top',
+    'width',
+    'height',
+    'maxWidth',
+    'margin',
+    'right',
+    'boxSizing',
+    'padding',
+    'borderRadius',
+    'overflow',
+    'fontSize',
+    'transform',
+    'transformOrigin',
+  ].forEach((key) => {
+    node.style[key] = '';
+  });
+}
+
+function FoldReplies({ folded, children }) {
+  const stackRef = useRef(null);
+  const [settled, setSettled] = useState(false);
+  const playedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!folded || playedRef.current) return undefined;
+    const stack = stackRef.current;
+    if (!stack) return undefined;
+    const nodes = [...stack.querySelectorAll('[data-reply]')];
+    if (!nodes.length) {
+      playedRef.current = true;
+      setSettled(true);
+      return undefined;
+    }
+
+    playedRef.current = true;
+    const openBox = stack.getBoundingClientRect();
+    stack.style.position = 'relative';
+    stack.style.width = `${openBox.width}px`;
+    stack.style.height = `${openBox.height}px`;
+    stack.style.flexShrink = '0';
+    const origin = stack.getBoundingClientRect();
+    const from = nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      const computed = getComputedStyle(node);
+      return {
+        box,
+        radius: computed.borderRadius,
+        padding: computed.padding,
+      };
+    });
+    const alignEnd = getComputedStyle(stack).alignItems === 'flex-end';
+    stack.style.alignItems = 'flex-start';
+    if (alignEnd) stack.style.justifyContent = 'flex-end';
+    stack.classList.add(styles.repliesFolded);
+    const to = nodes.map((node) => {
+      const computed = getComputedStyle(node);
+      return {
+        box: node.getBoundingClientRect(),
+        radius: computed.borderRadius,
+        padding: computed.padding,
+      };
+    });
+    stack.classList.remove(styles.repliesFolded);
+    stack.style.alignItems = '';
+    stack.style.justifyContent = '';
+
+    const place = (box) => ({
+      left: box.left - origin.left,
+      top: Math.max(0, box.top - origin.top),
+      width: box.width,
+      height: box.height,
+    });
+
+    stack.style.height = `${origin.height}px`;
+    const motions = nodes.map((node, index) => {
+      const start = from[index];
+      const end = to[index];
+      if (!start?.box.width || !end?.box.width) return null;
+      const here = place(start.box);
+      const next = place(end.box);
+      node.style.position = 'absolute';
+      node.style.boxSizing = 'border-box';
+      node.style.margin = '0';
+      node.style.right = 'auto';
+      node.style.maxWidth = 'none';
+      node.style.transition = 'none';
+      node.style.left = `${here.left}px`;
+      node.style.top = `${here.top}px`;
+      node.style.width = `${here.width}px`;
+      node.style.height = `${here.height}px`;
+      node.style.padding = start.padding;
+      node.style.borderRadius = start.radius;
+      return {
+        node,
+        text: node.querySelector('[data-reply-text]'),
+        next,
+        radius: end.radius,
+        padding: end.padding,
+      };
+    }).filter(Boolean);
+
+    void stack.offsetWidth;
+    const glide = [
+      'left',
+      'top',
+      'width',
+      'height',
+      'padding',
+      'border-radius',
+      'font-size',
+    ].map((prop) => `${prop} ${FOLD_MS}ms ${FOLD_EASE}`).join(', ');
+    motions.forEach((item) => {
+      item.node.style.transition = glide;
+      item.node.style.left = `${item.next.left}px`;
+      item.node.style.top = `${item.next.top}px`;
+      item.node.style.width = `${item.next.width}px`;
+      item.node.style.height = `${item.next.height}px`;
+      item.node.style.padding = item.padding;
+      item.node.style.borderRadius = item.radius;
+      item.node.style.fontSize = '0px';
+      if (item.text) {
+        item.text.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}, font-size ${FOLD_MS}ms ${FOLD_EASE}`;
+        item.text.style.opacity = '0';
+        item.text.style.fontSize = '0px';
+      }
+    });
+
+    let alive = true;
+    const settleTimer = window.setTimeout(() => {
+      if (!alive) return;
+      stack.classList.add(styles.repliesFolded);
+      stack.style.height = '';
+      stack.style.width = '';
+      stack.style.flexShrink = '';
+      stack.style.position = '';
+      motions.forEach((item) => {
+        item.node.style.transition = 'none';
+        clearFoldStyles(item.node);
+        if (item.text) {
+          item.text.style.transition = 'none';
+          item.text.style.opacity = '';
+          item.text.style.fontSize = '';
+        }
+      });
+      setSettled(true);
+    }, FOLD_MS + 40);
+
+    const unlockTimer = window.setTimeout(() => {
+      motions.forEach((item) => {
+        item.node.style.transition = '';
+        if (item.text) {
+          item.text.style.transition = '';
+          item.text.style.fontSize = '';
+        }
+      });
+    }, FOLD_MS + 140);
+
+    return () => {
+      alive = false;
+      playedRef.current = false;
+      window.clearTimeout(settleTimer);
+      window.clearTimeout(unlockTimer);
+    };
+  }, [folded]);
+
+  return (
+    <div ref={stackRef} className={`${styles.replies} ${settled ? styles.repliesFolded : ''}`}>
+      {children}
+    </div>
+  );
 }
 
 export default function StreetCanvas({
@@ -291,16 +470,17 @@ export default function StreetCanvas({
                     <p className={styles.mainLine}>{lineText(mark.lines[0])}</p>
                   </div>
                   {replies.length > 0 && (
-                    <div className={`${styles.replies} ${mark.folded ? styles.repliesFolded : ''}`}>
+                    <FoldReplies folded={mark.folded}>
                       {replies.map((line, index) => (
                         <p
                           key={`${mark.id}-reply-${index}`}
+                          data-reply=""
                           className={`${styles.reply} ${line.cam === 'B' ? styles.replyB : styles.replyA}`}
                         >
-                          <span className={styles.replyText}>{lineText(line)}</span>
+                          <span className={styles.replyText} data-reply-text="">{lineText(line)}</span>
                         </p>
                       ))}
-                    </div>
+                    </FoldReplies>
                   )}
                 </div>
               )}
