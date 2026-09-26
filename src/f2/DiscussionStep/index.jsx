@@ -46,6 +46,30 @@ const LINE_80_B = '삭막한 지금의 거리 위에 식물이 필요한 곳을 
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
 
+const PROMPT_CHARS_PER_LINE = 27;
+
+function promptLines(text) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!value) return [];
+  const chars = Array.from(value);
+  if (chars.length <= PROMPT_CHARS_PER_LINE * 2) return [value];
+  const mid = Math.round(chars.length / 2);
+  let splitAt = mid;
+  let best = Infinity;
+  chars.forEach((ch, index) => {
+    if (index < 4 || index > chars.length - 5) return;
+    if (!/[.?!。？！,]/.test(ch) && ch !== ' ') return;
+    const dist = Math.abs(index + 1 - mid);
+    if (dist < best) {
+      best = dist;
+      splitAt = index + 1;
+    }
+  });
+  const first = chars.slice(0, splitAt).join('').trim();
+  const second = chars.slice(splitAt).join('').trim();
+  return second ? [first, second] : [first];
+}
+
 function gazeLine(cam) {
   return `안녕하세요 ${cam}님. 이 광경에서 당신만의 식물을 어디에 심으면 좋을까요? 선택 후 3초간 응시해주세요.`;
 }
@@ -387,7 +411,14 @@ export default function DiscussionStep({
             </div>
 
             <div className={`${styles.promptBlock} ${showPrompt ? styles.promptOn : ''}`}>
-              <p key={agentLine} className={styles.promptText}>{agentLine}</p>
+              <p key={agentLine} className={styles.promptText}>
+                {promptLines(agentLine).map((line, index) => (
+                  <span key={line}>
+                    {index > 0 && <br />}
+                    {line}
+                  </span>
+                ))}
+              </p>
             </div>
 
             <div

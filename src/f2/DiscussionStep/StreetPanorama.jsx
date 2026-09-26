@@ -64,12 +64,14 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
     if (!canvas || !imageUrl) return undefined;
 
     const gl = canvas.getContext('webgl', {
-      alpha: false,
+      alpha: true,
       antialias: false,
       depth: false,
       stencil: false,
+      premultipliedAlpha: false,
     });
     if (!gl) return undefined;
+    gl.clearColor(0, 0, 0, 0);
 
     const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
     const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
@@ -105,6 +107,7 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
     const spanUniform = gl.getUniformLocation(program, 'yawSpan');
 
     let ready = false;
+    let presented = false;
     let dead = false;
     let frame = 0;
     let last = 0;
@@ -162,6 +165,10 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       gl.uniform1f(spanUniform, (yawSpan * Math.PI) / 180);
       gl.uniform3f(viewUniform, current.yaw, current.pitch, fov);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+      if (!presented) {
+        presented = true;
+        canvas.classList.add(styles.panoramaReady);
+      }
       placeMarks();
       frame = requestAnimationFrame(draw);
     };
