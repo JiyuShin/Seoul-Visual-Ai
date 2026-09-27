@@ -5,10 +5,12 @@ export const F_FRAME_COUNT = 9;
 
 let rouletteAnimationId = null;
 
-// 9칸을 한 칸씩 점프하지 않고, 호를 따라 왼쪽으로 미끄러진 뒤 마지막 배치에서 잠시 머문다.
-export function startRoulette(onOffset, onComplete) {
+// 9칸을 한 칸씩 점프하지 않고, 호를 따라 왼쪽으로 미끄러진 뒤
+// 뽑힌 지역이 가운데인 배치에서 멈춘다. s도 그 배치를 그대로 쓴다.
+export function startRoulette(onOffset, onComplete, targetOffset = F_FRAME_COUNT - 1) {
   const startedAt = performance.now();
   const travelMs = F_TOTAL_DURATION * 0.9;
+  const endOffset = targetOffset + ROULETTE_LOGOS.length;
   let finished = false;
 
   function animate(now) {
@@ -18,7 +20,7 @@ export function startRoulette(onOffset, onComplete) {
     const eased = t < cruise
       ? (t / cruise) * 0.82
       : 0.82 + 0.18 * (1 - (1 - (t - cruise) / (1 - cruise)) ** 3);
-    onOffset(eased * (F_FRAME_COUNT - 1));
+    onOffset(eased * endOffset);
 
     if (elapsed < F_TOTAL_DURATION) {
       rouletteAnimationId = requestAnimationFrame(animate);
@@ -27,7 +29,7 @@ export function startRoulette(onOffset, onComplete) {
 
     if (!finished) {
       finished = true;
-      onOffset(F_FRAME_COUNT - 1);
+      onOffset(endOffset);
       if (onComplete) onComplete();
     }
   }

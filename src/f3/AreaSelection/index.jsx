@@ -135,13 +135,13 @@ function RouletteTrack({ children, ring }) {
   );
 }
 
-function SpinningRoulette({ onComplete }) {
+function SpinningRoulette({ onComplete, targetOffset }) {
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
-    startRoulette(setOffset, onComplete);
+    startRoulette(setOffset, onComplete, targetOffset);
     return () => stopRoulette();
-  }, [onComplete]);
+  }, [onComplete, targetOffset]);
 
   return (
     <RouletteTrack ring>
@@ -454,16 +454,14 @@ export default function AreaSelection() {
   const kioskSessionRef = useRef(false);
   const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
-  const [districtIndex, setDistrictIndex] = useState(0);
+  const [districtIndex] = useState(() => Math.floor(Math.random() * DISTRICTS.length));
   const district = DISTRICTS[districtIndex];
   const displayQrUrl = qrTargetUrl || localQrUrl;
 
   const finishFinding = useCallback(() => {
-    const index = Math.floor(Math.random() * DISTRICTS.length);
-    setDistrictIndex(index);
-    setSelectedDistrict(DISTRICTS[index]);
+    setSelectedDistrict(district);
     setPhase('s');
-  }, [setSelectedDistrict]);
+  }, [district, setSelectedDistrict]);
 
   useEffect(() => {
     if (phase !== 's') return undefined;
@@ -497,7 +495,7 @@ export default function AreaSelection() {
       <FindingVideo hidden={phase !== 'f'} />
       <img className={styles.arc} src="/3/arc.svg" alt="" />
       <div className={`${styles.rouletteLayer} ${phase === 'f' ? '' : styles.isHidden}`}>
-        <SpinningRoulette onComplete={finishFinding} />
+        <SpinningRoulette targetOffset={district.rouletteOffset} onComplete={finishFinding} />
       </div>
       <div className={`${styles.rouletteLayer} ${phase === 'f' ? styles.isHidden : ''}`}>
         <StillRoulette district={district} />
