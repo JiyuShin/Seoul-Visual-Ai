@@ -1,0 +1,83 @@
+.viewport {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.fit {
+  position: relative;
+  flex: none;
+}
+
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3881px;
+  height: 2183px;
+  transform-origin: top left;
+  overflow: hidden;
+  background: #000;
+  color: #363636;
+  font-family: Pretendard, system-ui, sans-serif;
+}
+
+.bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 63px 140px;
+  border: 1.733px solid #fff;
+  border-radius: 70px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bubbleTravel {
+  top: 978px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    linear-gradient(189deg, rgba(193, 234, 150, 0.2) 19.939%, rgba(255, 255, 255, 0.6) 69.818%, rgba(189, 250, 255, 0.4) 95.83%);
+  box-shadow:
+    0 0 34.494px rgba(255, 255, 255, 0.78),
+    inset 0 14.306px 9.537px #fff;
+}
+
+.bubbleDraw {
+  top: 929px;
+  background:
+    linear-gradient(172deg, rgba(255, 255, 255, 0) 36.667%, rgba(255, 37, 157, 0.15) 92.111%),
+    linear-gradient(194deg, rgba(193, 234, 150, 0.64) 19.939%, rgba(255, 255, 255, 0.48) 69.818%, rgba(137, 245, 255, 0.704) 95.83%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4));
+  box-shadow:
+    0 0 100px #fff,
+    0 0 250px #fff,
+    0 0 34.494px rgba(255, 255, 255, 0.78),
+    inset 0 14.306px 20px #fff,
+    inset 0 14.306px 9.537px #fff;
+}
+
+.copy {
+  margin: 0;
+  font-size: 70px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -1.4px;
+  text-align: center;
+}
+
+.place {
+  font-weight: 700;
+}
