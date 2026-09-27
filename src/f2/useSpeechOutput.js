@@ -23,6 +23,14 @@ function spokenHoldMs(text) {
   return Math.max(1600, chars * 240);
 }
 
+function prepareSpoken(text) {
+  const spoken = text.trim();
+  // macOS 유나는 발화 맨 앞의 '안녕하세요'를 '넨넨하세요'로 읽는다.
+  // 한 단어로 넘기지 않으면 그 발음을 피한다.
+  if (!spoken.startsWith('안녕하세요')) return spoken;
+  return `안녕 하세요${spoken.slice('안녕하세요'.length)}`;
+}
+
 export function useSpeechOutput() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -58,7 +66,7 @@ export function useSpeechOutput() {
     const session = sessionRef.current + 1;
     sessionRef.current = session;
     const synth = window.speechSynthesis;
-    const spoken = text.trim();
+    const spoken = prepareSpoken(text);
     let finished = false;
     let keepAlive = 0;
 

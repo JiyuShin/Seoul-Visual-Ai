@@ -4,6 +4,7 @@ import { useEntryFlow } from '../src/shared/EntryFlowContext';
 import { VISION_CARDS } from '../src/shared/gazeConfig';
 import { useMenuJointSelect } from '../src/f1/VoteStep/useMenuJointSelect';
 import { CardHoverOutline } from '../src/f1/VoteStep/CardHoverOutline';
+import { useSpeechOutput } from '../src/f2/useSpeechOutput';
 import styles from './MenuSelectionPage.module.css';
 
 const CARD_OFFSETS = [0, 913.167, 1826.34, 2739.5];
@@ -21,6 +22,11 @@ const CARD_COPY = [
   '지친 걸음을 품어주는 넉넉한 초록 그늘의 서울',
   '자연의 형태가 도심 곳곳에 녹아드는 서울',
 ];
+const SELECTED_FOLLOW = '이제 그 풍경을 만들기 위해 무엇이 필요할지 서울의 거리를 함께 걸어보며 이야기 나눠볼게요!';
+
+function selectedPrompt(index) {
+  return `${CARD_COPY[index]}, 선택하셨네요. ${SELECTED_FOLLOW}`;
+}
 
 export default function MenuSelectionPage() {
   const router = useRouter();
@@ -32,6 +38,8 @@ export default function MenuSelectionPage() {
     setWinnerCard,
     reportDwellProgress,
   } = useEntryFlow();
+
+  const { speak, stopSpeaking } = useSpeechOutput();
 
   const cardRefs = useRef([]);
   const bgVideoRefs = useRef([]);
@@ -86,11 +94,27 @@ export default function MenuSelectionPage() {
 
   useEffect(() => {
     if (selectedIndex < 0) return undefined;
-    const timer = window.setTimeout(() => {
+    let leaving = false;
+    let delayTimer = 0;
+    const started = Date.now();
+    const go = () => {
+      if (leaving) return;
+      const remain = SELECT_ADVANCE_MS - (Date.now() - started);
+      if (remain > 0) {
+        delayTimer = window.setTimeout(go, remain);
+        return;
+      }
+      leaving = true;
       router.push('/2');
-    }, SELECT_ADVANCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [router, selectedIndex]);
+    };
+    const fallback = window.setTimeout(go, 24000);
+    speak(selectedPrompt(selectedIndex), go, go);
+    return () => {
+      window.clearTimeout(delayTimer);
+      window.clearTimeout(fallback);
+      stopSpeaking();
+    };
+  }, [router, selectedIndex, speak, stopSpeaking]);
 
   useEffect(() => {
     bgVideoRefs.current.forEach((video) => {
@@ -255,7 +279,7 @@ export default function MenuSelectionPage() {
           <>
             <span className={styles.pagePromptEm}>{CARD_COPY[selectedIndex]}</span>, 선택하셨네요.
             <br />
-            이제 그 풍경 속을 함께 걸어보며 이야기 나눠볼게요!
+            {SELECTED_FOLLOW}
           </>
         ) : isSplit ? (
           <>

@@ -9,6 +9,14 @@ function rememberAskLine(line) {
   if (recentAskLines.length > 8) recentAskLines.shift();
 }
 
+const KOREAN_SPEECH =
+  '알파벳으로 적힌 영어 단어는 쓰지 않는다. beneath, texture, green 같은 영문은 금지다. 외래어는 콘크리트, 실루엣처럼 한글로만 적는다. 참가자를 가리키는 A, B 한 글자만 예외다.';
+
+function hasEnglishWord(text) {
+  const words = String(text || '').match(/[A-Za-z]+/g) || [];
+  return words.some((word) => !/^[ABab]$/.test(word));
+}
+
 function fallbackLine({ beat, speakerLabel, districtName, history }) {
   const place = districtName || '이 거리';
   const lastUser = [...(history || [])].reverse().find((line) => line.role === 'user');
@@ -86,7 +94,7 @@ export default async function handler(req, res) {
           {
             role: 'system',
             content:
-              '너는 삭막한 서울 거리에 식물을 심어 보는 전시의 진행자다. 항상 한국어로, 따뜻하고 짧게, 사람 말하듯 말한다. 설명 목록은 쓰지 않는다. 의견을 들은 뒤에는 그 말을 인용하지 말고, 그 장면에만 맞는 호응을 한 뒤 질문 하나를 한다. 첫 추가 질문은 그 식물의 형태, 질감, 색감을 다채롭게 묻는다. 두 번째부터는 그 식물이 거리와 서울을 어떻게 바꾸는지만 묻는다. 사람의 활동, 대화, 머무름은 묻지 않는다. 호응은 매번 다르게 말하고, 같은 칭찬을 다음 사람에게 반복하지 않는다.',
+              `너는 삭막한 서울 거리에 식물을 심어 보는 전시의 진행자다. 항상 한국어로, 따뜻하고 짧게, 사람 말하듯 말한다. ${KOREAN_SPEECH} 설명 목록은 쓰지 않는다. 의견을 들은 뒤에는 그 말을 인용하지 말고, 그 장면에만 맞는 호응을 한 뒤 질문 하나를 한다. 첫 추가 질문은 그 식물의 형태, 질감, 색감을 다채롭게 묻는다. 두 번째부터는 그 식물이 거리와 서울을 어떻게 바꾸는지만 묻는다. 사람의 활동, 대화, 머무름은 묻지 않는다. 호응은 매번 다르게 말하고, 같은 칭찬을 다음 사람에게 반복하지 않는다.`,
           },
           {
             role: 'user',
@@ -95,6 +103,7 @@ export default async function handler(req, res) {
               `주제: ${visionLabel || '푸른 서울'}`,
               `장소: ${districtName || '서울 거리'}`,
               `지금까지의 대화: ${safeHistory.map((line) => `${line.role}: ${line.text}`).join('\n') || '없음'}`,
+              KOREAN_SPEECH,
             ].join('\n'),
           },
         ],
@@ -103,7 +112,39 @@ export default async function handler(req, res) {
 
     if (response.ok) {
       const data = await response.json();
-      const line = data?.choices?.[0]?.message?.content?.trim();
+      let line = data?.choices?.[0]?.message?.content?.trim();
+      if (line && hasEnglishWord(line)) {
+        const retry = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.4,
+            max_tokens: 180,
+            messages: [
+              {
+                role: 'system',
+                content: `너는 전시 진행자다. 방금 문장에 알파벳 영어가 섞였다. 뜻은 유지하고 한국어로만 다시 쓴다. ${KOREAN_SPEECH}`,
+              },
+              {
+                role: 'user',
+                content: line,
+              },
+            ],
+          }),
+        });
+        if (retry.ok) {
+          const retried = await retry.json();
+          const rewritten = retried?.choices?.[0]?.message?.content?.trim();
+          if (rewritten && !hasEnglishWord(rewritten)) line = rewritten;
+          else line = '';
+        } else {
+          line = '';
+        }
+      }
       if (line) {
         if (beat === 'ask') rememberAskLine(line);
         return res.status(200).json({ line, source: 'openai', model });

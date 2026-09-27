@@ -1,9 +1,21 @@
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
 import { MobileLinkProvider } from '../src/shared/mobileLink/MobileLinkContext';
 import GazeReticle from '../src/shared/GazeReticle';
 import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../src/shared/gaze/participants';
+
+const STREET_POSTER = '/street/red/assets/street-panorama.webp';
+
+if (typeof window !== 'undefined' && !window.__streetPoster) {
+  const image = new Image();
+  image.dataset.src = STREET_POSTER;
+  image.decoding = 'sync';
+  image.src = STREET_POSTER;
+  window.__streetPoster = image;
+  image.decode?.().catch(() => {});
+}
 
 function GlobalGazeCursor() {
   const router = useRouter();
@@ -35,6 +47,9 @@ function GlobalGazeCursor() {
 function AppFrame({ Component, pageProps }) {
   return (
     <>
+      <Head>
+        <link rel="preload" as="image" href="/street/red/assets/street-panorama.webp" />
+      </Head>
       <div style={{ position: 'relative', zIndex: 6, minHeight: '100vh' }}>
         <Component {...pageProps} />
       </div>

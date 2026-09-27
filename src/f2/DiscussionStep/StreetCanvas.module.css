@@ -25,6 +25,22 @@
   overflow: hidden;
 }
 
+.streetBlur {
+  position: absolute;
+  inset: 0;
+  filter: blur(20px);
+  transform: scale(1.12);
+  transform-origin: center center;
+  transition:
+    filter 1.15s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.streetSharp {
+  filter: blur(0px);
+  transform: scale(1);
+}
+
 .image {
   position: absolute;
   inset: 0;
@@ -41,11 +57,11 @@
   width: 100%;
   height: 100%;
   display: block;
-  visibility: hidden;
+  opacity: 0;
 }
 
 .panoramaReady {
-  visibility: visible;
+  opacity: 1;
 }
 
 .imageVeiled {
@@ -72,6 +88,70 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   animation: tagIn 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.markGather {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.markFloat {
+  animation: markDrift var(--drift-dur, 4.8s) ease-in-out infinite;
+  animation-delay: var(--drift-delay, 0s);
+}
+
+@keyframes markDrift {
+  0%,
+  100% {
+    margin-left: 0;
+    margin-top: 0;
+  }
+  50% {
+    margin-left: var(--drift-x, 12px);
+    margin-top: var(--drift-y, -24px);
+  }
+}
+
+.finaleOrb {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition:
+    left 1.9s cubic-bezier(0.16, 1.12, 0.32, 1),
+    top 1.9s cubic-bezier(0.16, 1.12, 0.32, 1),
+    width 1.9s cubic-bezier(0.16, 1.12, 0.32, 1),
+    height 1.9s cubic-bezier(0.16, 1.12, 0.32, 1),
+    opacity 0.8s ease;
+}
+
+.finaleHalo,
+.finaleCore {
+  position: absolute;
+  display: block;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+.finaleHalo {
+  left: var(--halo-inset);
+  top: var(--halo-inset);
+  width: var(--halo-size);
+  height: var(--halo-size);
+  filter: blur(calc(var(--halo-blur) * var(--street-scale, 0.5)));
+}
+
+.finaleCore {
+  left: var(--core-left);
+  top: var(--core-top);
+  width: var(--core-width);
+  height: var(--core-height);
+}
+
+.markQuiet .speech {
+  opacity: 0;
 }
 
 .badge {
@@ -116,12 +196,13 @@
 
 .speech {
   position: absolute;
-  top: calc(76px * var(--street-scale, 0.5));
+  top: 50%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: calc(22px * var(--street-scale, 0.5));
   animation: bubbleIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.6s ease;
 }
 
 .markA .speech {
@@ -131,16 +212,7 @@
 .markB .speech {
   left: auto;
   right: calc(167px * var(--street-scale, 0.5));
-  align-items: flex-end;
-}
-
-.markB .replies {
-  align-items: flex-end;
-}
-
-.plantAbove .speech {
-  top: auto;
-  bottom: calc(88px * var(--street-scale, 0.5));
+  align-items: flex-start;
 }
 
 .bubble {
@@ -195,19 +267,31 @@
 .replies {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: calc(22px * var(--street-scale, 0.5));
 }
 
+.markB .replies {
+  position: absolute;
+  left: 0;
+  right: auto;
+  top: calc(100% + 22px * var(--street-scale, 0.5));
+  width: max-content;
+  align-self: flex-start;
+  justify-content: flex-start;
+}
+
 .repliesFolded {
-  flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: calc(36px * var(--street-scale, 0.5));
 }
 
 .reply {
   box-sizing: border-box;
+  flex: none;
   margin: 0;
   width: max-content;
   max-width: calc(1400px * var(--street-scale, 0.5));

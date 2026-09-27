@@ -58,9 +58,9 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
           sum += sample * sample;
         }
         const rms = Math.sqrt(sum / data.length);
-        const next = Math.min(1, Math.max(0, rms - 0.018) / 0.14);
+        const next = Math.min(1, Math.max(0, (rms - 0.008) / 0.05));
         const prev = levelRef.current;
-        levelRef.current = prev + (next - prev) * (next > prev ? 0.48 : 0.2);
+        levelRef.current = prev + (next - prev) * (next > prev ? 0.62 : 0.16);
         meter.frame = window.requestAnimationFrame(tick);
       };
       meter.frame = window.requestAnimationFrame(tick);
@@ -156,6 +156,14 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     };
   }, [emitTranscriptUpdate, stopMeter]);
 
+  const stopListening = useCallback(() => {
+    shouldListenRef.current = false;
+    recognitionRef.current?.stop();
+    isListeningRef.current = false;
+    setIsListening(false);
+    stopMeter();
+  }, [stopMeter]);
+
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition) return false;
@@ -182,14 +190,6 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     startMeter();
     return tryStart();
   }, [startMeter]);
-
-  const stopListening = useCallback(() => {
-    shouldListenRef.current = false;
-    recognitionRef.current?.stop();
-    isListeningRef.current = false;
-    setIsListening(false);
-    stopMeter();
-  }, [stopMeter]);
 
   const getIsListening = useCallback(() => isListeningRef.current, []);
 

@@ -3,6 +3,113 @@ import { useEntryFlow } from '../../shared/EntryFlowContext';
 import StreetPanorama from './StreetPanorama';
 import styles from './StreetCanvas.module.css';
 
+const STAGE_W = 3881;
+const STAGE_H = 2183;
+const AGENT_CENTER = { x: 1941, y: 1092 };
+const FINALE_ORBS = [
+  {
+    id: 'purple-left',
+    x: 296 + 228.071 / 2,
+    y: 716.822 + 228.071 / 2,
+    size: 228.071,
+    tint: 'b',
+    late: false,
+    opacity: 1,
+    ring: '/2/finale-b-left-ring.svg',
+    face: '/2/finale-b-left-face.svg',
+    halo: { inset: -7.77, size: 115.54, blur: 8.86 },
+    core: { left: 21.8, top: 21.357, width: 57.971, height: 57.971, blur: 1.03 },
+    driftX: 8,
+    driftY: -16,
+    dur: 5.4,
+    delay: 0,
+  },
+  {
+    id: 'purple-big',
+    x: 3419 + 621.583 / 2,
+    y: 119 + 621.583 / 2,
+    size: 621.583,
+    tint: 'b',
+    late: false,
+    opacity: 0.77,
+    ring: '/2/finale-b-big-ring.svg',
+    face: '/2/finale-b-big-face.svg',
+    halo: { inset: -5.92, size: 111.84, blur: 18 },
+    core: { left: 21.799, top: 21.358, width: 57.971, height: 57.971, blur: 2.807 },
+    driftX: -10,
+    driftY: -18,
+    dur: 6.2,
+    delay: 0.4,
+  },
+  {
+    id: 'green-bottom',
+    x: 2741 + 240.912 / 2,
+    y: 2063 + 240.912 / 2,
+    size: 240.912,
+    tint: 'a',
+    late: false,
+    opacity: 1,
+    ring: '/2/finale-a-bottom-ring.svg',
+    face: '/2/finale-a-bottom-face.svg',
+    halo: { inset: -4.98, size: 109.96, blur: 6 },
+    core: { left: 4.661, top: 4.446, width: 91.236, height: 91.232, blur: 0 },
+    driftX: 7,
+    driftY: -12,
+    dur: 4.8,
+    delay: 0.7,
+  },
+  {
+    id: 'green-low',
+    x: 884 + 438.147 / 2,
+    y: 1400.406 + 438.147 / 2,
+    size: 438.147,
+    tint: 'a',
+    late: true,
+    opacity: 0.81,
+    ring: '/2/finale-a-low-ring.svg',
+    face: '/2/finale-a-low-face.svg',
+    halo: { inset: -11.85, size: 123.7, blur: 26 },
+    core: { left: 4.661, top: 4.447, width: 91.236, height: 91.229, blur: 0 },
+    driftX: -8,
+    driftY: -14,
+    dur: 5.6,
+    delay: 0.15,
+  },
+];
+
+function stageToViewPercent(x, y) {
+  const scale = Math.max(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  const offsetX = (window.innerWidth - STAGE_W * scale) / 2;
+  const offsetY = (window.innerHeight - STAGE_H * scale) / 2;
+  return {
+    left: ((offsetX + x * scale) / window.innerWidth) * 100,
+    top: ((offsetY + y * scale) / window.innerHeight) * 100,
+  };
+}
+
+function slotPoint(slot, spread) {
+  return stageToViewPercent(
+    AGENT_CENTER.x + (slot.x - AGENT_CENTER.x) * spread,
+    AGENT_CENTER.y + (slot.y - AGENT_CENTER.y) * spread,
+  );
+}
+
+function driftVars(slot) {
+  return {
+    '--drift-x': `${slot.driftX}px`,
+    '--drift-y': `${slot.driftY}px`,
+    '--drift-dur': `${slot.dur}s`,
+    '--drift-delay': `${slot.delay}s`,
+  };
+}
+
+function originFor(slot, index, marks) {
+  const same = marks.filter((mark) => (slot.tint === 'b' ? mark.cam === 'B' : mark.cam === 'A'));
+  const order = FINALE_ORBS.slice(0, index).filter((item) => item.tint === slot.tint).length;
+  const mark = same[order];
+  if (mark) return { left: (mark.nx ?? 0.5) * 100, top: (mark.ny ?? 0.5) * 100, fromMark: true };
+  return { ...slotPoint(slot, 1.65), fromMark: false };
+}
 const PLANT_DWELL_MS = 3000;
 const PLANT_STILL = 0.06;
 const PLANT_GRACE_MS = 260;
@@ -58,7 +165,8 @@ function FoldReplies({ folded, children }) {
 
     playedRef.current = true;
     const openBox = stack.getBoundingClientRect();
-    stack.style.position = 'relative';
+    const pinned = getComputedStyle(stack).position === 'absolute';
+    if (!pinned) stack.style.position = 'relative';
     stack.style.width = `${openBox.width}px`;
     stack.style.height = `${openBox.height}px`;
     stack.style.flexShrink = '0';
@@ -207,10 +315,33 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   onCanvasRect,
   revealed = true,
   repeatDwell = false,
+  quiet = false,
+  gather = false,
+  finaleFull = false,
 }, ref) {
   const canvasRef = useRef(null);
   const panoramaRef = useRef(null);
   const markRefs = useRef({});
+  const pinRef = useRef(false);
+  const [gatherReady, setGatherReady] = useState(false);
+  const [lateReady, setLateReady] = useState(false);
+  pinRef.current = gather;
+  useEffect(() => {
+    if (!gather) {
+      setGatherReady(false);
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => setGatherReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, [gather]);
+  useEffect(() => {
+    if (!finaleFull) {
+      setLateReady(false);
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => setLateReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, [finaleFull]);
   const lookRef = useRef(null);
   const holdLookRef = useRef(false);
   const pendingRef = useRef(null);
@@ -302,9 +433,9 @@ const StreetCanvas = forwardRef(function StreetCanvas({
     onPlantRef.current?.({ direction, nx: anchorX, ny: anchorY, markId });
   }, [clearPending, hitMark]);
 
-  const applyPoint = useCallback((x, y) => {
+  const applyPoint = useCallback((x, y, source = 'pointer') => {
       const norm = screenToNormalized(x, y);
-      if (norm && !holdLookRef.current) lookRef.current = { nx: norm.x, ny: norm.y };
+      if (norm && !holdLookRef.current) lookRef.current = { nx: norm.x, ny: norm.y, source };
       if (!norm || phaseRef.current !== 'gaze' || (!repeatRef.current && plantedRef.current)) {
         if (phaseRef.current !== 'gaze') clearPending();
         return { dwellProgress: 0, target: null };
@@ -349,7 +480,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
       if (typeof window !== 'undefined' && window.__seoulPointerOwnsGaze > performance.now()) {
         return { dwellProgress: 0, target: null };
       }
-      return applyPoint(x, y);
+      return applyPoint(x, y, 'gaze');
     },
     [activeViewerId, applyPoint]
   );
@@ -375,7 +506,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
       return;
     }
     const sample = gazeRef.current?.[viewerRef.current];
-    if (sample) applyPoint(sample.x, sample.y);
+    if (sample) applyPoint(sample.x, sample.y, 'gaze');
   }, [phase, repeatDwell, clearPending, applyPoint, gazeRef]);
 
   useEffect(() => {
@@ -429,22 +560,25 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   return (
     <div className={styles.canvasWrapper}>
       <div className={styles.canvas} ref={canvasRef}>
-        <div className={`${styles.imageFrame} ${revealed ? '' : styles.imageVeiled}`}>
+        <div className={styles.imageFrame}>
+          <div className={`${styles.streetBlur} ${revealed ? styles.streetSharp : ''}`}>
           {imageUrl ? (
-            <StreetPanorama
-              ref={panoramaRef}
-              imageUrl={imageUrl}
-              yawSpan={yawSpan}
-              zoom={zoom}
-              lookRef={lookRef}
-              markRefs={markRefs}
-              marks={marks}
-            />
+              <StreetPanorama
+                ref={panoramaRef}
+                imageUrl={imageUrl}
+                yawSpan={yawSpan}
+                zoom={zoom}
+                lookRef={lookRef}
+                markRefs={markRefs}
+                marks={marks}
+                pinRef={pinRef}
+              />
           ) : (
             <div className={styles.pendingScene}>
               <p>{pendingLabel} 거리뷰는 아직 제작 중입니다.</p>
             </div>
           )}
+          </div>
         </div>
         {pendingCircle && phase === 'gaze' && pendingCircle.progress > 0.02 && (
           <div
@@ -457,6 +591,42 @@ const StreetCanvas = forwardRef(function StreetCanvas({
             }}
           />
         )}
+        {gather && FINALE_ORBS.map((slot, index) => {
+          if (slot.late && !finaleFull) return null;
+          const arrived = slot.late ? lateReady : gatherReady;
+          const origin = originFor(slot, index, marks);
+          const point = arrived ? stageToViewPercent(slot.x, slot.y) : origin;
+          const size = arrived || !origin.fromMark ? slot.size : 146;
+          return (
+            <div
+              key={slot.id}
+              className={`${styles.finaleOrb} ${arrived ? styles.markFloat : ''}`}
+              style={{
+                left: `${point.left}%`,
+                top: `${point.top}%`,
+                width: `calc(${size}px * var(--street-scale, 0.5))`,
+                height: `calc(${size}px * var(--street-scale, 0.5))`,
+                opacity: arrived || origin.fromMark ? slot.opacity : 0,
+                '--halo-inset': `${slot.halo.inset}%`,
+                '--halo-size': `${slot.halo.size}%`,
+                '--halo-blur': `${slot.halo.blur}px`,
+                '--core-left': `${slot.core.left}%`,
+                '--core-top': `${slot.core.top}%`,
+                '--core-width': `${slot.core.width}%`,
+                '--core-height': `${slot.core.height}%`,
+                ...driftVars(slot),
+              }}
+            >
+              <img className={styles.finaleHalo} src={slot.ring} alt="" />
+              <img
+                className={styles.finaleCore}
+                src={slot.face}
+                alt=""
+                style={slot.core.blur ? { filter: `blur(calc(${slot.core.blur}px * var(--street-scale, 0.5)))` } : undefined}
+              />
+            </div>
+          );
+        })}
         {marks.map((mark) => {
           const replies = mark.lines.slice(1);
           return (
@@ -465,10 +635,11 @@ const StreetCanvas = forwardRef(function StreetCanvas({
               ref={(el) => {
                 markRefs.current[mark.id] = el;
               }}
-              className={`${styles.plantMark} ${mark.cam === 'B' ? styles.markB : styles.markA} ${(mark.ny ?? 0.5) > 0.62 ? styles.plantAbove : ''}`}
+              className={`${styles.plantMark} ${mark.cam === 'B' ? styles.markB : styles.markA} ${quiet ? styles.markQuiet : ''} ${gather ? styles.markGather : ''}`}
               style={{
                 left: `${(mark.nx ?? 0.5) * 100}%`,
                 top: `${(mark.ny ?? 0.5) * 100}%`,
+                ...(gather ? { opacity: 0 } : {}),
               }}
             >
               <span className={styles.badge}>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
@@ -34,6 +34,12 @@ const CARD_LINES = {
 
 const STAGE_W = 3881;
 const STAGE_H = 2183;
+
+function readStageScale() {
+  if (typeof window === 'undefined') return 1;
+  const next = Math.max(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  return next > 0 ? next : 1;
+}
 const AFTER_LINE_MS = 0;
 const VEIL_FADE_MS = 1150;
 const AFTER_VEIL_MS = 1000;
@@ -43,7 +49,12 @@ function spokenHoldMs(text) {
   return Math.max(1600, chars * 240);
 }
 const AFTER_USER_MS = 1800;
+const MIC_LIMIT_MS = 10000;
 const INTRO_LINE = '함께 선택해주신 이 서울을 실현하기 위해, 삭막한 지금의 거리에서 식물이 필요한 곳을 차례대로 바라보며 토론을 통해 의견을 나눠볼게요.';
+const CLOSE_LINE = '토론이 종료 되었어요. 이제 의견을 모아볼게요!';
+const WAIT_LINE = '잠시만 기다려 주세요...';
+const ANALYZE_LINE = '토론 내용을 기반을 지역구 추천을 위해 분석 중이에요...';
+const CLOSING_BEATS = new Set(['close', 'gather', 'wait', 'analyze']);
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
 
@@ -128,7 +139,7 @@ export default function DiscussionStep({
   const [agentLine, setAgentLine] = useState('');
   const [marks, setMarks] = useState([]);
   const [gazeOpen, setGazeOpen] = useState(false);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(readStageScale);
   const historyRef = useRef([]);
   const activeMarkRef = useRef(null);
   const beatRef = useRef(beat);
@@ -153,15 +164,23 @@ export default function DiscussionStep({
   const cardPhrase = CARD_PHRASE[winnerCard?.id] || winnerCard?.label || CARD_PHRASE.food;
   phraseRef.current = cardPhrase;
 
-  const showChrome = !['intro', 'shrink', 'dock'].includes(beat);
-  const showPrompt = Boolean(agentLine) && !['intro', 'shrink', 'done'].includes(beat);
+  const showChrome = !['intro', 'shrink', 'dock', 'gather', 'wait', 'analyze'].includes(beat);
+  const showPlace = showChrome && beat !== 'close';
+  const showPrompt = Boolean(agentLine) && !['intro', 'shrink', 'done', 'close', 'gather', 'wait', 'analyze'].includes(beat);
   const docked = beat !== 'intro' && beat !== 'shrink';
+  const closingCopy = beat === 'close'
+    ? CLOSE_LINE
+    : beat === 'wait'
+      ? WAIT_LINE
+      : beat === 'analyze'
+        ? ANALYZE_LINE
+        : '';
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const fit = () => {
-      const next = Math.max(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
-      setScale(next > 0 ? next : 1);
-      document.documentElement.style.setProperty('--street-scale', String(next > 0 ? next : 1));
+      const next = readStageScale();
+      setScale(next);
+      document.documentElement.style.setProperty('--street-scale', String(next));
     };
     fit();
     window.addEventListener('resize', fit);
@@ -225,10 +244,31 @@ export default function DiscussionStep({
   }, [setDiscussionCam, speaker.cam]);
 
   useEffect(() => {
-    if (beat !== 'done') return undefined;
-    const timer = window.setTimeout(() => router.push('/3'), 1200);
-    return () => window.clearTimeout(timer);
-  }, [beat, router]);
+    if (beat === 'close') {
+      say('close', CLOSE_LINE);
+      const timer = window.setTimeout(() => {
+        if (beatRef.current === 'close') setBeat('gather');
+      }, 5200);
+      return () => window.clearTimeout(timer);
+    }
+    if (beat === 'gather') {
+      const timer = window.setTimeout(() => {
+        if (beatRef.current === 'gather') setBeat('wait');
+      }, 3400);
+      return () => window.clearTimeout(timer);
+    }
+    if (beat === 'wait') {
+      const timer = window.setTimeout(() => {
+        if (beatRef.current === 'wait') setBeat('analyze');
+      }, 2800);
+      return () => window.clearTimeout(timer);
+    }
+    if (beat === 'analyze') {
+      const timer = window.setTimeout(() => router.push('/3'), 2800);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [beat, router, say]);
 
   useEffect(() => {
     committedRef.current = false;
@@ -245,7 +285,7 @@ export default function DiscussionStep({
       setBeat('gaze');
       return;
     }
-    setBeat('done');
+    setBeat('close');
   }, []);
 
   useEffect(() => {
@@ -293,6 +333,7 @@ export default function DiscussionStep({
         micArmed = true;
         speechRef.current.clearTranscript();
         speechRef.current.startListening();
+        armMicLimit();
       };
       say(`speak-${speakerRef.current.cam}`, MIC_LINE, openMic, openMic);
       return undefined;
@@ -363,28 +404,44 @@ export default function DiscussionStep({
     };
   }, [beat, say, scene.name, speakerIndex]);
 
-  const commitUserLine = useCallback((text) => {
-    const trimmed = text.trim();
-    if (!trimmed || committedRef.current || !USER_BEATS.has(beatRef.current)) return;
+  const finishUserTurn = useCallback((text, immediate) => {
+    if (committedRef.current || !USER_BEATS.has(beatRef.current)) return;
+    const trimmed = (text || '').trim();
+    if (!trimmed && !immediate) return;
     committedRef.current = true;
     window.clearTimeout(submitTimerRef.current);
-    const markId = activeMarkRef.current;
-    const author = speakerRef.current.cam;
+    window.clearTimeout(micLimitRef.current);
     const current = beatRef.current;
-    const entry = { text: trimmed, cam: author };
-    setMarks((prev) => prev.map((mark) => (
-      mark.id === markId
-        ? { ...mark, lines: [...mark.lines, entry] }
-        : mark
-    )));
-    historyRef.current = [...historyRef.current, { role: 'user', text: trimmed }];
+    if (trimmed) {
+      const markId = activeMarkRef.current;
+      const author = speakerRef.current.cam;
+      const entry = { text: trimmed, cam: author };
+      setMarks((prev) => prev.map((mark) => (
+        mark.id === markId
+          ? { ...mark, lines: [...mark.lines, entry] }
+          : mark
+      )));
+      historyRef.current = [...historyRef.current, { role: 'user', text: trimmed }];
+    }
     const nextBeat = current === 'speak' ? 'ask1' : current === 'reply1' ? 'ask2' : 'fold';
-    submitTimerRef.current = window.setTimeout(() => {
+    const go = () => {
       if (beatRef.current === current) setBeat(nextBeat);
-    }, AFTER_USER_MS);
+    };
+    if (immediate) go();
+    else submitTimerRef.current = window.setTimeout(go, AFTER_USER_MS);
   }, []);
-  const commitRef = useRef(commitUserLine);
-  commitRef.current = commitUserLine;
+  const finishRef = useRef(finishUserTurn);
+  finishRef.current = finishUserTurn;
+  const micLimitRef = useRef(0);
+  const armMicLimit = useCallback(() => {
+    window.clearTimeout(micLimitRef.current);
+    micLimitRef.current = window.setTimeout(() => {
+      if (!USER_BEATS.has(beatRef.current) || committedRef.current) return;
+      const heard = speechRef.current.getCombinedText();
+      speechRef.current.stopListening();
+      finishRef.current(heard, true);
+    }, MIC_LIMIT_MS);
+  }, []);
 
   const speech = useSpeechInput({
     onFinalTranscript: (fullText) => {
@@ -392,7 +449,7 @@ export default function DiscussionStep({
       const trimmed = fullText.trim();
       if (!trimmed) return;
       window.clearTimeout(submitTimerRef.current);
-      submitTimerRef.current = window.setTimeout(() => commitRef.current(trimmed), 1800);
+      submitTimerRef.current = window.setTimeout(() => finishRef.current(trimmed, false), 1800);
     },
   });
   const speechRef = useRef(speech);
@@ -400,16 +457,24 @@ export default function DiscussionStep({
 
   useEffect(() => {
     if (!USER_BEATS.has(beat)) {
+      window.clearTimeout(micLimitRef.current);
       speechRef.current.stopListening();
       return undefined;
     }
     if (beat === 'speak') {
-      return () => speechRef.current.stopListening();
+      return () => {
+        window.clearTimeout(micLimitRef.current);
+        speechRef.current.stopListening();
+      };
     }
     speechRef.current.clearTranscript();
     speechRef.current.startListening();
-    return () => speechRef.current.stopListening();
-  }, [beat]);
+    armMicLimit();
+    return () => {
+      window.clearTimeout(micLimitRef.current);
+      speechRef.current.stopListening();
+    };
+  }, [armMicLimit, beat]);
 
   const handlePlant = useCallback((spot) => {
     const currentBeat = beatRef.current;
@@ -436,17 +501,36 @@ export default function DiscussionStep({
   }, [onGazeClipChange]);
 
   const orbSize = 400;
+  const finaleSize = 442;
   const showVisionCard = beat === 'intro' || beat === 'shrink';
   const cardScale = (beat === 'intro' ? 563 : 306) / 563;
+  const morphing = beat === 'wait' || beat === 'analyze';
+  const pillWidth = beat === 'analyze' ? 2082 : 1339;
+  const pillHeight = 227;
+  const circlePose = (size, top) => ({
+    left: (STAGE_W - size) / 2,
+    top,
+    width: size,
+    height: size,
+    radius: size / 2,
+  });
   const orbPose = beat === 'intro'
-    ? { left: (STAGE_W - 563) / 2, top: 722, size: 563 }
+    ? circlePose(563, 722)
     : beat === 'shrink'
-      ? { left: (STAGE_W - 306) / 2, top: 784, size: 306 }
-      : {
-          left: (STAGE_W - orbSize) / 2,
-          top: showPrompt ? 1744 : 1704,
-          size: orbSize,
-        };
+      ? circlePose(306, 784)
+      : morphing
+        ? {
+            left: (STAGE_W - pillWidth) / 2,
+            top: 978,
+            width: pillWidth,
+            height: pillHeight,
+            radius: pillHeight / 2,
+          }
+        : beat === 'close'
+          ? circlePose(finaleSize, 1542)
+          : CLOSING_BEATS.has(beat)
+            ? circlePose(finaleSize, 871)
+            : circlePose(orbSize, showPrompt ? 1744 : 1704);
 
   return (
     <section className={styles.discussionStep}>
@@ -463,7 +547,10 @@ export default function DiscussionStep({
           marks={marks}
           onPlant={handlePlant}
           onCanvasRect={handleCanvasRect}
-          revealed
+          revealed={docked && beat !== 'wait' && beat !== 'analyze'}
+          quiet={CLOSING_BEATS.has(beat)}
+          gather={beat === 'gather' || beat === 'wait' || beat === 'analyze'}
+          finaleFull={beat === 'wait' || beat === 'analyze'}
         />
       </div>
 
@@ -472,14 +559,14 @@ export default function DiscussionStep({
       <div className={styles.hudViewport}>
         <div className={styles.hudFit} style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
           <div className={styles.hudStage} style={{ transform: `scale(${scale})` }}>
-            <div className={`${styles.turn} ${showChrome ? styles.turnOn : ''}`}>
+            <div className={`${styles.turn} ${showChrome ? styles.turnOn : ''} ${beat === 'close' ? styles.turnRest : ''}`}>
               <div className={styles.pills}>
-                <span className={`${styles.pill} ${styles.pillA} ${speaker.cam === 'A' ? styles.pillOn : ''}`}>
+                <span className={`${styles.pill} ${styles.pillA} ${speaker.cam === 'A' && beat !== 'close' ? styles.pillOn : ''}`}>
                   <img src="/2/turn-a.svg" alt="" />
                   <img className={styles.pillRim} src="/2/turn-a-rim.svg" alt="" />
                   <span>A</span>
                 </span>
-                <span className={`${styles.pill} ${styles.pillB} ${speaker.cam === 'B' ? styles.pillOn : ''}`}>
+                <span className={`${styles.pill} ${styles.pillB} ${speaker.cam === 'B' && beat !== 'close' ? styles.pillOn : ''}`}>
                   <img src="/2/turn-b.svg" alt="" />
                   <span>B</span>
                 </span>
@@ -487,7 +574,7 @@ export default function DiscussionStep({
               <p className={styles.turnLabel}>{speaker.cam}님의 차례예요</p>
             </div>
 
-            <div className={`${styles.placeChip} ${showChrome ? styles.placeOn : ''}`}>
+            <div className={`${styles.placeChip} ${showPlace ? styles.placeOn : ''}`}>
               <span className={styles.placePin} aria-hidden="true">
                 <img src="/2/location-on.svg" alt="" />
               </span>
@@ -505,9 +592,20 @@ export default function DiscussionStep({
               </p>
             </div>
 
+            {(beat === 'close' || beat === 'gather') && (
+              <div className={`${styles.closingBubble} ${styles.closingTalk} ${beat === 'gather' ? styles.closingLeave : ''}`}>
+                <p>{CLOSE_LINE}</p>
+              </div>
+            )}
+
             <div
-              className={`${styles.orbSlot} ${showVisionCard ? '' : styles.orbIsAgent}`}
-              style={{ left: orbPose.left, top: orbPose.top, width: orbPose.size, height: orbPose.size }}
+              className={`${styles.orbSlot} ${CLOSING_BEATS.has(beat) ? styles.orbFinale : ''} ${showVisionCard ? '' : styles.orbIsAgent} ${morphing ? styles.orbPill : ''}`}
+              style={{
+                top: orbPose.top + orbPose.height / 2,
+                width: orbPose.width,
+                height: orbPose.height,
+                borderRadius: orbPose.radius,
+              }}
             >
               <div className={styles.visionCard} style={{ transform: `scale(${cardScale})` }}>
                 {showVisionCard && (
@@ -523,11 +621,13 @@ export default function DiscussionStep({
                 <div className={styles.orbPulse}>
                   <AgentOrb
                     agentSpeaking={speechOutput.isSpeaking}
+                    userListening={speech.isListening}
                     userLevelRef={speech.levelRef}
                     className={styles.orbCanvas}
                   />
                 </div>
               </div>
+              {morphing && <p key={closingCopy} className={styles.orbCopy}>{closingCopy}</p>}
             </div>
 
             <p className={`${styles.caption} ${beat === 'intro' ? styles.captionOn : ''}`}>

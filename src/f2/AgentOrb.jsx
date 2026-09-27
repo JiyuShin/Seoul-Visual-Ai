@@ -13,6 +13,7 @@ const fragmentShader = `
   precision highp float;
   uniform float time;
   uniform float motion;
+  uniform float spin;
   varying vec2 vUv;
 
   float hash(vec2 p) {
@@ -43,8 +44,8 @@ const fragmentShader = `
     return v;
   }
 
-  float blob(vec2 p, vec2 c, vec2 radius) {
-    vec2 d = (p - c) / radius;
+  float blob3(vec3 p, vec3 c, float radius) {
+    vec3 d = (p - c) / radius;
     return exp(-dot(d, d));
   }
 
@@ -56,13 +57,18 @@ const fragmentShader = `
     if (mask <= 0.001) discard;
 
     float t = time;
-    float lively = 1.0 + max(motion - 1.0, 0.0) * 0.45;
-    float sway = 0.22 + motion * 0.08;
+    float lively = 1.0 + max(motion - 1.0, 0.0) * 0.35;
+    float sway = 0.1 + motion * 0.03;
+    float cp = cos(spin);
+    float spn = sin(spin);
+    float z = sqrt(max(0.0, 1.0 - dot(p, p)));
+    vec3 sp = vec3(p, z);
+    vec3 src = vec3(sp.x, cp * sp.y + spn * sp.z, -spn * sp.y + cp * sp.z);
     vec2 warp = vec2(
-      fbm(p * 1.7 + vec2(t * 0.31, t * 0.22)),
-      fbm(p * 1.7 + vec2(-t * 0.24, t * 0.28) + 4.8)
+      fbm(src.xy * 1.6 + vec2(t * 0.2, src.z)),
+      fbm(src.xy * 1.6 + vec2(-t * 0.14, t * 0.16) + 4.8)
     );
-    vec2 q = p + (warp - 0.5) * sway;
+    vec2 q = src.xy + (warp - 0.5) * sway;
 
     vec2 gradOrigin = vec2(0.1215, -1.0384);
     float g = clamp(length(q - gradOrigin) / 1.6867, 0.0, 1.0);
@@ -72,15 +78,15 @@ const fragmentShader = `
     vec3 col = mix(blue, mint, smoothstep(0.0, 0.490385, g));
     col = mix(col, yellow, smoothstep(0.490385, 1.0, g));
 
-    vec2 warmC = vec2(0.34, 0.18) + 0.28 * lively * vec2(sin(t * 0.72), cos(t * 0.51));
-    vec2 pinkC = vec2(-0.36, -0.16) + 0.26 * lively * vec2(cos(t * 0.46), sin(t * 0.63));
-    vec2 mintC = vec2(0.02, -0.08) + 0.22 * lively * vec2(sin(t * 0.38), cos(t * 0.41));
-    vec2 cyanC = vec2(-0.04, 0.32) + 0.2 * lively * vec2(cos(t * 0.88), sin(t * 0.47));
-
-    float warm = blob(q, warmC, vec2(0.62, 0.42));
-    float pink = blob(q, pinkC, vec2(0.5, 0.58));
-    float mintBand = blob(q, mintC, vec2(0.95, 0.28));
-    float cyan = blob(q, cyanC, vec2(1.05, 0.16));
+    vec3 warmC = vec3(0.32, 0.18, 0.5);
+    vec3 pinkC = vec3(-0.3, -0.22, 0.16);
+    vec3 mintC = vec3(0.04, -0.06, -0.46);
+    vec3 cyanC = vec3(-0.04, 0.4, -0.1);
+    float warm = blob3(src, warmC, 0.62);
+    float pink = blob3(src, pinkC, 0.55);
+    float mintBand = blob3(src, mintC, 0.7);
+    float cyan = blob3(src, cyanC, 0.5);
+    col *= 0.9 + 0.12 * lively * clamp(src.z * 0.5 + 0.5, 0.0, 1.0);
 
     float warmN = fbm(q * 2.4 + vec2(t * 0.45, -t * 0.3));
     float pinkN = fbm(q * 2.6 + vec2(-t * 0.36, t * 0.27) + 8.0);
@@ -106,13 +112,17 @@ const fragmentShader = `
   }
 `;
 
-export default function AgentOrb({ agentSpeaking = false, userLevelRef, className }) {
+export default function AgentOrb({ agentSpeaking = false, userListening = false, userLevelRef, className }) {
   const canvasRef = useRef(null);
   const rootRef = useRef(null);
   const haloBlurRef = useRef(null);
+  const haloGroupRef = useRef(null);
+  const colorSpinRef = useRef(null);
   const agentSpeakingRef = useRef(agentSpeaking);
+  const userListeningRef = useRef(userListening);
   const levelSourceRef = useRef(userLevelRef);
   agentSpeakingRef.current = agentSpeaking;
+  userListeningRef.current = userListening;
   levelSourceRef.current = userLevelRef;
 
   useEffect(() => {
@@ -135,6 +145,7 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
     const uniforms = {
       time: { value: 0 },
       motion: { value: 1 },
+      spin: { value: 0 },
     };
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
@@ -152,6 +163,8 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
     let last = 0;
     let haloPhase = 0;
     let haloBlur = 8;
+    let spin = 0;
+    let drive = 0;
 
     const resize = () => {
       const size = canvas.clientWidth || 148;
@@ -167,11 +180,22 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
       const dt = Math.min((now - (last || now)) / 1000, 0.05);
       last = now;
       const level = levelSourceRef.current?.current || 0;
-      const target = 1 + level * 0.65;
-      uniforms.motion.value += (target - uniforms.motion.value) * 0.12;
-      uniforms.time.value += dt * 2.58 * (1 + level * 0.42);
-      if (rootRef.current) {
-        rootRef.current.style.transform = `scale(${(1 + level * 0.07).toFixed(4)})`;
+      const listening = userListeningRef.current ? 1 : 0;
+      const targetDrive = Math.min(1, listening * 0.55 + level * 0.7);
+      drive += (targetDrive - drive) * (targetDrive > drive ? 0.18 : 0.08);
+      spin += dt * drive * 0.8;
+      uniforms.spin.value = spin;
+      const motionTarget = 1 + level * 0.35;
+      uniforms.motion.value += (motionTarget - uniforms.motion.value) * 0.12;
+      uniforms.time.value += dt * 2.58 * (1 + level * 0.2);
+      if (rootRef.current) rootRef.current.style.transform = 'none';
+      if (colorSpinRef.current) {
+        const travel = Math.sin(spin) * 26;
+        const sy = 0.74 + 0.26 * Math.cos(spin);
+        colorSpinRef.current.setAttribute(
+          'transform',
+          `translate(122.938 ${(107.117 + travel).toFixed(2)}) scale(1 ${sy.toFixed(4)}) translate(-122.938 -107.117)`
+        );
       }
       if (agentSpeakingRef.current) {
         haloPhase += dt / 3.6;
@@ -179,8 +203,20 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
         const tri = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
         const eased = tri * tri * (3 - 2 * tri);
         haloBlur = 8 + eased * 19;
+        if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
+      } else if (drive > 0.04) {
+        haloPhase += dt * (1.7 + level * 2.2);
+        const wave = Math.sin(haloPhase);
+        const shimmer = Math.sin(haloPhase * 2.15 + 0.7);
+        const target = 8 + (wave * 0.5 + 0.5) * 6 + level * 2;
+        haloBlur += (target - haloBlur) * 0.16;
+        if (haloGroupRef.current) {
+          const opacity = 0.68 + (shimmer * 0.5 + 0.5) * 0.32;
+          haloGroupRef.current.setAttribute('opacity', opacity.toFixed(3));
+        }
       } else {
         haloBlur += (8 - haloBlur) * 0.08;
+        if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
       }
       if (haloBlurRef.current) haloBlurRef.current.setAttribute('stdDeviation', haloBlur.toFixed(2));
       renderer.render(scene, camera);
@@ -218,7 +254,7 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
           pointerEvents: 'none',
         }}
       >
-        <g filter="url(#agentHalo)">
+        <g ref={haloGroupRef} filter="url(#agentHalo)">
           <circle cx="122.938" cy="107.117" r="77.5" fill="#fff" />
         </g>
         <g filter="url(#agentInner)">
@@ -227,6 +263,7 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
         <g opacity="0.84" filter="url(#agentRing)">
           <circle cx="122.682" cy="107.117" r="76.9053" fill="none" stroke="url(#agentRingPaint)" strokeWidth="1.18941" />
         </g>
+        <g ref={colorSpinRef} clipPath="url(#agentColorClip)">
         <g opacity="0.27" filter="url(#agentWarm)">
           <path d="M216.934 95.8491C198.857 105.775 201.253 139.198 157.585 134.718C113.917 130.239 74.2755 99.25 94.061 89.2871C61.3261 88.6251 141.227 25.5777 158.312 50.3006C175.397 75.0236 225.565 64.1717 216.934 95.8491Z" fill="url(#agentWarmPaint)" />
         </g>
@@ -239,7 +276,11 @@ export default function AgentOrb({ agentSpeaking = false, userLevelRef, classNam
         <g opacity="0.35" filter="url(#agentCyan)">
           <path d="M239.558 87.2283C207.93 88.427 212.123 97.9498 135.721 97.4088C59.3193 96.8678 -10.038 93.1255 24.5789 91.9223C-32.6945 91.8423 107.1 78.7419 136.992 81.7276C166.885 84.7133 254.659 83.4027 239.558 87.2283Z" fill="url(#agentCyanPaint)" />
         </g>
+        </g>
         <defs>
+          <clipPath id="agentColorClip">
+            <circle cx="122.938" cy="107.117" r="77.5" />
+          </clipPath>
           <filter id="agentHalo" x="-100" y="-120" width="460" height="460" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
             <feGaussianBlur ref={haloBlurRef} in="SourceAlpha" stdDeviation="8" result="blur" />
             <feComposite in="blur" in2="SourceAlpha" operator="out" result="outside" />

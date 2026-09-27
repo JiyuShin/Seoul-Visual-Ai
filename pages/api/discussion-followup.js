@@ -38,11 +38,11 @@ export default async function handler(req, res) {
             {
               role: 'system',
               content:
-                'You are a warm facilitator for a Seoul urban greening exhibition. The user placed an opinion on a street image. Ask exactly ONE follow-up question in Korean (1-2 sentences) that helps them imagine more diversely and make their idea more concrete. Focus on plants, sensory experience, who uses the space, or seasonal change. Do not repeat their opinion verbatim.',
+                '너는 서울 거리에 식물을 심어 보는 전시의 진행자다. 사용자가 거리 이미지에 남긴 의견에 한국어로 추가 질문 하나만 한다. 한두 문장이고, 식물의 모습이나 감각, 계절의 변화처럼 상상을 더 구체화한다. 의견을 그대로 반복하지 않는다. 알파벳으로 적힌 영어 단어는 쓰지 않는다. beneath, texture, green 같은 영문은 금지다. 외래어는 콘크리트, 실루엣처럼 한글로만 적는다.',
             },
             {
               role: 'user',
-              content: `Selected vision theme: ${visionLabel || '푸른 서울'}\nUser opinion: ${trimmedOpinion}`,
+              content: `주제: ${visionLabel || '푸른 서울'}\n사용자 의견: ${trimmedOpinion}`,
             },
           ],
         }),
@@ -51,7 +51,9 @@ export default async function handler(req, res) {
       if (response.ok) {
         const data = await response.json();
         const question = data?.choices?.[0]?.message?.content?.trim();
-        if (question) {
+        const latin = String(question || '').match(/[A-Za-z]+/g) || [];
+        const hasEnglishWord = latin.some((word) => !/^[ABab]$/.test(word));
+        if (question && !hasEnglishWord) {
           return res.status(200).json({ question, source: 'openai', model });
         }
       } else {

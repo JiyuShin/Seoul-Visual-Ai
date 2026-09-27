@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { clamp, lookFromPointer, screenToWorld, viewFov, worldToScreen } from './streetLook';
 import styles from './StreetCanvas.module.css';
 
@@ -46,7 +46,28 @@ function compile(gl, type, source) {
   return shader;
 }
 
-export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs, marks, yawSpan = 360, zoom = 1 }, ref) {
+export function preloadStreetPoster(url = '/street/red/assets/street-panorama.webp') {
+  if (typeof window === 'undefined') return null;
+  const current = window.__streetPoster;
+  if (current && current.dataset.src === url) return current;
+  const image = new Image();
+  image.dataset.src = url;
+  image.decoding = 'sync';
+  image.src = url;
+  window.__streetPoster = image;
+  image.decode?.().catch(() => {});
+  return image;
+}
+
+export default forwardRef(function StreetPanorama({
+  imageUrl,
+  lookRef,
+  markRefs,
+  marks,
+  pinRef,
+  yawSpan = 360,
+  zoom = 1,
+}, ref) {
   const canvasRef = useRef(null);
   const viewRef = useRef({ yaw: 0, pitch: 0, fov: viewFov(16 / 9), aspect: 16 / 9 });
   const marksRef = useRef(marks);
@@ -63,7 +84,7 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
     },
   }), []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !imageUrl) return undefined;
 
@@ -117,8 +138,29 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
     let last = 0;
     const current = { yaw: 0, pitch: 0 };
     const target = { yaw: 0, pitch: 0 };
+    const stable = { nx: 0.5, ny: 0.5 };
+
+    const aimedLook = (look, dt) => {
+      if (look.source !== 'gaze') {
+        stable.nx = look.nx;
+        stable.ny = look.ny;
+        return lookFromPointer(look.nx, look.ny);
+      }
+      const dx = look.nx - stable.nx;
+      const dy = look.ny - stable.ny;
+      const dist = Math.hypot(dx, dy);
+      if (dist >= 0.08) {
+        const pull = (dist - 0.08) / dist;
+        const tau = dist > 0.22 ? 420 : 1100;
+        const gain = 1 - Math.exp(-dt / tau);
+        stable.nx += dx * pull * gain;
+        stable.ny += dy * pull * gain;
+      }
+      return lookFromPointer(stable.nx, stable.ny);
+    };
 
     const placeMarks = () => {
+      if (pinRef?.current) return;
       const view = viewRef.current;
       marksRef.current.forEach((mark) => {
         const el = markRefs.current?.[mark.id];
@@ -141,15 +183,18 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       last = time;
       const homing = Boolean(homeRef.current);
       const look = lookRef.current;
+      const gazeDriven = Boolean(look && look.source === 'gaze' && !homing);
       if (homing) {
         target.yaw = 0;
         target.pitch = 0;
+        stable.nx = 0.5;
+        stable.ny = 0.5;
       } else if (look) {
-        const next = lookFromPointer(look.nx, look.ny);
+        const next = aimedLook(look, dt);
         target.yaw = next.yaw;
         target.pitch = next.pitch;
       }
-      const follow = 1 - Math.exp(-dt / (homing ? 980 : 160));
+      const follow = 1 - Math.exp(-dt / (homing ? 980 : gazeDriven ? 560 : 160));
       current.yaw += (target.yaw - current.yaw) * follow;
       current.pitch += (target.pitch - current.pitch) * follow;
 
@@ -188,31 +233,35 @@ export default forwardRef(function StreetPanorama({ imageUrl, lookRef, markRefs,
       frame = requestAnimationFrame(draw);
     };
 
-    const image = new Image();
-    image.onload = () => {
-      if (dead) return;
+    const image = preloadStreetPoster(imageUrl);
+    const onError = () => {
+      canvas.dataset.failed = '1';
+    };
+    const present = () => {
+      if (dead || !image?.naturalWidth) return;
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
       ready = true;
-      frame = requestAnimationFrame(draw);
+      draw(performance.now());
     };
-    image.onerror = () => {
-      canvas.dataset.failed = '1';
-    };
-    image.src = imageUrl;
+    if (image?.complete && image.naturalWidth) present();
+    else if (image) {
+      image.addEventListener('load', present, { once: true });
+      image.addEventListener('error', onError, { once: true });
+    }
 
     return () => {
       dead = true;
       cancelAnimationFrame(frame);
-      image.onload = null;
-      image.onerror = null;
+      image?.removeEventListener('load', present);
+      image?.removeEventListener('error', onError);
       gl.deleteTexture(texture);
       gl.deleteBuffer(buffer);
       gl.deleteShader(vertex);
       gl.deleteShader(fragment);
       gl.deleteProgram(program);
     };
-  }, [imageUrl, lookRef, markRefs, yawSpan, zoom]);
+  }, [imageUrl, lookRef, markRefs, pinRef, yawSpan, zoom]);
 
   return <canvas ref={canvasRef} className={styles.panorama} />;
 });
