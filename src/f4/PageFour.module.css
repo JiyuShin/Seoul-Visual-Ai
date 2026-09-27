@@ -28,6 +28,31 @@
   font-family: Pretendard, system-ui, sans-serif;
 }
 
+.street {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(24px);
+  transform: scale(1.1);
+  transform-origin: center center;
+}
+
+.streetOn {
+  opacity: 1;
+  transition:
+    filter 3.4s cubic-bezier(0.45, 0, 0.2, 1),
+    transform 3.4s cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.streetSharp {
+  filter: blur(0);
+  transform: scale(1);
+}
+
 .bubble {
   position: absolute;
   left: 50%;
@@ -42,6 +67,7 @@
   border-radius: 70px;
   text-align: center;
   white-space: nowrap;
+  z-index: 2;
   pointer-events: none;
 }
 

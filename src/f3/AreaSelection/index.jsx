@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import {
   buildMobileJoinUrl,
@@ -13,6 +14,8 @@ import {
   S_DURATION_MS,
   STAGE,
   placementForLogo,
+  rouletteOffsetForLogo,
+  districtIndexForLandedOffset,
   startRoulette,
   stopRoulette,
 } from './sequence';
@@ -83,7 +86,7 @@ function CircleToken({ logo, placement, colored }) {
   const logoFade = colored && !logo.stack ? 1 - placement.glow : 1;
   const sideMark = imageStyle(placement, (swaps ? 1 - placement.swap : 1) * logoFade, logo.sidePosition);
   const centerMark = {
-    ...imageStyle(placement, placement.swap * logoFade, logo.sidePosition),
+    ...imageStyle(placement, placement.swap, logo.sidePosition),
     objectFit: logo.cover ? 'cover' : 'contain',
   };
 
@@ -137,11 +140,13 @@ function RouletteTrack({ children, ring }) {
 
 function SpinningRoulette({ onComplete, targetOffset }) {
   const [offset, setOffset] = useState(0);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
-    startRoulette(setOffset, onComplete, targetOffset);
+    startRoulette(setOffset, (landedOffset) => onCompleteRef.current(landedOffset), targetOffset);
     return () => stopRoulette();
-  }, [onComplete, targetOffset]);
+  }, [targetOffset]);
 
   return (
     <RouletteTrack ring>
@@ -190,13 +195,14 @@ function StillCenter({ district }) {
 
 function StillRoulette({ district }) {
   const count = ROULETTE_LOGOS.length;
+  const offset = rouletteOffsetForLogo(district.logoIndex);
 
   return (
     <RouletteTrack ring={false}>
       {ROULETTE_LOGOS.map((logo, index) => {
-        const slot = (((index - district.rouletteOffset) % count) + count) % count;
+        const slot = (((index - offset) % count) + count) % count;
         if (slot === 4) return <StillCenter key={logo.src} district={district} />;
-        return <CircleToken key={logo.src} logo={logo} placement={placementForLogo(index, district.rouletteOffset)} />;
+        return <CircleToken key={logo.src} logo={logo} placement={placementForLogo(index, offset)} />;
       })}
     </RouletteTrack>
   );
@@ -211,7 +217,7 @@ function FindingVideo({ hidden }) {
 
   useEffect(() => {
     if (hidden) return undefined;
-    const timer = setTimeout(() => setFading(true), Math.max(0, F_TOTAL_DURATION - 1600));
+    const timer = setTimeout(() => setFading(true), Math.max(0, F_TOTAL_DURATION * 0.9));
     return () => clearTimeout(timer);
   }, [hidden]);
 
@@ -449,25 +455,61 @@ function QrCopy({ phase, qrUrl }) {
 }
 
 export default function AreaSelection() {
+  const router = useRouter();
   const { setSelectedDistrict } = useEntryFlow();
   const { startKioskSession, qrTargetUrl, mobilePublicOrigin } = useMobileLink();
   const kioskSessionRef = useRef(false);
   const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
-  const [districtIndex] = useState(() => Math.floor(Math.random() * DISTRICTS.length));
+  const [districtIndex, setDistrictIndex] = useState(0);
+  const [districtReady, setDistrictReady] = useState(false);
   const district = DISTRICTS[districtIndex];
   const displayQrUrl = qrTargetUrl || localQrUrl;
 
-  const finishFinding = useCallback(() => {
-    setSelectedDistrict(district);
+  const finishFinding = useCallback((landedOffset) => {
+    const index = districtIndexForLandedOffset(landedOffset);
+    const next = DISTRICTS[index];
+    setDistrictIndex(index);
+    setSelectedDistrict(next);
+    try {
+      sessionStorage.setItem('seoul-district', next.name);
+    } catch {
+      // 저장이 막혀도 화면 전환은 이어간다.
+    }
     setPhase('s');
-  }, [district, setSelectedDistrict]);
+  }, [setSelectedDistrict]);
+
+  useEffect(() => {
+    setDistrictIndex(Math.floor(Math.random() * DISTRICTS.length));
+    setDistrictReady(true);
+  }, []);
 
   useEffect(() => {
     if (phase !== 's') return undefined;
     const timeout = setTimeout(() => setPhase('q'), S_DURATION_MS);
     return () => clearTimeout(timeout);
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'q') return undefined;
+    const name = district.name;
+    const timeout = setTimeout(() => {
+      try {
+        sessionStorage.setItem('seoul-district', name);
+      } catch {
+        // 저장이 막혀도 화면 전환은 이어간다.
+      }
+      router.push(`/4?district=${encodeURIComponent(name)}`);
+    }, MAP_FADE_OUT_MS + 2200);
+    return () => clearTimeout(timeout);
+  }, [phase, router, district]);
+
+  useEffect(() => {
+    if (!districtReady || !district?.name) return undefined;
+    const image = new Image();
+    image.src = `/api/district-street?name=${encodeURIComponent(district.name)}&v=2`;
+    return undefined;
+  }, [districtReady, district]);
 
   useLayoutEffect(() => {
     if (phase === 'f') {
@@ -494,11 +536,10 @@ export default function AreaSelection() {
       <Background hidden={phase === 'f'} />
       <FindingVideo hidden={phase !== 'f'} />
       <img className={styles.arc} src="/3/arc.svg" alt="" />
-      <div className={`${styles.rouletteLayer} ${phase === 'f' ? '' : styles.isHidden}`}>
-        <SpinningRoulette targetOffset={district.rouletteOffset} onComplete={finishFinding} />
-      </div>
-      <div className={`${styles.rouletteLayer} ${phase === 'f' ? styles.isHidden : ''}`}>
-        <StillRoulette district={district} />
+      <div className={styles.rouletteLayer}>
+        {districtReady ? (
+          <SpinningRoulette targetOffset={rouletteOffsetForLogo(district.logoIndex)} onComplete={finishFinding} />
+        ) : null}
       </div>
       <FindingCopy phase={phase} />
       <MovingMap phase={phase} />

@@ -5,9 +5,18 @@ export const F_FRAME_COUNT = 9;
 
 let rouletteAnimationId = null;
 
-// 9칸을 한 칸씩 점프하지 않고, 호를 따라 왼쪽으로 미끄러진 뒤
-// 뽑힌 지역이 가운데인 배치에서 멈춘다. s도 그 배치를 그대로 쓴다.
-export function startRoulette(onOffset, onComplete, targetOffset = F_FRAME_COUNT - 1) {
+// 처음엔 빠르게 지나가고, 끝으로 갈수록 한 칸이 길어지며 멈춘다.
+function easeOutSpin(t) {
+  return 1 - (1 - t) ** 2;
+}
+
+// 뽑힌 지역 로고가 가운데 칸(4)에 오도록 맞춘다.
+export function rouletteOffsetForLogo(logoIndex) {
+  const count = ROULETTE_LOGOS.length;
+  return (logoIndex - 4 + count) % count;
+}
+
+export function startRoulette(onOffset, onComplete, targetOffset = 0) {
   const startedAt = performance.now();
   const travelMs = F_TOTAL_DURATION * 0.9;
   const endOffset = targetOffset + ROULETTE_LOGOS.length;
@@ -16,13 +25,9 @@ export function startRoulette(onOffset, onComplete, targetOffset = F_FRAME_COUNT
   function animate(now) {
     const elapsed = now - startedAt;
     const t = Math.min(elapsed / travelMs, 1);
-    const cruise = 0.78;
-    const eased = t < cruise
-      ? (t / cruise) * 0.82
-      : 0.82 + 0.18 * (1 - (1 - (t - cruise) / (1 - cruise)) ** 3);
-    onOffset(eased * endOffset);
+    onOffset(easeOutSpin(t) * endOffset);
 
-    if (elapsed < F_TOTAL_DURATION) {
+    if (t < 1) {
       rouletteAnimationId = requestAnimationFrame(animate);
       return;
     }
@@ -30,7 +35,7 @@ export function startRoulette(onOffset, onComplete, targetOffset = F_FRAME_COUNT
     if (!finished) {
       finished = true;
       onOffset(endOffset);
-      if (onComplete) onComplete();
+      if (onComplete) onComplete(endOffset);
     }
   }
 
@@ -64,12 +69,10 @@ export const ROULETTE_LOGOS = [
   },
   {
     src: '/3/logo-images.png',
-    centerSrc: '/3/logo-images-color.png',
+    centerSrc: '/3/logo-360.png',
     texture: '/3/circle-f007.svg',
-    stack: true,
-    cover: true,
     side: { x: 13, y: 26, w: 69, h: 43 },
-    center: { x: 21, y: 47, w: 132, h: 81 },
+    center: { x: 8, y: 38, w: 159, h: 112 },
   },
   {
     src: '/3/logo-r800.png',
@@ -83,13 +86,11 @@ export const ROULETTE_LOGOS = [
   },
   {
     src: '/3/logo-173.png',
-    centerSrc: '/3/logo-173-color.png',
+    centerSrc: '/3/logo-361.png',
     texture: '/3/circle-f009.svg',
-    stack: true,
-    centerCrop: { width: '100%', height: '147.54%', top: '-4.92%', left: '0' },
     sidePosition: 'bottom',
     side: { x: 20, y: 22, w: 56, h: 51 },
-    center: { x: 28, y: 34, w: 119, h: 107 },
+    center: { x: 28, y: 36, w: 120, h: 110 },
   },
   {
     src: '/3/logo-eb.png',
@@ -154,7 +155,7 @@ export const DISTRICTS = [
     id: 1,
     name: '종로구',
     logo: '/3/logo-355.png',
-    rouletteOffset: 1,
+    logoIndex: 5,
     centerMark: {
       src: '/3/mark-jongno.png',
       texture: '/3/texture-jongno.svg',
@@ -170,50 +171,10 @@ export const DISTRICTS = [
     ],
   },
   {
-    id: 2,
-    name: '용산구',
-    logo: '/3/logo-360.png',
-    rouletteOffset: 5,
-    centerMark: {
-      src: '/3/mark-yongsan.png',
-      texture: '/3/texture-yongsan.svg',
-      x: 20.6,
-      y: 40,
-      w: 158.8,
-      h: 111.9,
-      position: 'bottom',
-    },
-    title: { x: 214, y: 692 },
-    glow: { x: 2700, y: 1261 },
-    lines: [
-      '용산구는 대규모 공원과 녹지가 있는 한편, 생활권 곳곳의 녹지를 연결하는 지점이 부족하기',
-      '때문에 그늘을 만드는 나무와 일상 가까이에서 만날 수 있는 식물이 필요해요.',
-    ],
-  },
-  {
-    id: 3,
-    name: '성동구',
-    logo: '/3/logo-350.png',
-    rouletteOffset: 2,
-    centerMark: {
-      src: '/3/mark-seongdong.png',
-      texture: '/3/texture-seongdong.svg',
-      x: 37,
-      y: 54,
-      w: 126.5,
-      h: 74,
-    },
-    glow: { x: 2814, y: 1200 },
-    lines: [
-      '성동구는 서울숲 같은 큰 녹지와 함께 주거와 상업,준공업 지역이 함께 있는 도시이기 때문에,',
-      '생활권 곳곳에 녹지를 더할 수 있는 나무와 식물이 필요해요.',
-    ],
-  },
-  {
     id: 4,
     name: '마포구',
     logo: '/3/logo-r800.png',
-    rouletteOffset: 7,
+    logoIndex: 2,
     centerMark: {
       src: '/3/mark-mapo.png',
       texture: '/3/texture-mapo.svg',
@@ -230,30 +191,10 @@ export const DISTRICTS = [
     ],
   },
   {
-    id: 5,
-    name: '송파구',
-    logo: '/3/logo-361.png',
-    rouletteOffset: 7,
-    centerMark: {
-      src: '/3/mark-songpa.png',
-      texture: '/3/texture-songpa.svg',
-      x: 30.8,
-      y: 48,
-      w: 138.2,
-      h: 95.9,
-      position: 'bottom',
-    },
-    glow: { x: 3098, y: 1354 },
-    lines: [
-      '송파구는 공원과 호수 등 녹지공간이 잘 갖춰져 있지만, 일부 생활도로에서 가로수로 인한 ',
-      '보행공간이 좁아지고 있기 때문에 보행을 방해하지 않을 적당한 크기의나무와 식물이 필요해요.',
-    ],
-  },
-  {
     id: 6,
     name: '강남구',
     logo: '/3/logo-gangnam.png',
-    rouletteOffset: 3,
+    logoIndex: 7,
     centerMark: {
       src: '/3/mark-gangnam.png',
       disc: '/3/texture-gangnam.svg',
@@ -269,6 +210,13 @@ export const DISTRICTS = [
     ],
   },
 ];
+
+export function districtIndexForLandedOffset(offset) {
+  const count = ROULETTE_LOGOS.length;
+  const logoIndex = ((4 + Math.round(offset)) % count + count) % count;
+  const index = DISTRICTS.findIndex((item) => item.logoIndex === logoIndex);
+  return index >= 0 ? index : 0;
+}
 
 function slotPoint(slot) {
   const size = slot.center ? 175 : 95;
