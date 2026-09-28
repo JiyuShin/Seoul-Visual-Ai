@@ -9,8 +9,6 @@ const FIGMA = { width: 4074, height: 2274 };
 const SX = STAGE.width / FIGMA.width;
 const SY = STAGE.height / FIGMA.height;
 const HOLD_MS = 3200;
-const CARD_TRAVEL_MS = 4500;
-const CARD_SHIFT_PX = 7734;
 const LAST_FRAME = 19;
 
 const TELLS = [
@@ -114,7 +112,7 @@ function holdFor(frame) {
   if (frame === 4) return 2400;
   if (frame === 5) return 1800;
   if (frame === 16) return 2200;
-  if (frame === 11 || frame === 12) return CARD_TRAVEL_MS / 2 + 40;
+  if (frame === 11 || frame === 12) return 1100;
   if (frame === 18) return 1700;
   if (frame === 19) return 1500;
   if ([7, 8, 9, 10, 13, 14, 15, 17].includes(frame)) return 6800;
@@ -125,80 +123,10 @@ function agentSpeaking(frame) {
   return [7, 8, 9, 10, 13, 14, 15, 17].includes(frame);
 }
 
-function CenterCard() {
-  return (
-    <div className={`${styles.centerCard} ${styles.cardRim}`}>
-      <svg className={styles.centerSvg} viewBox="0 0 1450 815" aria-hidden="true">
-        <defs>
-          <clipPath id="opCenterClip">
-            <rect width="1450" height="815" rx="53.3" ry="53.3" />
-          </clipPath>
-          <clipPath id="opLeafClip">
-            <circle cx="725" cy="290" r="173" />
-          </clipPath>
-          <filter id="opPhotoBlur" x="-80" y="-80" width="1900" height="1200" filterUnits="userSpaceOnUse">
-            <feGaussianBlur stdDeviation="7.5" />
-          </filter>
-          <filter id="opLeafHaloBlur" x="420" y="-10" width="620" height="600" filterUnits="userSpaceOnUse">
-            <feGaussianBlur stdDeviation="16" />
-          </filter>
-          <linearGradient id="opWashA" gradientUnits="userSpaceOnUse" x1="1007.89" y1="1130.77" x2="635.11" y2="-185.77">
-            <stop offset="8.209%" stopColor="rgb(60, 209, 255)" stopOpacity="0.4" />
-            <stop offset="49.53%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="opWashB" gradientUnits="userSpaceOnUse" x1="1376.06" y1="1172.96" x2="266.94" y2="-227.96">
-            <stop offset="4.516%" stopColor="rgb(223, 255, 213)" stopOpacity="0.4" />
-            <stop offset="43.56%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="opWashC" gradientUnits="userSpaceOnUse" x1="275.57" y1="-230.36" x2="1367.43" y2="1175.36">
-            <stop offset="9.983%" stopColor="rgb(184, 255, 162)" stopOpacity="0.6" />
-            <stop offset="67.366%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-          <radialGradient id="opLeafHalo" gradientUnits="userSpaceOnUse" cx="725" cy="290" r="250">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-            <stop offset="55%" stopColor="#ffffff" stopOpacity="0.28" />
-            <stop offset="72%" stopColor="#ffffff" stopOpacity="0.92" />
-            <stop offset="100%" stopColor="#e4ffd2" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <g clipPath="url(#opCenterClip)">
-          <rect width="1450" height="815" fill="#ffffff" />
-          <g filter="url(#opPhotoBlur)">
-            <g transform="rotate(180 821.5 472.5)">
-              <image href="/op/card-center-bg.png" x="-21" y="0" width="1685" height="945" opacity="0.9" preserveAspectRatio="none" />
-              <rect x="-21" y="0" width="1685" height="945" fill="url(#opWashA)" />
-              <rect x="-21" y="0" width="1685" height="945" fill="url(#opWashB)" />
-              <rect x="-21" y="0" width="1685" height="945" fill="url(#opWashC)" />
-            </g>
-          </g>
-          <circle cx="725" cy="290" r="230" fill="url(#opLeafHalo)" filter="url(#opLeafHaloBlur)" />
-          <g transform="translate(726.04 290) scale(1 -1) rotate(90) translate(-726.04 -290)" clipPath="url(#opLeafClip)">
-            <image href="/op/card-leaf.png" x="553.04" y="117" width="346" height="346" preserveAspectRatio="none" style={{ mixBlendMode: 'lighten' }} />
-          </g>
-          <g transform="translate(726.04 290) scale(1 -1) rotate(90) translate(-726.04 -290)" clipPath="url(#opLeafClip)">
-            <image href="/op/card-leaf.png" x="553.04" y="117" width="346" height="346" preserveAspectRatio="none" style={{ mixBlendMode: 'lighten' }} />
-          </g>
-          <g transform="translate(724.96 289.99) scale(1 -1) rotate(-98.12) translate(-724.96 -289.99)" clipPath="url(#opLeafClip)">
-            <image href="/op/card-leaf-b.png" x="551.96" y="117" width="346" height="346" preserveAspectRatio="none" style={{ mixBlendMode: 'lighten' }} />
-          </g>
-        </g>
-      </svg>
-      <p>
-        탁한 일상을 비우고
-        <br />
-        <b>맑은 초록으로 채우는</b> 서울
-      </p>
-    </div>
-  );
-}
-
 export default function Opening() {
   const router = useRouter();
   const { isReady, isCalibrating } = useEntryFlow();
   const viewportRef = useRef(null);
-  const cardRowRef = useRef(null);
-  const cardGlideRef = useRef(null);
-  const cardExitRef = useRef(false);
   const [scale, setScale] = useState(1);
   const [frame, setFrame] = useState(1);
 
@@ -218,34 +146,6 @@ export default function Opening() {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, []);
-
-  useEffect(() => {
-    const row = cardRowRef.current;
-    if (!row) return undefined;
-    if (frame === 11 && !cardGlideRef.current) {
-      cardGlideRef.current = row.animate(
-        [{ transform: 'translateX(0px)' }, { transform: `translateX(-${CARD_SHIFT_PX}px)` }],
-        { duration: CARD_TRAVEL_MS, easing: 'linear', fill: 'forwards' },
-      );
-    }
-    if (frame < 11 && cardGlideRef.current) {
-      cardGlideRef.current.cancel();
-      cardGlideRef.current = null;
-      cardExitRef.current = false;
-      row.style.transform = 'translateX(0px)';
-    }
-    if (frame >= 13 && cardGlideRef.current && !cardExitRef.current) {
-      cardExitRef.current = true;
-      row.animate(
-        [
-          { transform: `translateX(-${CARD_SHIFT_PX}px)` },
-          { transform: `translateX(-${CARD_SHIFT_PX + 980}px)` },
-        ],
-        { duration: 1100, easing: 'ease-out', fill: 'forwards' },
-      );
-    }
-    return undefined;
-  }, [frame]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -288,20 +188,10 @@ export default function Opening() {
             </div>
           </div>
           <div className={`${styles.cardScene} ${frame === 11 || frame === 12 ? styles.cardSceneOn : ''}`}>
-            <div className={styles.cardRow} ref={cardRowRef}>
-              <CenterCard />
-              <div className={`${styles.sideCard} ${styles.cardRim}`}>
-                <img src="/op/card-left.png" alt="" />
-              </div>
-              <div className={`${styles.sideCardRight} ${styles.cardRim}`}>
-                <img src="/op/card-right.png" alt="" />
-              </div>
-            </div>
-            <div className={styles.cardEdgeLeft}>
-              <div className={styles.cardEdgeBlur} />
-            </div>
-            <div className={styles.cardEdgeRight}>
-              <div className={styles.cardEdgeBlur} />
+            <div className={styles.cardRow}>
+              <img className={styles.sideCard} src="/op/card-left.png" alt="" />
+              <img className={styles.sideCardRight} src="/op/card-right.png" alt="" />
+              <img className={styles.frameCenter} src="/op/op10-frame-center.png" alt="" />
             </div>
           </div>
           <div className={`${styles.floor} ${agentSpeaking(frame) || frame === 11 || frame === 12 ? styles.floorOn : ''}`} />

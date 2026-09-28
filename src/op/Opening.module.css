@@ -1,3 +1,10 @@
+.lensDefs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .viewport {
   position: fixed;
   inset: 0;
@@ -318,18 +325,18 @@
   z-index: 2;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 1.1s ease;
+  transition: opacity 1.6s ease;
 }
 
 .cardSceneOn {
   opacity: 1;
-  transition: opacity 0.18s ease;
+  transition: opacity 1.4s ease;
 }
 
 .cardRow {
   position: absolute;
   top: 27px;
-  left: 3367px;
+  left: -588px;
   width: 5251px;
   height: 1449px;
 }
@@ -368,15 +375,28 @@
 .sideCardRight {
   position: absolute;
   z-index: 2;
+  object-fit: cover;
   opacity: 0.9;
 }
 
-.sideCard img,
-.sideCardRight img {
-  display: block;
+.centerBg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: rotate(180deg);
+}
+
+.centerLeaf {
+  position: absolute;
+  left: 552px;
+  top: 117px;
+  width: 346px;
+  height: 346px;
+  border-radius: 50%;
+  object-fit: cover;
+  mix-blend-mode: lighten;
 }
 
 .cardRim::before,
@@ -417,6 +437,38 @@
   to { transform: translateY(16px); }
 }
 
+.opCardSvg,
+.opCardImg {
+  display: block;
+  width: 1450px;
+  height: 815px;
+  object-fit: contain;
+}
+
+.opCard1,
+.opCard2,
+.opCard3 {
+  position: absolute;
+  top: 317px;
+  width: 1450px;
+  height: 815px;
+  overflow: visible;
+  transform-style: preserve-3d;
+  transform-origin: center center;
+}
+
+.opCard1 {
+  left: 380px;
+  transform: perspective(1400px) rotateY(14deg);
+  transform-origin: right center;
+}
+.opCard2 { left: 1996px; }
+.opCard3 {
+  left: 3612px;
+  transform: perspective(1400px) rotateY(-14deg);
+  transform-origin: left center;
+}
+
 .sideCard {
   left: 0;
   top: 0;
@@ -425,10 +477,20 @@
 }
 
 .sideCardRight {
-  left: 3041px;
+  left: 3078px;
   top: 16px;
   width: 2210px;
   height: 1433px;
+}
+
+.frameCenter {
+  position: absolute;
+  left: 1801px;
+  top: 217px;
+  width: 1650px;
+  height: 1015px;
+  object-fit: cover;
+  z-index: 3;
 }
 
 .centerCard {
