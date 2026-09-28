@@ -61,12 +61,7 @@ export function EntryFlowProvider({ children }) {
   const [discussionCam, setDiscussionCam] = useState('A');
   discussionCamRef.current = discussionCam;
 
-  const activeStep =
-    router.pathname === '/2'
-      ? 'discussion'
-      : router.pathname === '/1' && !winnerCard
-        ? 'vote'
-        : null;
+  const activeStep = router.pathname === '/2' ? 'discussion' : null;
 
   activeStepRef.current = activeStep;
   gazeClipRef.current = gazeClip;
@@ -197,7 +192,7 @@ export function EntryFlowProvider({ children }) {
       isReady: engine.ready || mouseDev,
       mouseDev,
       enableMouseDev,
-      // 준비가 끝나기 전에는 /1, /2 가 보정 화면으로 돌려보낸다.
+      // 준비가 끝나기 전에는 참여 화면이 보정 화면으로 돌려보낸다.
       isCalibrating: !setupComplete,
       setupComplete,
       completeSetup,
