@@ -3,6 +3,7 @@ const { parse } = require('url');
 const next = require('next');
 const { WebSocketServer } = require('ws');
 const { attachMobileLinkClient } = require('./src/shared/mobileLink/mobileSessionHub.js');
+const { attachOpeningClient, WS_PATH: OPENING_WS_PATH } = require('./src/shared/opening/openingHub.js');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0';
@@ -25,6 +26,25 @@ app.prepare().then(() => {
     if (pathname === '/ws/mobile') {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
+      });
+      return;
+    }
+    if (pathname === OPENING_WS_PATH) {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        ws.once('message', (raw) => {
+          let msg;
+          try {
+            msg = JSON.parse(String(raw));
+          } catch {
+            ws.close();
+            return;
+          }
+          if (msg.type !== 'join') {
+            ws.close();
+            return;
+          }
+          attachOpeningClient(ws, { role: msg.role });
+        });
       });
       return;
     }

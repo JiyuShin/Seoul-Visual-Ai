@@ -335,10 +335,12 @@
 
 .cardRow {
   position: absolute;
-  top: 27px;
-  left: -588px;
-  width: 5251px;
-  height: 1449px;
+  top: 380.15px;
+  left: -140.99px;
+  width: 4370.4px;
+  height: 1206px;
+  transform: scale(0.952626, 0.959982);
+  transform-origin: top left;
 }
 
 .cardEdgeLeft,
@@ -472,23 +474,23 @@
 .sideCard {
   left: 0;
   top: 0;
-  width: 2210px;
-  height: 1449px;
+  width: 1839.379px;
+  height: 1206px;
 }
 
 .sideCardRight {
-  left: 3078px;
-  top: 16px;
-  width: 2210px;
-  height: 1433px;
+  left: 2561.81px;
+  top: 13.32px;
+  width: 1839.379px;
+  height: 1192.683px;
 }
 
 .frameCenter {
   position: absolute;
-  left: 1801px;
-  top: 217px;
-  width: 1650px;
-  height: 1015px;
+  left: 1498.965px;
+  top: 180.609px;
+  width: 1373.292px;
+  height: 844.783px;
   object-fit: cover;
   z-index: 3;
 }

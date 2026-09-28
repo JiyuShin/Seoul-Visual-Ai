@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useEntryFlow } from '../shared/EntryFlowContext';
 import OpeningAgent from './OpeningAgent';
 import styles from './Opening.module.css';
 
@@ -112,7 +111,7 @@ function holdFor(frame) {
   if (frame === 4) return 2400;
   if (frame === 5) return 1800;
   if (frame === 16) return 2200;
-  if (frame === 11 || frame === 12) return 1100;
+  if (frame === 11 || frame === 12) return 1800;
   if (frame === 18) return 1700;
   if (frame === 19) return 1500;
   if ([7, 8, 9, 10, 13, 14, 15, 17].includes(frame)) return 6800;
@@ -125,14 +124,9 @@ function agentSpeaking(frame) {
 
 export default function Opening() {
   const router = useRouter();
-  const { isReady, isCalibrating } = useEntryFlow();
   const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [frame, setFrame] = useState(1);
-
-  useEffect(() => {
-    if (isReady && isCalibrating) router.replace('/app');
-  }, [isReady, isCalibrating, router]);
 
   useEffect(() => {
     const fit = () => {

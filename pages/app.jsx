@@ -59,7 +59,7 @@ export default function CalibrationPage() {
 
   useEffect(() => {
     if (setupComplete) {
-      router.push('/op');
+      router.push('/still');
     }
   }, [setupComplete, router]);
 
