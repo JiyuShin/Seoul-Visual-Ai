@@ -330,7 +330,29 @@
 
 .cardSceneOn {
   opacity: 1;
-  transition: opacity 1.4s ease;
+  transition: none;
+}
+
+.cardSceneOn .sideCard {
+  animation: cardDissolve 1.4s ease both;
+}
+
+.cardSceneOn .frameCenter {
+  animation: cardDissolveCenter 1.4s ease 0.55s both;
+}
+
+.cardSceneOn .sideCardRight {
+  animation: cardDissolve 1.4s ease 1.1s both;
+}
+
+@keyframes cardDissolve {
+  from { opacity: 0; }
+  to { opacity: 0.9; }
+}
+
+@keyframes cardDissolveCenter {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .cardRow {
