@@ -23,6 +23,20 @@ function spokenHoldMs(text) {
   return Math.max(1600, chars * 240);
 }
 
+const OPEN_VOWELS = new Set([0, 2, 4, 6, 8, 12, 18, 20]);
+
+function syllableAmp(ch) {
+  if (/\s/.test(ch)) return 0;
+  if (/[.?!。？！,，、…~]/.test(ch)) return 0;
+  if (/[가-힣]/.test(ch)) {
+    const code = ch.charCodeAt(0) - 0xac00;
+    const jung = Math.floor((code % 588) / 28);
+    const open = OPEN_VOWELS.has(jung) ? 1 : 0.68;
+    return open * (0.78 + ((code * 13) % 17) / 70);
+  }
+  return 0.42;
+}
+
 function prepareSpoken(text) {
   const spoken = text.trim();
   // macOS 유나는 발화 맨 앞의 '안녕하세요'를 '넨넨하세요'로 읽는다.
@@ -37,25 +51,46 @@ export function useSpeechOutput() {
   const [voiceLive, setVoiceLive] = useState(false);
   const [voiceMark, setVoiceMark] = useState(0);
   const sessionRef = useRef(0);
+  const voiceLevelRef = useRef(0);
+  const voiceLiveRef = useRef(false);
+  const levelLoopRef = useRef(0);
 
   useEffect(() => {
     setIsSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
 
     return () => {
       sessionRef.current += 1;
+      window.cancelAnimationFrame(levelLoopRef.current);
+      voiceLiveRef.current = false;
+      voiceLevelRef.current = 0;
       if (typeof window !== 'undefined') {
         window.speechSynthesis?.cancel();
       }
     };
   }, []);
 
+  const stopLevel = useCallback(() => {
+    window.cancelAnimationFrame(levelLoopRef.current);
+    voiceLiveRef.current = false;
+    const ease = () => {
+      voiceLevelRef.current *= 0.84;
+      if (voiceLevelRef.current < 0.012) {
+        voiceLevelRef.current = 0;
+        return;
+      }
+      levelLoopRef.current = window.requestAnimationFrame(ease);
+    };
+    levelLoopRef.current = window.requestAnimationFrame(ease);
+  }, []);
+
   const stopSpeaking = useCallback(() => {
     sessionRef.current += 1;
+    stopLevel();
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setVoiceLive(false);
-  }, []);
+  }, [stopLevel]);
 
   const speak = useCallback((text, onEnd, onAudioEnd) => {
     if (typeof window === 'undefined' || !window.speechSynthesis || !text?.trim()) {
@@ -75,6 +110,7 @@ export function useSpeechOutput() {
       finished = true;
       window.clearInterval(keepAlive);
       clearWords();
+      stopLevel();
       setIsSpeaking(false);
       setVoiceLive(false);
       onEnd?.();
@@ -96,20 +132,49 @@ export function useSpeechOutput() {
       setVoiceMark((mark) => mark + 1);
     };
 
+    const weights = Array.from(spoken, syllableAmp);
+    let anchorIndex = 0;
+    let anchorAt = 0;
+    const followVoice = (now) => {
+      if (finished || session !== sessionRef.current || !voiceLiveRef.current) return;
+      const since = now - anchorAt;
+      const pos = anchorIndex + since / 175;
+      const index = Math.max(0, Math.floor(pos));
+      const within = index < weights.length;
+      const unit = within ? pos - index : (since % 175) / 175;
+      const amp = within ? weights[index] : 0.62;
+      const hump = amp === 0 ? 0 : Math.sin(Math.PI * Math.min(1, Math.max(0, unit))) ** 0.72;
+      voiceLevelRef.current = amp * hump;
+      levelLoopRef.current = window.requestAnimationFrame(followVoice);
+    };
+    const armVoice = () => {
+      anchorAt = performance.now();
+      anchorIndex = 0;
+      voiceLiveRef.current = true;
+      window.cancelAnimationFrame(levelLoopRef.current);
+      levelLoopRef.current = window.requestAnimationFrame(followVoice);
+      setVoiceLive(true);
+    };
     utterance.onstart = () => {
       if (session !== sessionRef.current) return;
       startedAt = Date.now();
+      const elapsed = voiceLiveRef.current ? performance.now() - anchorAt : Infinity;
+      if (!voiceLiveRef.current || elapsed < 180) armVoice();
       setIsSpeaking(true);
-      setVoiceLive(true);
     };
     utterance.onboundary = (event) => {
       if (session !== sessionRef.current) return;
       if (event.name && event.name !== 'word') return;
+      if (typeof event.charIndex === 'number' && event.charIndex > anchorIndex) {
+        anchorIndex = event.charIndex;
+        anchorAt = performance.now();
+      }
       setVoiceMark((mark) => mark + 1);
     };
     utterance.onend = () => {
       if (session !== sessionRef.current) return;
       clearWords();
+      stopLevel();
       setVoiceLive(false);
       onAudioEnd?.();
       const elapsed = startedAt ? Date.now() - startedAt : minHold;
@@ -136,7 +201,7 @@ export function useSpeechOutput() {
         queued = true;
         synth.resume();
         synth.speak(utterance);
-        setVoiceLive(true);
+        armVoice();
         clearWords();
         let at = 90;
         spoken.split(/\s+/).filter(Boolean).forEach((word) => {
@@ -174,7 +239,7 @@ export function useSpeechOutput() {
     window.setTimeout(() => run(true), 700);
 
     return true;
-  }, []);
+  }, [stopLevel]);
 
   return {
     speak,
@@ -183,5 +248,7 @@ export function useSpeechOutput() {
     isSupported,
     voiceLive,
     voiceMark,
+    voiceLevelRef,
+    voiceLiveRef,
   };
 };

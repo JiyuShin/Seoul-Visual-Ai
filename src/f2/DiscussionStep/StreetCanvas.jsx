@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
+import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import StreetPanorama from './StreetPanorama';
 import styles from './StreetCanvas.module.css';
 
@@ -118,6 +119,16 @@ function distance(x1, y1, x2, y2) {
   return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
 }
 
+const INTRO_SWEEP_MS = 12000;
+const INTRO_SWEEP_AMP = 0.32;
+
+function introSweepOffset(t) {
+  const ease = (u) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, u)))) / 2;
+  if (t <= 0.32) return -ease(t / 0.32);
+  if (t <= 0.7) return -1 + 2 * ease((t - 0.32) / 0.38);
+  return 1 - ease((t - 0.7) / 0.3);
+}
+
 function lineText(line) {
   return typeof line === 'string' ? line : line?.text || '';
 }
@@ -222,9 +233,15 @@ function FoldReplies({ folded, children }) {
       node.style.height = `${here.height}px`;
       node.style.padding = start.padding;
       node.style.borderRadius = start.radius;
+      const keyword = node.querySelector('[data-reply-keyword]');
+      if (keyword?.textContent.trim()) {
+        keyword.style.display = 'block';
+        keyword.style.opacity = '0';
+      }
       return {
         node,
         text: node.querySelector('[data-reply-text]'),
+        keyword,
         next,
         radius: end.radius,
         padding: end.padding,
@@ -249,11 +266,16 @@ function FoldReplies({ folded, children }) {
       item.node.style.height = `${item.next.height}px`;
       item.node.style.padding = item.padding;
       item.node.style.borderRadius = item.radius;
-      item.node.style.fontSize = '0px';
+      if (!item.keyword?.textContent.trim()) item.node.style.fontSize = '0px';
       if (item.text) {
         item.text.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}, font-size ${FOLD_MS}ms ${FOLD_EASE}`;
         item.text.style.opacity = '0';
         item.text.style.fontSize = '0px';
+      }
+      if (item.keyword?.textContent.trim()) {
+        item.keyword.style.display = 'block';
+        item.keyword.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}`;
+        item.keyword.style.opacity = '1';
       }
     });
 
@@ -272,6 +294,11 @@ function FoldReplies({ folded, children }) {
           item.text.style.transition = 'none';
           item.text.style.opacity = '';
           item.text.style.fontSize = '';
+        }
+        if (item.keyword) {
+          item.keyword.style.transition = 'none';
+          item.keyword.style.opacity = '';
+          item.keyword.style.display = '';
         }
       });
       setSettled(true);
@@ -343,6 +370,8 @@ const StreetCanvas = forwardRef(function StreetCanvas({
     return () => cancelAnimationFrame(frame);
   }, [finaleFull]);
   const lookRef = useRef(null);
+  const introLockRef = useRef(true);
+  if (revealed) introLockRef.current = false;
   const holdLookRef = useRef(false);
   const pendingRef = useRef(null);
   const phaseRef = useRef(phase);
@@ -373,6 +402,9 @@ const StreetCanvas = forwardRef(function StreetCanvas({
         onDone?.();
       });
       return true;
+    },
+    releaseLook() {
+      holdLookRef.current = false;
     },
   }), []);
 
@@ -434,6 +466,10 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   }, [clearPending, hitMark]);
 
   const applyPoint = useCallback((x, y, source = 'pointer') => {
+      if (introLockRef.current) {
+        if (phaseRef.current !== 'gaze') clearPending();
+        return { dwellProgress: 0, target: null };
+      }
       const norm = screenToNormalized(x, y);
       if (norm && !holdLookRef.current) lookRef.current = { nx: norm.x, ny: norm.y, source };
       if (!norm || phaseRef.current !== 'gaze' || (!repeatRef.current && plantedRef.current)) {
@@ -488,6 +524,8 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   useEffect(() => {
     const onMove = (event) => {
       if (event.pointerType === 'touch') return;
+      if (introLockRef.current) return;
+      if (phaseRef.current === 'gaze' && viewerRef.current === VIEWER_BY_CAM.A) return;
       window.__seoulPointerOwnsGaze = performance.now() + 4500;
       const viewerId = viewerRef.current;
       if (gazeRef.current && viewerId) {
@@ -498,6 +536,21 @@ const StreetCanvas = forwardRef(function StreetCanvas({
     window.addEventListener('pointermove', onMove, true);
     return () => window.removeEventListener('pointermove', onMove, true);
   }, [applyPoint, gazeRef]);
+
+  useEffect(() => {
+    if (!introLockRef.current) return undefined;
+    const started = performance.now();
+    let frame = 0;
+    const tick = (now) => {
+      if (!introLockRef.current) return;
+      const t = Math.min(1, (now - started) / INTRO_SWEEP_MS);
+      const offset = t >= 1 ? 0 : introSweepOffset(t);
+      lookRef.current = { nx: 0.5 + offset * INTRO_SWEEP_AMP, ny: 0.5, source: 'auto' };
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [revealed]);
 
   useEffect(() => {
     plantedRef.current = false;
@@ -635,7 +688,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
               ref={(el) => {
                 markRefs.current[mark.id] = el;
               }}
-              className={`${styles.plantMark} ${mark.cam === 'B' ? styles.markB : styles.markA} ${quiet ? styles.markQuiet : ''} ${gather ? styles.markGather : ''}`}
+              className={`${styles.plantMark} ${mark.cam === 'B' ? styles.markB : styles.markA} ${quiet ? styles.markQuiet : ''} ${gather ? styles.markGather : ''} ${mark.tucked ? styles.markTuck : ''}`}
               style={{
                 left: `${(mark.nx ?? 0.5) * 100}%`,
                 top: `${(mark.ny ?? 0.5) * 100}%`,
@@ -669,6 +722,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
                           className={`${styles.reply} ${line.cam === 'B' ? styles.replyB : styles.replyA}`}
                         >
                           <span className={styles.replyText} data-reply-text="">{lineText(line)}</span>
+                          <span className={styles.replyKeyword} data-reply-keyword="">{line.keyword || ''}</span>
                         </p>
                       ))}
                     </FoldReplies>

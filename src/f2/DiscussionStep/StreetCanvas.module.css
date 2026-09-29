@@ -154,6 +154,40 @@
   opacity: 0;
 }
 
+.markTuck .bubble {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.markTuck.markA .speech,
+.markTuck.markB .speech {
+  left: 0;
+  right: auto;
+  top: calc(100% + 10px * var(--street-scale, 0.5));
+  width: max-content;
+  align-items: flex-start;
+  animation: none;
+  transform: none;
+  transition:
+    left 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    right 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.markTuck.markA .replies,
+.markTuck.markB .replies {
+  position: relative;
+  left: 0;
+  right: auto;
+  top: auto;
+  width: max-content;
+  align-self: flex-start;
+  justify-content: flex-start;
+}
+
 .badge {
   position: relative;
   display: block;
@@ -318,19 +352,29 @@
 }
 
 .reply.replyA {
-  background: linear-gradient(180deg, rgba(236, 244, 226, 0.78) 0%, rgba(147, 240, 75, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(255, 252, 145, 0.32) 0%, rgba(182, 255, 126, 0.4) 100%);
   box-shadow:
-    inset 0 calc(-40px * var(--street-scale, 0.5)) calc(48px * var(--street-scale, 0.5)) rgba(200, 255, 213, 0.45),
-    inset calc(30px * var(--street-scale, 0.5)) 0 calc(40px * var(--street-scale, 0.5)) rgba(209, 255, 173, 0.5),
-    inset 0 calc(6px * var(--street-scale, 0.5)) calc(6px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.45);
+    inset 0 calc(4px * var(--street-scale, 0.5)) calc(9px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.7),
+    inset 0 calc(-102.857px * var(--street-scale, 0.5)) calc(116.571px * var(--street-scale, 0.5)) rgba(200, 255, 213, 0.3),
+    inset calc(34.286px * var(--street-scale, 0.5)) 0 calc(68.571px * var(--street-scale, 0.5)) rgba(209, 255, 173, 0.44),
+    inset calc(1.714px * var(--street-scale, 0.5)) 0 calc(8.571px * var(--street-scale, 0.5)) rgba(147, 240, 75, 0.66),
+    inset 0 calc(6.857px * var(--street-scale, 0.5)) calc(6.857px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.25),
+    inset calc(-12px * var(--street-scale, 0.5)) calc(-17.143px * var(--street-scale, 0.5)) calc(29.709px * var(--street-scale, 0.5)) rgba(0, 0, 0, 0.1);
 }
 
 .reply.replyB {
-  background: linear-gradient(180deg, rgba(236, 220, 248, 0.72) 0%, rgba(124, 32, 204, 0.5) 100%);
+  background: linear-gradient(180deg, rgba(119, 255, 205, 0.4) 0%, rgba(150, 53, 235, 0.4) 100%);
   box-shadow:
-    inset 0 calc(-40px * var(--street-scale, 0.5)) calc(48px * var(--street-scale, 0.5)) rgba(246, 189, 252, 0.4),
-    inset calc(30px * var(--street-scale, 0.5)) 0 calc(40px * var(--street-scale, 0.5)) rgba(124, 32, 204, 0.35),
-    inset 0 calc(6px * var(--street-scale, 0.5)) calc(6px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.4);
+    inset 0 calc(4px * var(--street-scale, 0.5)) calc(9px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.7),
+    inset 0 calc(-124.192px * var(--street-scale, 0.5)) calc(140.751px * var(--street-scale, 0.5)) rgba(246, 189, 252, 0.3),
+    inset calc(41.397px * var(--street-scale, 0.5)) 0 calc(82.795px * var(--street-scale, 0.5)) rgba(124, 32, 204, 0.44),
+    inset calc(2.07px * var(--street-scale, 0.5)) 0 calc(10.349px * var(--street-scale, 0.5)) rgba(124, 32, 204, 0.8),
+    inset 0 calc(8.279px * var(--street-scale, 0.5)) calc(8.279px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.25),
+    inset calc(-14.489px * var(--street-scale, 0.5)) calc(-20.699px * var(--street-scale, 0.5)) calc(35.871px * var(--street-scale, 0.5)) rgba(0, 0, 0, 0.1);
+}
+
+.replyKeyword {
+  display: none;
 }
 
 .repliesFolded .reply {
@@ -363,6 +407,40 @@
 .repliesFolded .replyText {
   color: transparent;
   font-size: 0;
+}
+
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)) {
+  width: max-content;
+  max-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: calc(40px * var(--street-scale, 0.5));
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)) .replyText {
+  display: none;
+}
+
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)) .replyKeyword {
+  display: block;
+  color: #fff;
+  font-size: calc(40px * var(--street-scale, 0.5));
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)):hover .replyText,
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)):focus-visible .replyText {
+  display: block;
+}
+
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)):hover .replyKeyword,
+.repliesFolded .reply:has([data-reply-keyword]:not(:empty)):focus-visible .replyKeyword {
+  display: none;
 }
 
 .repliesFolded .reply:hover,

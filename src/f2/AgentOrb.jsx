@@ -14,6 +14,7 @@ const fragmentShader = `
   uniform float time;
   uniform float motion;
   uniform float spin;
+  uniform float vivid;
   varying vec2 vUv;
 
   float hash(vec2 p) {
@@ -58,7 +59,7 @@ const fragmentShader = `
 
     float t = time;
     float lively = 1.0 + max(motion - 1.0, 0.0) * 0.35;
-    float sway = 0.1 + motion * 0.03;
+    float sway = 0.1 + motion * 0.03 + vivid * 0.28;
     float cp = cos(spin);
     float spn = sin(spin);
     float z = sqrt(max(0.0, 1.0 - dot(p, p)));
@@ -106,13 +107,23 @@ const fragmentShader = `
 
     float sheen = pow(max(0.0, 1.0 - length((p - vec2(-0.18, 0.28)) * vec2(1.15, 1.35))), 2.4);
     col = mix(col, vec3(1.0), sheen * 0.16);
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(luma), col, 1.0 + vivid * 0.95);
     col = clamp(col, 0.0, 1.0);
 
     gl_FragColor = vec4(col, mask);
   }
 `;
 
-export default function AgentOrb({ agentSpeaking = false, userListening = false, userLevelRef, className }) {
+export default function AgentOrb({
+  agentSpeaking = false,
+  userListening = false,
+  userLevelRef,
+  voiceLevelRef,
+  voiceLiveRef,
+  lively = false,
+  className,
+}) {
   const canvasRef = useRef(null);
   const rootRef = useRef(null);
   const haloBlurRef = useRef(null);
@@ -121,9 +132,15 @@ export default function AgentOrb({ agentSpeaking = false, userListening = false,
   const agentSpeakingRef = useRef(agentSpeaking);
   const userListeningRef = useRef(userListening);
   const levelSourceRef = useRef(userLevelRef);
+  const voiceLevelSourceRef = useRef(voiceLevelRef);
+  const voiceLiveSourceRef = useRef(voiceLiveRef);
+  const livelyRef = useRef(lively);
   agentSpeakingRef.current = agentSpeaking;
   userListeningRef.current = userListening;
   levelSourceRef.current = userLevelRef;
+  voiceLevelSourceRef.current = voiceLevelRef;
+  voiceLiveSourceRef.current = voiceLiveRef;
+  livelyRef.current = lively;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -146,6 +163,7 @@ export default function AgentOrb({ agentSpeaking = false, userListening = false,
       time: { value: 0 },
       motion: { value: 1 },
       spin: { value: 0 },
+      vivid: { value: 0 },
     };
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
@@ -165,6 +183,8 @@ export default function AgentOrb({ agentSpeaking = false, userListening = false,
     let haloBlur = 8;
     let spin = 0;
     let drive = 0;
+    let vivid = 0;
+    let voiceSmooth = 0;
 
     const resize = () => {
       const size = canvas.clientWidth || 148;
@@ -183,12 +203,22 @@ export default function AgentOrb({ agentSpeaking = false, userListening = false,
       const listening = userListeningRef.current ? 1 : 0;
       const targetDrive = Math.min(1, listening * 0.55 + level * 0.7);
       drive += (targetDrive - drive) * (targetDrive > drive ? 0.18 : 0.08);
-      spin += dt * drive * 0.8;
+      const vividTarget = livelyRef.current ? 1 : 0;
+      vivid += (vividTarget - vivid) * 0.05;
+      uniforms.vivid.value = vivid;
+      spin += dt * (drive * 0.8 + vivid * 1.15);
       uniforms.spin.value = spin;
-      const motionTarget = 1 + level * 0.35;
+      const motionTarget = 1 + level * 0.35 + vivid * 1.15;
       uniforms.motion.value += (motionTarget - uniforms.motion.value) * 0.12;
-      uniforms.time.value += dt * 2.58 * (1 + level * 0.2);
-      if (rootRef.current) rootRef.current.style.transform = 'none';
+      uniforms.time.value += dt * 2.58 * (1 + level * 0.2) * (1 + vivid * 1.35);
+      const audible = Boolean(voiceLiveSourceRef.current?.current);
+      const voiceTarget = audible ? Math.min(1, voiceLevelSourceRef.current?.current || 0) : 0;
+      const voiceTau = voiceTarget > voiceSmooth ? 0.055 : 0.16;
+      voiceSmooth += (voiceTarget - voiceSmooth) * (1 - Math.exp(-dt / voiceTau));
+      if (rootRef.current) {
+        const scale = 1 + voiceSmooth * 0.16;
+        rootRef.current.style.transform = `scale(${scale.toFixed(4)})`;
+      }
       if (colorSpinRef.current) {
         const travel = Math.sin(spin) * 26;
         const sy = 0.74 + 0.26 * Math.cos(spin);
@@ -197,12 +227,12 @@ export default function AgentOrb({ agentSpeaking = false, userListening = false,
           `translate(122.938 ${(107.117 + travel).toFixed(2)}) scale(1 ${sy.toFixed(4)}) translate(-122.938 -107.117)`
         );
       }
-      if (agentSpeakingRef.current) {
-        haloPhase += dt / 3.6;
-        const cycle = haloPhase % 1;
-        const tri = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
-        const eased = tri * tri * (3 - 2 * tri);
-        haloBlur = 8 + eased * 19;
+      if (audible) {
+        const target = 8 + voiceSmooth * 20;
+        haloBlur += (target - haloBlur) * (1 - Math.exp(-dt / 0.07));
+        if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
+      } else if (agentSpeakingRef.current) {
+        haloBlur += (8 - haloBlur) * 0.08;
         if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
       } else if (drive > 0.04) {
         haloPhase += dt * (1.7 + level * 2.2);

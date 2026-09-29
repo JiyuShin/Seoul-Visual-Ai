@@ -17,6 +17,23 @@ function hasEnglishWord(text) {
   return words.some((word) => !/^[ABab]$/.test(word));
 }
 
+function chatPayload(model, messages, temperature) {
+  if (/^gpt-5(?!-chat)/.test(model)) {
+    return {
+      model,
+      messages,
+      max_completion_tokens: 800,
+      reasoning_effort: 'low',
+    };
+  }
+  return {
+    model,
+    messages,
+    temperature,
+    max_tokens: 180,
+  };
+}
+
 function fallbackLine({ beat, speakerLabel, districtName, history }) {
   const place = districtName || '이 거리';
   const lastUser = [...(history || [])].reverse().find((line) => line.role === 'user');
@@ -27,10 +44,23 @@ function fallbackLine({ beat, speakerLabel, districtName, history }) {
   if (beat === 'close') {
     return `${speakerLabel}님의 이야기는 여기까지입니다. 남겨 둔 자리와 답은 그 자리에 둡니다.`;
   }
+  if (beat === 'flow1-summary' || beat === 'reply-keyword') return '';
+  if (beat === 'flow1-echo') {
+    const heard = lastUser?.text ? opinionEcho(lastUser.text) : '';
+    return heard || '그 장면이 거리에 피어난다니, 너무 좋아요!';
+  }
   if (lastUser?.text) {
     return buildFollowUpQuestion(lastUser.text, place);
   }
   return '그 자리에 어떤 식물이 있으면 좋을지, 조금 더 구체적으로 들려주세요.';
+}
+
+function opinionEcho(text) {
+  const value = String(text || '').replace(/\s+/g, ' ').replace(/[.!?…]+$/g, '').trim();
+  if (!value) return '';
+  const chars = Array.from(value);
+  const short = chars.length > 18 ? `${chars.slice(0, 16).join('')}` : value;
+  return `${short}라니, 너무 좋아요!`;
 }
 
 export default async function handler(req, res) {
@@ -77,6 +107,11 @@ export default async function handler(req, res) {
         : '아직 다른 사람에게 한 호응은 없다.',
     ].join(' '),
     close: `${speakerLabel || '참가자'}의 대화 턴이 끝났다고 짧게 안내한다. 남겨 둔 자리는 그대로 둔다고 말한다. 새 질문은 하지 않는다.`,
+    'flow1-summary': 'A와 B가 실제로 단 의견만 읽고 각각 한 줄로 요약해 이 문장만 말한다. A님과 B님의 의견을 모아봤어요. A님은 (A가 실제로 말한 내용의 요약) B님은 (B가 실제로 말한 내용의 요약) 말하지 않은 식물, 행동, 감정은 만들지 않는다. 원문을 그대로 이어 붙이지 않는다. 각 끝은 그 사람이 한 말의 내용에 맞춘다. 색, 모양, 질감처럼 모습을 말했으면 서술로 끝낸다. 심거나 피우고 싶다고 말한 경우에만 싶다를 쓴다. 모습 예: A님은 보슬보슬한 연두 잎을 떠올리셨고 B님은 동그란 노란 꽃을 떠올리셨군요. 소원 예: A님은 무궁화 같은 꽃들을 유기적인 형태로 심고 싶고 B님은 개나리를 피우고 싶으시군요. 틀린 예: A님은 쾌적한 거리 싶고. 막대 문자, 따옴표, 설명, 줄바꿈은 넣지 않는다.',
+    'reply-keyword': Number(followUp) > 1
+      ? '사용자가 방금 단 답글에서 대표 단어 하나만 고른다. 방금 질문이 거리와 서울에 미치는 영향, 지나가는 사람의 생각, 앞으로의 성장 중 무엇을 물었는지 보고, 그 질문과 가장 관련된 단어 하나를 답글 안에서만 고른다. 형용사, 부사, 명사를 구분하고 질문의 핵심을 가장 잘 담은 하나를 고른다. 색이나 질감 단어는 그 질문이 모습을 물은 것이 아니면 고르지 않는다. 답글에 없는 단어는 만들지 않는다. 출력은 그 단어 하나뿐이다.'
+      : '사용자가 방금 단 답글에서 대표 단어 하나만 고른다. 질문은 식물의 색, 모양, 형태, 질감이다. 그중 답글에 실제로 나온 말에서 가장 핵심인 단어 하나만 고른다. 형용사, 부사, 명사를 구분하고 모습을 가장 잘 담은 하나를 고른다. 답글에 없는 단어는 만들지 않는다. 출력은 그 단어 하나뿐이다.',
+    'flow1-echo': '방금 사용자가 한 말에만 닿는 호응을 한두 문장으로 한다. 질문은 하지 않는다. 물음표와 까요는 쓰지 않는다. 말투는 "도시의 딱딱함에서 벗어나 일상 속의 공원처럼 보여진다니, 너무 좋아요!"와 "저도 방금 의견에 동의해요! 서울의 거리가 이렇게 상상만으로도 푸릇푸릇해질 수 있다니 너무 좋은걸요?"와 같다. 예문을 그대로 복사하지 말고, 방금 말의 장면으로 다시 쓴다. 사용자를 인용하지 않는다.',
   }[beat] || '한국어로 한 문장만 말한다.';
 
   try {
@@ -86,15 +121,16 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        temperature: beat === 'ask' ? 1 : 0.8,
-        max_tokens: 180,
-        messages: [
+      body: JSON.stringify(chatPayload(model, [
           {
             role: 'system',
-            content:
-              `너는 삭막한 서울 거리에 식물을 심어 보는 전시의 진행자다. 항상 한국어로, 따뜻하고 짧게, 사람 말하듯 말한다. ${KOREAN_SPEECH} 설명 목록은 쓰지 않는다. 의견을 들은 뒤에는 그 말을 인용하지 말고, 그 장면에만 맞는 호응을 한 뒤 질문 하나를 한다. 첫 추가 질문은 그 식물의 형태, 질감, 색감을 다채롭게 묻는다. 두 번째부터는 그 식물이 거리와 서울을 어떻게 바꾸는지만 묻는다. 사람의 활동, 대화, 머무름은 묻지 않는다. 호응은 매번 다르게 말하고, 같은 칭찬을 다음 사람에게 반복하지 않는다.`,
+            content: beat === 'flow1-summary'
+              ? `너는 전시 진행자다. 항상 한국어만 쓴다. ${KOREAN_SPEECH} A와 B가 실제로 단 의견만 요약한다. 말하지 않은 내용은 만들지 않는다. 문장 끝은 그 의견의 내용에 맞춘다. 모습을 말한 내용에 싶다를 붙이지 않는다. 요청한 문장만 출력한다.`
+              : beat === 'reply-keyword'
+                ? `너는 답글에서 대표 단어 하나만 고른다. 항상 한국어 단어 하나만 출력한다. 답글에 없는 말은 만들지 않는다. 형용사, 부사, 명사 중에서 그 질문에 가장 맞는 하나를 고른다.`
+              : beat === 'flow1-echo'
+                ? `너는 삭막한 서울 거리에 식물을 심어 보는 전시의 진행자다. 항상 한국어로, 따뜻하고 짧게, 사람 말하듯 말한다. ${KOREAN_SPEECH} 질문은 하지 않는다. 방금 의견의 장면을 부드럽게 되짚고, 좋다는 반응으로 끝낸다.`
+                : `너는 삭막한 서울 거리에 식물을 심어 보는 전시의 진행자다. 항상 한국어로, 따뜻하고 짧게, 사람 말하듯 말한다. ${KOREAN_SPEECH} 설명 목록은 쓰지 않는다. 의견을 들은 뒤에는 그 말을 인용하지 말고, 그 장면에만 맞는 호응을 한 뒤 질문 하나를 한다. 첫 추가 질문은 그 식물의 형태, 질감, 색감을 다채롭게 묻는다. 두 번째부터는 그 식물이 거리와 서울을 어떻게 바꾸는지만 묻는다. 사람의 활동, 대화, 머무름은 묻지 않는다. 호응은 매번 다르게 말하고, 같은 칭찬을 다음 사람에게 반복하지 않는다.`,
           },
           {
             role: 'user',
@@ -106,8 +142,7 @@ export default async function handler(req, res) {
               KOREAN_SPEECH,
             ].join('\n'),
           },
-        ],
-      }),
+        ], beat === 'ask' ? 1 : beat === 'flow1-echo' ? 0.9 : beat === 'flow1-summary' ? 0.3 : 0.8)),
     });
 
     if (response.ok) {
@@ -120,11 +155,7 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model,
-            temperature: 0.4,
-            max_tokens: 180,
-            messages: [
+          body: JSON.stringify(chatPayload(model, [
               {
                 role: 'system',
                 content: `너는 전시 진행자다. 방금 문장에 알파벳 영어가 섞였다. 뜻은 유지하고 한국어로만 다시 쓴다. ${KOREAN_SPEECH}`,
@@ -133,8 +164,7 @@ export default async function handler(req, res) {
                 role: 'user',
                 content: line,
               },
-            ],
-          }),
+            ], 0.4)),
         });
         if (retry.ok) {
           const retried = await retry.json();

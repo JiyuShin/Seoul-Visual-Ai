@@ -1,5 +1,22 @@
 import { buildFollowUpQuestion } from '../../src/f2/buildFollowUpQuestion';
 
+function chatPayload(model, messages, temperature) {
+  if (/^gpt-5(?!-chat)/.test(model)) {
+    return {
+      model,
+      messages,
+      max_completion_tokens: 800,
+      reasoning_effort: 'low',
+    };
+  }
+  return {
+    model,
+    messages,
+    temperature,
+    max_tokens: 180,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -30,11 +47,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model,
-          temperature: 0.9,
-          max_tokens: 180,
-          messages: [
+        body: JSON.stringify(chatPayload(model, [
             {
               role: 'system',
               content:
@@ -44,8 +57,7 @@ export default async function handler(req, res) {
               role: 'user',
               content: `주제: ${visionLabel || '푸른 서울'}\n사용자 의견: ${trimmedOpinion}`,
             },
-          ],
-        }),
+          ], 0.9)),
       });
 
       if (response.ok) {
