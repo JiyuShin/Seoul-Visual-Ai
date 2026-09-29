@@ -119,7 +119,7 @@ function holdFor(frame) {
 }
 
 function agentSpeaking(frame) {
-  return [7, 8, 9, 10, 13, 14, 15, 17].includes(frame);
+  return [1, 2, 7, 8, 9, 10, 13, 14, 15, 17].includes(frame);
 }
 
 export default function Opening() {
@@ -155,7 +155,7 @@ export default function Opening() {
   return (
     <div className={styles.viewport} ref={viewportRef}>
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
-        <div className={styles.stage} style={{ transform: `scale(${scale})` }}>
+        <div role="application" aria-label="Opening" className={styles.stage} style={{ transform: `scale(${scale})` }}>
           <div className={styles.cityBase}>
             <img src="/op/city-sharp.png" alt="" style={{ opacity: plainOpacity(frame) }} />
           </div>
@@ -173,8 +173,10 @@ export default function Opening() {
               <img className={styles.plantRight} src="/op/plant-right.png" alt="" />
               <img className={styles.plantFlip} src="/op/plant-flip.png" alt="" />
             </div>
-            <p className={styles.wordmark} style={{ opacity: frame === 1 ? 1 : 0 }}>ONSI</p>
-            <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }}>A City Cultivated by Sight</p>
+          </div>
+          <div className={styles.titleCopy}>
+            <p className={styles.wordmark} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">ONSI</p>
+            <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">A City Cultivated by Sight</p>
           </div>
           <div className={styles.agentMove} style={agentStyle(frame)}>
             <div className={`${styles.agentFloat} ${agentSpeaking(frame) ? styles.agentSpeaking : ''}`}>
@@ -194,24 +196,24 @@ export default function Opening() {
               key={item.id}
               className={`${styles.pill} ${styles.pillTell} ${item.id === 7 ? styles.pillTight : ''} ${frame === item.id ? styles.copyOn : ''}`}
             >
-              <p className={styles.tellCopy}>{item.text}</p>
+              <p className={styles.tellCopy} aria-hidden="true">{item.text}</p>
             </div>
           ))}
           <div className={`${styles.pill} ${styles.pillAsk} ${frame === 14 ? styles.copyOn : ''}`}>
-            <p className={styles.askCopy}>이제 상상하는 서울을 직접 그려볼 시간이에요</p>
+            <p className={styles.askCopy} aria-hidden="true">이제 상상하는 서울을 직접 그려볼 시간이에요</p>
           </div>
           <div className={`${styles.pill} ${styles.pillAsk} ${frame === 15 ? styles.copyOn : ''}`}>
-            <p className={styles.askCopy}>
+            <p className={styles.askCopy} aria-hidden="true">
               먼저, 여러분이 생각하는 서울의 모습을 <b>이야기하며 서로의 생각을 나눠볼게요</b>
             </p>
           </div>
           <div className={`${styles.pill} ${styles.pillAsk} ${frame === 13 ? styles.copyOn : ''}`}>
-            <p className={styles.askCopy}>
+            <p className={styles.askCopy} aria-hidden="true">
               여러분이 <b>상상하는 서울</b>은 어떤 모습인가요?
             </p>
           </div>
           <div className={`${styles.pill} ${styles.pillAsk} ${frame === 17 ? styles.copyOn : ''}`}>
-            <p className={styles.askCopy}>
+            <p className={styles.askCopy} aria-hidden="true">
               그럼 시작해볼까요?
             </p>
           </div>

@@ -65,7 +65,7 @@ void main() {
   float farGlow = exp(-pow(outside / 0.18, 2.0));
   float glow = nearGlow * 0.7 + farGlow;
   glow *= 1.0 - smoothstep(0.84, 1.0, r);
-  float glowAmt = glow * (0.36 + 0.22 * mintWave);
+  float glowAmt = glow * (0.27 + 0.16 * mintWave);
   float alpha = max(mask, glowAmt);
   if (alpha < 0.004) discard;
 
@@ -111,7 +111,7 @@ void main() {
   glowCol = mix(glowCol, vec3(1.0, 0.96, 0.97), 0.42);
   float rim = exp(-pow((r - rad) / 0.035, 2.0));
   vec3 outCol = mix(glowCol, col, clamp(mask, 0.0, 1.0));
-  outCol += glowCol * rim * 0.4;
+  outCol += glowCol * rim * 0.3;
   gl_FragColor = vec4(clamp(outCol, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
 }
 `;
