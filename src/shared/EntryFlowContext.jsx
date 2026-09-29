@@ -16,6 +16,7 @@ import GazeDebugHud from './gaze/GazeDebugHud';
 import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
 
 const EntryFlowContext = createContext(null);
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 // 거리뷰 토론(/2)은 한 사람이 조작하는 단계라 1번 참가자의 시선만 쓴다.
 const PRIMARY_VIEWER_ID = VIEWER_BY_CAM.A;
@@ -46,7 +47,7 @@ export function EntryFlowProvider({ children }) {
   const [setupComplete, setSetupComplete] = useState(false);
 
   // 자식 페이지의 보정 화면 이동보다 먼저 복원해야, 1페이지가 보정을 다시 요구하지 않는다.
-  useLayoutEffect(() => {
+  useIsoLayoutEffect(() => {
     if (loadGazeSession()?.setupComplete) setSetupComplete(true);
   }, []);
   // DEV ONLY: 최종 파일에서 제거. 시선 보정 없이 마우스 좌표로 이후 인터랙션을 진행한다.
