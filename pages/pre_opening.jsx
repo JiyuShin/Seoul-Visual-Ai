@@ -4,18 +4,18 @@ import { useRouter } from 'next/router';
 import OpeningStill from '../src/op/OpeningStill';
 import useOpeningPhase from '../src/op/useOpeningPhase';
 
-export default function StillPage() {
+export default function PreOpeningPage() {
   const router = useRouter();
   const phase = useOpeningPhase();
 
   useEffect(() => {
-    if (phase === 'playing') router.replace('/op');
+    if (phase === 'playing') router.replace('/1');
   }, [phase, router]);
 
   return (
     <>
       <Head>
-        <title>Plant Your Seoul — Still</title>
+        <title>Plant Your Seoul — Pre-opening</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
         <link
