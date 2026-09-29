@@ -16,6 +16,7 @@
 }
 
 .stage {
+  --bubble-seq: 5.6s;
   position: absolute;
   left: 0;
   top: 0;
@@ -44,13 +45,21 @@
 .streetOn {
   opacity: 1;
   transition:
-    filter 3.4s cubic-bezier(0.45, 0, 0.2, 1),
-    transform 3.4s cubic-bezier(0.45, 0, 0.2, 1);
+    filter 3.4s cubic-bezier(0.22, 0, 0.36, 1),
+    transform 3.4s cubic-bezier(0.22, 0, 0.36, 1);
 }
 
 .streetSharp {
   filter: blur(0);
   transform: scale(1);
+}
+
+.streetHeld {
+  filter: blur(7.5px);
+  transform: scale(1.03);
+  transition:
+    filter 2.8s cubic-bezier(0.42, 0, 0.58, 1),
+    transform 2.8s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .bubble {
@@ -69,6 +78,46 @@
   white-space: nowrap;
   z-index: 2;
   pointer-events: none;
+}
+
+.bubbleEnter {
+  animation: bubbleIn 0.7s linear both;
+}
+
+.bubbleLeave {
+  animation: bubbleOut 0.55s linear forwards;
+}
+
+@keyframes bubbleOut {
+  0% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.16, 0.7, 0.3, 1);
+  }
+  100% { opacity: 0; }
+}
+
+@keyframes bubbleIn {
+  0% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.18, 1.4, 0.32, 1);
+  }
+  100% { opacity: 1; }
+}
+
+.bubbleLeaveSoft {
+  z-index: 4;
+  animation: bubbleOutSoft 2.6s cubic-bezier(0.42, 0, 0.58, 1) forwards;
+}
+
+@keyframes bubbleOutSoft {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
 }
 
 .bubbleTravel {
@@ -106,4 +155,265 @@
 
 .place {
   font-weight: 700;
+}
+
+.sproutCopy {
+  position: absolute;
+  left: 681px;
+  top: 230px;
+  z-index: 3;
+  width: 2518px;
+  opacity: 0;
+  transform: translateY(16px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.sproutSequence {
+  animation: headlineFill var(--bubble-seq) linear forwards;
+}
+
+@keyframes headlineFill {
+  0%, 80% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  80% {
+    animation-timing-function: cubic-bezier(0.16, 0.8, 0.32, 1);
+  }
+  89%, 100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sproutTitle,
+.sproutSub {
+  margin: 0;
+}
+
+.sproutTitle {
+  color: #efffe4;
+  font-size: 130px;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -2.6px;
+}
+
+.sproutTitle b {
+  font-weight: 700;
+}
+
+.sproutSub {
+  margin-top: 26px;
+  color: #fff;
+  font-size: 60px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -1.2px;
+}
+
+.plantSlot {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.slotLeft,
+.slotRight {
+  width: 917px;
+  height: 917px;
+  transform-origin: center center;
+}
+
+.slotLeft {
+  left: 813px;
+  top: 635px;
+}
+
+.slotRight {
+  left: 2083px;
+  top: 635px;
+}
+
+.slotLeft.slotSequence {
+  animation:
+    slotLeftPop var(--bubble-seq) linear both,
+    slotFade 2.6s cubic-bezier(0.42, 0, 0.58, 1) both;
+}
+
+.slotRight.slotSequence {
+  animation:
+    slotRightPop var(--bubble-seq) linear both,
+    slotFade 2.6s cubic-bezier(0.42, 0, 0.58, 1) both;
+}
+
+@keyframes slotFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slotLeftPop {
+  0% {
+    transform: translate(-37px, 48px) scale(0.74);
+    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+  }
+  22% {
+    transform: translate(-37px, 48px) scale(0.795);
+    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+  }
+  32% {
+    transform: translate(-37px, 48px) scale(0.795);
+    animation-timing-function: cubic-bezier(0.45, 0.02, 0.55, 1);
+  }
+  78%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes slotRightPop {
+  0% {
+    transform: translate(55px, 48px) scale(0.74);
+    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+  }
+  22% {
+    transform: translate(55px, 48px) scale(0.795);
+    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+  }
+  32% {
+    transform: translate(55px, 48px) scale(0.795);
+    animation-timing-function: cubic-bezier(0.45, 0.02, 0.55, 1);
+  }
+  78%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.orb {
+  position: absolute;
+  inset: 0;
+}
+
+.orbClip {
+  position: absolute;
+  inset: 11%;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.orbRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 149%;
+  height: 149%;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.plant {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transform-origin: center center;
+}
+
+.nameText {
+  display: inline-block;
+  opacity: 0;
+  transform-origin: center center;
+}
+
+.slotSequence .plant,
+.slotSequence .nameText {
+  animation: contentPop var(--bubble-seq) linear both;
+}
+
+.slotSequence .namePill {
+  animation: pillPop var(--bubble-seq) linear both;
+}
+
+@keyframes contentPop {
+  0%, 80% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  80% {
+    animation-timing-function: cubic-bezier(0.18, 1.35, 0.32, 1);
+  }
+  89% {
+    opacity: 1;
+    transform: scale(1.06);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.5, 1);
+  }
+  95%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pillPop {
+  0%, 80% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.82);
+  }
+  80% {
+    animation-timing-function: cubic-bezier(0.18, 1.35, 0.32, 1);
+  }
+  89% {
+    opacity: 0.97;
+    transform: translateX(-50%) scale(1.05);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.5, 1);
+  }
+  95%, 100% {
+    opacity: 0.97;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+.namePill {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 48px);
+  margin: 0;
+  padding: 62px 80px;
+  border: 2px solid #fff;
+  border-radius: 84px;
+  color: #2b3a37;
+  font-size: 50px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-50%);
+  transform-origin: center center;
+}
+
+.nameLilac {
+  background:
+    radial-gradient(circle at 50% 50%, #bd8fe6 0%, #dec7f2 45%, #fff 90%);
+  box-shadow:
+    0 0 59px #dfc0ff,
+    inset 0 -11px 15px #fff,
+    inset 6px 6px 24px #a869df,
+    inset 7px 7px 19px rgba(255, 255, 255, 0.7);
+}
+
+.nameMint {
+  background:
+    radial-gradient(circle at 40% 45%, rgba(179, 242, 131, 0.95) 0%, rgba(217, 249, 193, 0.98) 50%, #fff 100%);
+  box-shadow:
+    0 0 12px #fff,
+    0 0 19px rgba(210, 255, 214, 0.5),
+    inset 14px 7px 5px rgba(255, 255, 255, 0.5),
+    inset 0 -12px 24px #fff,
+    inset 5px 5px 60px rgba(158, 255, 84, 0.8);
 }
