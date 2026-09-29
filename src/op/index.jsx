@@ -162,7 +162,7 @@ export default function Opening() {
           <div className={styles.cityBloom} style={{ opacity: bloomOpacity(frame) }}>
             <img src={frame >= 8 ? '/op/title-bg-blur.png' : '/op/title-bg.png'} alt="" />
           </div>
-          <div className={`${styles.titleBoard} ${frame >= 4 ? styles.titleBoardOut : ''}`}>
+          <div className={`${styles.titleBoard} ${frame >= 3 ? styles.titleBoardOut : ''}`}>
             <img className={styles.titleBg} src="/op/title-bg-blur.png" alt="" />
             <div className={`${styles.flowersLeft} ${frame >= 3 ? styles.flowersLeftOut : ''}`}>
               <img className={styles.plantSpin} src="/op/plant-spin.png" alt="" />

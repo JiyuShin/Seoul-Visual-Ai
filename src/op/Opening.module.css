@@ -48,14 +48,12 @@
 }
 
 .titleBoardOut {
-  animation: cityDissolve 6.6s linear forwards;
+  animation: cityDissolve 5.8s cubic-bezier(0.42, 0, 0.58, 1) forwards;
 }
 
 @keyframes cityDissolve {
-  0% { opacity: 1; }
-  18% { opacity: 0.12; }
-  50% { opacity: 0.1; }
-  100% { opacity: 0; }
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .titleBg {
@@ -77,12 +75,12 @@
 
 .flowersLeftOut {
   transform-origin: 22% 58%;
-  animation: flowerLeft 1.5s cubic-bezier(0.45, 0.02, 0.2, 1) both;
+  animation: flowerLeft 2.6s cubic-bezier(0.42, 0, 0.58, 1) both;
 }
 
 .flowersRightOut {
   transform-origin: 78% 52%;
-  animation: flowerRight 1.5s cubic-bezier(0.45, 0.02, 0.2, 1) both;
+  animation: flowerRight 2.6s cubic-bezier(0.42, 0, 0.58, 1) both;
 }
 
 @keyframes flowerLeft {
@@ -159,7 +157,7 @@
   letter-spacing: -106px;
   color: #fff;
   white-space: nowrap;
-  transition: opacity 0.7s ease;
+  transition: opacity 1.6s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .tagline {
@@ -173,7 +171,7 @@
   line-height: 1.3;
   color: #fff;
   white-space: nowrap;
-  transition: opacity 0.7s ease;
+  transition: opacity 1.6s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .cityBase,
@@ -194,12 +192,12 @@
 }
 
 .cityBase img {
-  transition: opacity 1.3s ease;
+  transition: opacity 2.8s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .cityBloom {
   opacity: 0;
-  transition: opacity 1.6s ease;
+  transition: opacity 3.2s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .floor {
@@ -240,7 +238,7 @@
   z-index: 3;
   transform-origin: top left;
   pointer-events: none;
-  transition: transform 1.45s cubic-bezier(0.45, 0.05, 0.2, 1);
+  transition: transform 2.4s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .agentFloat {
@@ -569,27 +567,15 @@
   z-index: 4;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%) translateY(-8px) scale(0.99);
+  transform: translate3d(-50%, 10px, 0);
   transition:
-    opacity 0.4s ease,
-    transform 0.46s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 1.7s cubic-bezier(0.42, 0, 0.58, 1),
+    transform 1.9s cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 .copyOn {
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
-  animation: pillIn 0.7s cubic-bezier(0.22, 0.7, 0.28, 1) both;
-}
-
-@keyframes pillIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(14px) scale(0.985);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
+  transform: translate3d(-50%, 0, 0);
 }
 
 .pillTight {
