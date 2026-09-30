@@ -1,3 +1,28 @@
+.miniQr {
+  position: absolute;
+  left: 50%;
+  top: 200px;
+  z-index: 5;
+  box-sizing: border-box;
+  width: 196px;
+  height: 196px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.22);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.miniQr img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: contain;
+}
+
 .veil {
   position: absolute;
   left: 0;

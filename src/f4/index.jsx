@@ -1,13 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
+import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
+import { bothSlotsHaveSent, bothSlotsConnected } from '../shared/mobileLink/slotPlants';
 import QuietStreet from './QuietStreet';
 import styles from './PageFour.module.css';
 
 const STAGE = { width: 3881, height: 2183 };
 const TRAVEL_MS = 7000;
-const DRAW_HOLD_MS = 5600;
 const PLACES = ['종로구', '마포구', '강남구'];
+
+/** 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다. */
+const KIOSK_PLANT_IMAGES = {
+  'jongno-a': '/4/plants/jongno-a.png',
+  'jongno-b': '/4/plants/jongno-b.png',
+  'jongno-c': '/4/plants/jongno-c.png',
+  'mapo-a': '/4/plants/mapo-a.png',
+  'mapo-b': '/4/plants/mapo-b.png',
+  'mapo-c': '/4/plants/mapo-c.png',
+  'gangnam-a': '/4/plants/gangnam-a.png',
+  'gangnam-b': '/4/plants/gangnam-b.png',
+  'gangnam-c': '/4/plants/gangnam-c.png',
+};
 
 const PLACEHOLDER_PLANTS = [
   { name: '몬스테라', image: '/4/plant-left.png', tone: 'lilac' },
@@ -26,12 +40,14 @@ function readStoredPlace() {
 export default function PageFour() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
+  const { startKioskSession, sessionId, role, slotPlants, slots } = useMobileLink();
   const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [step, setStep] = useState('travel');
   const [streetReady, setStreetReady] = useState(false);
   const [placeName, setPlaceName] = useState('');
   const travelStarted = useRef(false);
+  const kioskEnsured = useRef(false);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -57,16 +73,64 @@ export default function PageFour() {
   useEffect(() => {
     if (!streetReady || travelStarted.current) return undefined;
     travelStarted.current = true;
-    const timer = window.setTimeout(() => setStep('draw'), TRAVEL_MS);
+    if (bothSlotsHaveSent(slotPlants)) {
+      setStep('slots');
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setStep((current) => {
+        if (current === 'slots') return current;
+        if (!bothSlotsConnected(slots)) return 'travel';
+        return 'draw';
+      });
+    }, TRAVEL_MS);
     return () => window.clearTimeout(timer);
-  }, [streetReady]);
+  }, [streetReady, slotPlants, slots]);
 
   useEffect(() => {
-    if (step !== 'draw') return undefined;
-    // 모바일 전송 신호가 연결되면 이 타이머 대신 그 신호로 slots로 넘긴다.
-    const timer = window.setTimeout(() => setStep('slots'), DRAW_HOLD_MS);
-    return () => window.clearTimeout(timer);
-  }, [step]);
+    if (!streetReady || bothSlotsHaveSent(slotPlants)) return undefined;
+    if (!bothSlotsConnected(slots)) return undefined;
+    setStep((current) => (current === 'slots' ? current : 'draw'));
+    return undefined;
+  }, [streetReady, slots, slotPlants]);
+
+  useEffect(() => {
+    if (!placeName || kioskEnsured.current) return undefined;
+    if (sessionId && role === 'kiosk') {
+      kioskEnsured.current = true;
+      return undefined;
+    }
+    kioskEnsured.current = true;
+    startKioskSession({ name: placeName });
+    return undefined;
+  }, [placeName, sessionId, role, startKioskSession]);
+
+  const bothSent = bothSlotsHaveSent(slotPlants);
+
+  useEffect(() => {
+    if (!bothSent) return undefined;
+    setStep('slots');
+    return undefined;
+  }, [bothSent]);
+
+  const slotPlantsView = useMemo(
+    () =>
+      ['A', 'B'].map((slotKey, index) => {
+        const fallback = PLACEHOLDER_PLANTS[index];
+        const live = slotPlants[slotKey];
+        const plantImage = KIOSK_PLANT_IMAGES[live?.plantVariant] || live?.plantImage;
+        const drawingUrl = plantImage ? null : live?.drawingUrl;
+        return {
+          key: slotKey,
+          name: live?.plantName?.trim() || fallback.name,
+          image: plantImage || drawingUrl || fallback.image,
+          tone: fallback.tone,
+          isUserDrawing: Boolean(drawingUrl),
+          isPicked: Boolean(plantImage),
+        };
+      }),
+    [slotPlants]
+  );
 
   return (
     <div className={styles.viewport} ref={viewportRef}>
@@ -104,14 +168,20 @@ export default function PageFour() {
                 </p>
                 <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
               </div>
-              {PLACEHOLDER_PLANTS.map((plant, index) => (
+              {slotPlantsView.map((plant, index) => (
                 <div
-                  key={plant.name}
+                  key={plant.key}
                   className={`${styles.plantSlot} ${index === 0 ? styles.slotLeft : styles.slotRight} ${styles.slotSequence}`}
                 >
                   <div className={styles.orb}>
                     <div className={styles.orbClip}>
-                      <img className={styles.plant} src={plant.image} alt="" />
+                      <img
+                        className={`${styles.plant} ${plant.isUserDrawing ? styles.plantUserDrawing : ''} ${
+                          plant.isPicked ? styles.plantPicked : ''
+                        }`}
+                        src={plant.image}
+                        alt=""
+                      />
                     </div>
                     <img className={styles.orbRing} src="/4/orb-grown.svg" alt="" />
                   </div>

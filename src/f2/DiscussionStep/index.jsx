@@ -17,6 +17,7 @@ import {
   fetchReplyKeyword,
   fetchSummaryLine,
 } from '../flow1';
+import { DEV_PASS_GAZE_EVENT, DEV_VOICE_EVENT } from '../../shared/dev/devEvents';
 import styles from './DiscussionStep.module.css';
 
 const SPEAKERS = [
@@ -815,6 +816,47 @@ export default function DiscussionStep({
     setMarks((prev) => [...prev, mark]);
     setBeat(currentBeat === 'f1Gaze' ? 'f1Speak' : 'speak');
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (process.env.NODE_ENV === 'production') {
+      const devQuery = new URLSearchParams(window.location.search).get('dev');
+      if (devQuery !== '1' && devQuery !== 'true') return undefined;
+    }
+
+    const onDevVoice = (event) => {
+      const { text, viewer, submit } = event.detail ?? {};
+      const trimmed = typeof text === 'string' ? text.trim() : '';
+      const speakerCam = speakerRef.current.cam;
+      const forCurrentSpeaker = viewer === speakerCam;
+
+      if (forCurrentSpeaker) {
+        speechRef.current.setManualText(typeof text === 'string' ? text : '');
+      }
+
+      if (!submit || !trimmed) return;
+      if (!USER_BEATS.has(beatRef.current)) return;
+      if (!forCurrentSpeaker) return;
+
+      speechRef.current.stopListening();
+      window.clearTimeout(submitTimerRef.current);
+      window.clearTimeout(micLimitRef.current);
+      finishRef.current(trimmed, false);
+    };
+
+    const onDevPassGaze = () => {
+      const currentBeat = beatRef.current;
+      if (currentBeat !== 'gaze' && currentBeat !== 'f1Gaze') return;
+      handlePlant({ direction: 'dev', nx: 0.5, ny: 0.52 });
+    };
+
+    window.addEventListener(DEV_VOICE_EVENT, onDevVoice);
+    window.addEventListener(DEV_PASS_GAZE_EVENT, onDevPassGaze);
+    return () => {
+      window.removeEventListener(DEV_VOICE_EVENT, onDevVoice);
+      window.removeEventListener(DEV_PASS_GAZE_EVENT, onDevPassGaze);
+    };
+  }, [handlePlant]);
 
   const handleCanvasRect = useCallback((rect) => {
     if ((beatRef.current === 'gaze' || beatRef.current === 'f1Gaze') && rect) onGazeClipChange?.(rect);
