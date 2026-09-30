@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
+import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import QuietStreet from './QuietStreet';
 import styles from './PageFour.module.css';
 
 const STAGE = { width: 3881, height: 2183 };
 const TRAVEL_MS = 7000;
 const DRAW_HOLD_MS = 5600;
+const ASSET_SEQUENCE_MS = 5600;
+const ASSET_HOLD_MS = 1800;
 const PLACES = ['종로구', '마포구', '강남구'];
-
-const PLACEHOLDER_PLANTS = [
-  { name: '몬스테라', image: '/4/plant-left.png', tone: 'lilac' },
-  { name: '금목서향새싹', image: '/4/plant-right.png', tone: 'mint' },
+const PLANT_FRAMES = [
+  { slot: 'A', image: '/4/plant-left.png', tone: 'lilac' },
+  { slot: 'B', image: '/4/plant-right.png', tone: 'mint' },
 ];
 
 function readStoredPlace() {
@@ -26,6 +28,7 @@ function readStoredPlace() {
 export default function PageFour() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
+  const { plantNames } = useMobileLink();
   const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [step, setStep] = useState('travel');
@@ -68,6 +71,15 @@ export default function PageFour() {
     return () => window.clearTimeout(timer);
   }, [step]);
 
+  useEffect(() => {
+    if (step !== 'slots') return undefined;
+    const timer = window.setTimeout(() => {
+      const next = placeName ? `/5?district=${encodeURIComponent(placeName)}` : '/5';
+      router.push(next);
+    }, ASSET_SEQUENCE_MS + ASSET_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [step, router, placeName]);
+
   return (
     <div className={styles.viewport} ref={viewportRef}>
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
@@ -104,22 +116,27 @@ export default function PageFour() {
                 </p>
                 <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
               </div>
-              {PLACEHOLDER_PLANTS.map((plant, index) => (
-                <div
-                  key={plant.name}
-                  className={`${styles.plantSlot} ${index === 0 ? styles.slotLeft : styles.slotRight} ${styles.slotSequence}`}
-                >
-                  <div className={styles.orb}>
-                    <div className={styles.orbClip}>
-                      <img className={styles.plant} src={plant.image} alt="" />
+              {PLANT_FRAMES.map((frame) => {
+                const name = plantNames[frame.slot] || '';
+                return (
+                  <div
+                    key={frame.slot}
+                    className={`${styles.plantSlot} ${frame.slot === 'A' ? styles.slotLeft : styles.slotRight} ${styles.slotSequence}`}
+                  >
+                    <div className={styles.orb}>
+                      <div className={styles.orbClip}>
+                        <img className={styles.plant} src={frame.image} alt="" />
+                      </div>
+                      <img className={styles.orbRing} src="/4/orb-grown.svg" alt="" />
                     </div>
-                    <img className={styles.orbRing} src="/4/orb-grown.svg" alt="" />
+                    {name ? (
+                      <p className={`${styles.namePill} ${frame.tone === 'lilac' ? styles.nameLilac : styles.nameMint}`}>
+                        <span className={styles.nameText}>{name}</span>
+                      </p>
+                    ) : null}
                   </div>
-                  <p className={`${styles.namePill} ${plant.tone === 'lilac' ? styles.nameLilac : styles.nameMint}`}>
-                    <span className={styles.nameText}>{plant.name}</span>
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </>
           ) : null}
         </div>

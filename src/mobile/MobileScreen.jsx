@@ -21,7 +21,7 @@ import { resolveMobileDistrictCopy } from './mobileDistrictCopy';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
-  const { districtFromKiosk } = useMobileLink();
+  const { districtFromKiosk, sendState } = useMobileLink();
   const { selectedDistrict } = useEntryFlow();
   const districtName =
     districtFromKiosk?.name ?? selectedDistrict?.name ?? '용산구';
@@ -102,6 +102,12 @@ export default function MobileScreen() {
       setTag2Exit(false);
     }, TAG_TO_END_MS);
   }, [plantName]);
+
+  const sendPlantName = useCallback(() => {
+    const name = plantName.trim();
+    if (!name) return;
+    sendState({ name });
+  }, [plantName, sendState]);
 
   const { width, height } = MOBILE_LOADING_ARTBOARD;
 
@@ -203,7 +209,7 @@ export default function MobileScreen() {
               plantName={plantName}
               drawingUrl={plantDrawingUrl}
               enterFromTag
-              onSend={() => {}}
+              onSend={sendPlantName}
             />
           </div>
         )}

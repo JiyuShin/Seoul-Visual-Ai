@@ -28,7 +28,8 @@ function GlobalGazeCursor() {
     router.pathname !== '/app' &&
     router.pathname !== '/mobile' &&
     router.pathname !== '/1' &&
-    router.pathname !== '/pre_opening';
+    router.pathname !== '/pre_opening' &&
+    router.pathname !== '/5';
 
   // 토론 중에는 지금 차례인 사람의 커서만 따라다닌다. 심어 둔 자리는 따로 남는다.
   const keys = router.pathname === '/2'

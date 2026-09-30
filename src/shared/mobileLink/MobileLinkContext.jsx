@@ -31,6 +31,7 @@ export function MobileLinkProvider({ children }) {
   const [role, setRole] = useState(null);
   const [status, setStatus] = useState('idle');
   const [slots, setSlots] = useState({ A: false, B: false });
+  const [plantNames, setPlantNames] = useState({ A: '', B: '' });
   const [districtFromKiosk, setDistrictFromKiosk] = useState(null);
   const [lastError, setLastError] = useState(null);
   const [mobilePublicOrigin, setMobilePublicOrigin] = useState(() => getMobilePublicOriginSync());
@@ -105,8 +106,12 @@ export function MobileLinkProvider({ children }) {
           }
           return;
         }
-        if (msg.type === MSG.STATE && msg.payload?.district) {
-          setDistrictFromKiosk(msg.payload.district);
+        if (msg.type === MSG.STATE) {
+          if (msg.payload?.district) setDistrictFromKiosk(msg.payload.district);
+          const name = typeof msg.payload?.name === 'string' ? msg.payload.name.trim() : '';
+          if (name && (msg.slot === 'A' || msg.slot === 'B')) {
+            setPlantNames((prev) => ({ ...prev, [msg.slot]: name }));
+          }
           return;
         }
         if (msg.type === MSG.PEER_LEFT) {
@@ -191,6 +196,7 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
+      plantNames,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,
@@ -206,6 +212,7 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
+      plantNames,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,
