@@ -92,7 +92,7 @@ export default function PageFour() {
               <p className={styles.copy}>
                 이 공간에 어떤 식물이 자라면 좋을까요?
                 <br />
-                모바일 화면에 원하는 식물을 그려주세요.
+                모바일 화면에 원하는 식물을 그려주세요
               </p>
             </div>
           ) : null}

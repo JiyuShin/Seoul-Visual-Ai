@@ -3,7 +3,7 @@
   src: url('/fonts/WantedSansVariable.woff2') format('woff2');
   font-weight: 400 1000;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 .lensDefs {
@@ -263,6 +263,9 @@
   z-index: 3;
   transform-origin: top left;
   pointer-events: none;
+}
+
+.agentMoveOn {
   transition: transform 2.4s cubic-bezier(0.42, 0, 0.58, 1);
 }
 

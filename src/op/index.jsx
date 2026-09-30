@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import OpeningAgent from './OpeningAgent';
 import styles from './Opening.module.css';
@@ -125,10 +125,11 @@ function agentSpeaking(frame) {
 export default function Opening() {
   const router = useRouter();
   const viewportRef = useRef(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0);
+  const [poseReady, setPoseReady] = useState(false);
   const [frame, setFrame] = useState(1);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const fit = () => {
       const box = viewportRef.current;
       const width = box?.clientWidth || window.innerWidth;
@@ -140,6 +141,12 @@ export default function Opening() {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, []);
+
+  useEffect(() => {
+    if (!scale) return undefined;
+    const id = window.requestAnimationFrame(() => setPoseReady(true));
+    return () => window.cancelAnimationFrame(id);
+  }, [scale]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -154,6 +161,7 @@ export default function Opening() {
 
   return (
     <div className={styles.viewport} ref={viewportRef}>
+      {scale > 0 ? (
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
         <div role="application" aria-label="Opening" className={styles.stage} style={{ transform: `scale(${scale})` }}>
           <div className={styles.cityBase}>
@@ -178,7 +186,7 @@ export default function Opening() {
             <p className={styles.wordmark} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">ONSI</p>
             <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">A City Cultivated by Sight</p>
           </div>
-          <div className={styles.agentMove} style={agentStyle(frame)}>
+          <div className={`${styles.agentMove} ${poseReady ? styles.agentMoveOn : ''}`} style={agentStyle(frame)}>
             <div className={`${styles.agentFloat} ${agentSpeaking(frame) ? styles.agentSpeaking : ''}`}>
               <OpeningAgent speaking={agentSpeaking(frame)} />
             </div>
@@ -219,6 +227,7 @@ export default function Opening() {
           </div>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }
