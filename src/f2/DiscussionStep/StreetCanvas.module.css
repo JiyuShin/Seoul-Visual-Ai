@@ -5,6 +5,14 @@
   height: 100%;
 }
 
+.textFilterDefs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .canvas {
   position: absolute;
   inset: 0;
@@ -216,18 +224,6 @@
   height: 94%;
 }
 
-.badgeLetter {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: calc(56px * var(--street-scale, 0.5));
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
 .speech {
   position: absolute;
   top: 50%;
@@ -352,14 +348,28 @@
 }
 
 .reply.replyA {
-  background: linear-gradient(180deg, rgba(255, 252, 145, 0.32) 0%, rgba(182, 255, 126, 0.4) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(26, 83, 37, 0.2) 0%,
+    rgba(79, 255, 63, 0.2) 53.3654%
+  );
   box-shadow:
-    inset 0 calc(4px * var(--street-scale, 0.5)) calc(9px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.7),
-    inset 0 calc(-102.857px * var(--street-scale, 0.5)) calc(116.571px * var(--street-scale, 0.5)) rgba(200, 255, 213, 0.3),
-    inset calc(34.286px * var(--street-scale, 0.5)) 0 calc(68.571px * var(--street-scale, 0.5)) rgba(209, 255, 173, 0.44),
-    inset calc(1.714px * var(--street-scale, 0.5)) 0 calc(8.571px * var(--street-scale, 0.5)) rgba(147, 240, 75, 0.66),
-    inset 0 calc(6.857px * var(--street-scale, 0.5)) calc(6.857px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.25),
-    inset calc(-12px * var(--street-scale, 0.5)) calc(-17.143px * var(--street-scale, 0.5)) calc(29.709px * var(--street-scale, 0.5)) rgba(0, 0, 0, 0.1);
+    inset calc(-12px * var(--street-scale, 0.5)) calc(-17.1429px * var(--street-scale, 0.5)) calc(29.7086px * var(--street-scale, 0.5)) rgba(0, 0, 0, 0.1),
+    inset 0 calc(6.85714px * var(--street-scale, 0.5)) calc(6.85714px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.25),
+    inset calc(9px * var(--street-scale, 0.5)) calc(6px * var(--street-scale, 0.5)) calc(8.57142px * var(--street-scale, 0.5)) rgba(210, 255, 176, 0.9),
+    inset calc(25px * var(--street-scale, 0.5)) 0 calc(18.3px * var(--street-scale, 0.5)) rgba(75, 92, 19, 0.41),
+    inset 0 calc(-102.857px * var(--street-scale, 0.5)) calc(116.571px * var(--street-scale, 0.5)) rgba(161, 255, 183, 0.6),
+    inset 0 calc(-17px * var(--street-scale, 0.5)) calc(25px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.19);
+}
+
+.reply.replyA .replyText,
+.reply.replyA .replyKeyword {
+  background: linear-gradient(180deg, #406649 -28.2571%, #51805c 127.6253%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 
 .reply.replyB {
@@ -383,7 +393,7 @@
   height: calc(157px * var(--street-scale, 0.5));
   max-height: calc(157px * var(--street-scale, 0.5));
   overflow: hidden;
-  padding: calc(24px * var(--street-scale, 0.5));
+  padding: calc(32px * var(--street-scale, 0.5)) calc(56px * var(--street-scale, 0.5));
   color: transparent;
   font-size: 0;
   line-height: 0;
@@ -404,6 +414,21 @@
     border-radius 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.repliesFolded .reply.replyA {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 83, 37, 0.2) 0%,
+    rgba(79, 255, 63, 0.2) 53.3654%
+  );
+  box-shadow:
+    inset calc(-12px * var(--street-scale, 0.5)) calc(-17.1429px * var(--street-scale, 0.5)) calc(29.7086px * var(--street-scale, 0.5)) rgba(0, 0, 0, 0.1),
+    inset 0 calc(6.85714px * var(--street-scale, 0.5)) calc(6.85714px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.25),
+    inset calc(9px * var(--street-scale, 0.5)) calc(6px * var(--street-scale, 0.5)) calc(8.57142px * var(--street-scale, 0.5)) rgba(210, 255, 176, 0.9),
+    inset calc(25px * var(--street-scale, 0.5)) 0 calc(18.3px * var(--street-scale, 0.5)) rgba(75, 92, 19, 0.41),
+    inset 0 calc(-102.857px * var(--street-scale, 0.5)) calc(116.571px * var(--street-scale, 0.5)) rgba(161, 255, 183, 0.6),
+    inset 0 calc(-17px * var(--street-scale, 0.5)) calc(25px * var(--street-scale, 0.5)) rgba(255, 255, 255, 0.19);
+}
+
 .repliesFolded .replyText {
   color: transparent;
   font-size: 0;
@@ -415,6 +440,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: calc(32px * var(--street-scale, 0.5)) calc(56px * var(--street-scale, 0.5));
   color: #fff;
   font-size: calc(40px * var(--street-scale, 0.5));
   line-height: 1.2;
@@ -431,6 +457,17 @@
   font-size: calc(40px * var(--street-scale, 0.5));
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.repliesFolded .reply.replyB:has([data-reply-keyword]:not(:empty)),
+.repliesFolded .reply.replyB:has([data-reply-keyword]:not(:empty)) .replyKeyword {
+  color: #280531;
+}
+
+.repliesFolded .reply.replyA:has([data-reply-keyword]:not(:empty)),
+.repliesFolded .reply.replyA:has([data-reply-keyword]:not(:empty)) .replyKeyword {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .repliesFolded .reply:has([data-reply-keyword]:not(:empty)):hover .replyText,
@@ -463,6 +500,15 @@
   font-size: calc(40px * var(--street-scale, 0.5));
   line-height: 1.4;
   text-shadow: 0 1px 2px rgba(40, 50, 40, 0.28);
+}
+
+.repliesFolded .reply.replyA:hover,
+.repliesFolded .reply.replyA:focus-visible,
+.repliesFolded .reply.replyA:hover .replyText,
+.repliesFolded .reply.replyA:focus-visible .replyText {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 
 @keyframes tagIn {
