@@ -183,7 +183,7 @@ export default function FailScreen() {
       : '모바일 인식이 모두 완료되었어요';
   const subtitle = recognizedCount === 2
     ? '이제 모바일 웹에 접속하여 상상하신 대로 자유롭게 나만의 식물을 그려주세요'
-    : '화면 속 QR을 인식하시고 모바일 웹으로 접속해주세요';
+    : '화면 속 QR을 인식하고 모바일 웹으로 접속해주세요';
 
   return (
     <div className={arc.viewport}>
