@@ -48,14 +48,16 @@ function compile(gl, type, source) {
   return shader;
 }
 
-export default function QuietStreet({ name, still = false, onReady }) {
+export default function QuietStreet({ name, still = false, hold = false, onReady }) {
   const canvasRef = useRef(null);
   const onReadyRef = useRef(onReady);
   const stillRef = useRef(still);
+  const holdRef = useRef(hold);
   const [shown, setShown] = useState(false);
   const [sharp, setSharp] = useState(false);
   onReadyRef.current = onReady;
   stillRef.current = still;
+  holdRef.current = hold;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -106,15 +108,21 @@ export default function QuietStreet({ name, still = false, onReady }) {
     let swayStart = 0;
     let sharpenTimer = 0;
 
+    let heldSway = 0;
+
     const draw = (now) => {
       frame = 0;
       if (dead || !ready) return;
       let sway = 0;
-      if (stillRef.current) {
+      if (holdRef.current) {
+        sway = heldSway;
+      } else if (stillRef.current) {
         swayStart = 0;
+        heldSway = 0;
       } else {
         if (!swayStart) swayStart = now;
         sway = Math.sin(((now - swayStart) / SWAY_MS) * Math.PI * 2) * YAW_SWAY;
+        heldSway = sway;
       }
       const ratio = Math.min(window.devicePixelRatio || 1, 4096 / Math.max(canvas.clientWidth, 1), 2);
       const w = Math.max(1, Math.round(canvas.clientWidth * ratio));
@@ -170,7 +178,7 @@ export default function QuietStreet({ name, still = false, onReady }) {
   return (
     <canvas
       ref={canvasRef}
-      className={`${styles.street} ${shown ? styles.streetOn : ''} ${sharp ? styles.streetSharp : ''}`}
+      className={`${styles.street} ${shown ? styles.streetOn : ''} ${hold ? styles.streetHeld : sharp ? styles.streetSharp : ''}`}
       aria-hidden="true"
     />
   );

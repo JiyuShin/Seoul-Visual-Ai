@@ -133,6 +133,137 @@ function lineText(line) {
   return typeof line === 'string' ? line : line?.text || '';
 }
 
+function NabiBadge({ uid }) {
+  const ring = `${uid}-ring`;
+  const core = `${uid}-core`;
+  const gloss = `${uid}-gloss`;
+  const pattern = `${uid}-pattern`;
+  const image = `${uid}-image`;
+  return (
+    <svg className={styles.badgeRing} viewBox="0 0 147 147" fill="none" aria-hidden="true">
+      <circle cx="73.14" cy="73.14" r="73.14" fill={`url(#${ring})`} fillOpacity="0.5" />
+      <circle cx="73.5" cy="73.5" r="58.5" fill={`url(#${core})`} fillOpacity="0.66" />
+      <rect width="117.199" height="117.199" rx="58.5993" transform="matrix(-0.994604 -0.103744 -0.103744 0.994604 138.73 23.5918)" fill={`url(#${pattern})`} />
+      <circle cx="73" cy="73" r="73" transform="matrix(-1 0 0 1 146 0)" fill={`url(#${gloss})`} fillOpacity="0.2" />
+      <defs>
+        <pattern id={pattern} patternContentUnits="objectBoundingBox" width="1" height="1">
+          <use href={`#${image}`} xlinkHref={`#${image}`} transform="translate(-0.0404461) scale(0.000527779)" />
+        </pattern>
+        <linearGradient id={ring} x1="23.5" y1="7" x2="113" y2="136" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#AAE1AF" />
+          <stop offset="0.403846" stopColor="#32D60E" />
+          <stop offset="1" stopColor="#1A7007" />
+        </linearGradient>
+        <radialGradient id={core} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(73.5 73.5) rotate(89.5304) scale(61.0021)">
+          <stop offset="0.493562" stopColor="#7AEA6D" />
+          <stop offset="1" stopColor="white" />
+        </radialGradient>
+        <linearGradient id={gloss} x1="73" y1="0" x2="73" y2="146" gradientUnits="userSpaceOnUse">
+          <stop stopColor="white" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#E5C7FA" stopOpacity="0.5" />
+        </linearGradient>
+        <image id={image} href="/2/bang.png" xlinkHref="/2/bang.png" width="2048" height="2048" preserveAspectRatio="none" />
+      </defs>
+    </svg>
+  );
+}
+
+function SoraBadge({ uid }) {
+  const ring = `${uid}-ring`;
+  const edge = `${uid}-edge`;
+  const core = `${uid}-core`;
+  const gloss = `${uid}-gloss`;
+  const pattern = `${uid}-pattern`;
+  const image = `${uid}-image`;
+  return (
+    <svg className={styles.badgeRing} viewBox="0 0 157 157" fill="none" aria-hidden="true">
+      <circle cx="73.14" cy="73.14" r="72.89" transform="matrix(-1 0 0 1 151.297 0.00195312)" fill={`url(#${ring})`} fillOpacity="0.8" stroke={`url(#${edge})`} strokeWidth="0.5" />
+      <circle cx="58.5" cy="58.5" r="58.5" transform="matrix(-1 0 0 1 135.998 15)" fill={`url(#${core})`} fillOpacity="0.8" />
+      <rect opacity="0.9" width="118.729" height="118.729" transform="matrix(-0.402246 -0.915532 -0.915532 0.402246 156.457 108.701)" fill={`url(#${pattern})`} />
+      <circle cx="73" cy="73" r="73" transform="matrix(-1 0 0 1 150.996 0)" fill={`url(#${gloss})`} fillOpacity="0.2" />
+      <defs>
+        <pattern id={pattern} patternContentUnits="objectBoundingBox" width="1" height="1">
+          <use href={`#${image}`} xlinkHref={`#${image}`} transform="scale(0.000488281)" />
+        </pattern>
+        <radialGradient id={ring} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(106.295 31.5019) rotate(106.112) scale(119.471 221.851)">
+          <stop stopColor="#BCADCC" />
+          <stop offset="0.807692" stopColor="#BD51FF" />
+        </radialGradient>
+        <linearGradient id={edge} x1="131.824" y1="12.4062" x2="9.82423" y2="125.906" gradientUnits="userSpaceOnUse">
+          <stop stopColor="white" />
+          <stop offset="1" stopColor="#D8C9C9" />
+        </linearGradient>
+        <radialGradient id={core} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(58.5 58.5) rotate(90) scale(58.5)">
+          <stop offset="0.533654" stopColor="#BC74E8" />
+          <stop offset="1" stopColor="#E5C7FA" />
+        </radialGradient>
+        <linearGradient id={gloss} x1="73" y1="0" x2="73" y2="146" gradientUnits="userSpaceOnUse">
+          <stop stopColor="white" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#E5C7FA" stopOpacity="0.5" />
+        </linearGradient>
+        <image id={image} href="/2/fang.png" xlinkHref="/2/fang.png" width="2048" height="2048" preserveAspectRatio="none" />
+      </defs>
+    </svg>
+  );
+}
+
+function NabiFoldedTextFilter() {
+  return (
+    <svg className={styles.textFilterDefs} width="0" height="0" aria-hidden="true">
+      <defs>
+        <filter
+          id="nabi-folded-text-filter"
+          x="-12"
+          y="-102.857"
+          width="1339.3"
+          height="246.714"
+          filterUnits="userSpaceOnUse"
+          colorInterpolationFilters="sRGB"
+        >
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
+          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dx="-12" dy="-17.1429" />
+          <feGaussianBlur stdDeviation="14.8543" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
+          <feBlend mode="normal" in2="shape" result="effect1_innerShadow_nabi_text" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dy="6.85714" />
+          <feGaussianBlur stdDeviation="3.42857" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.25 0" />
+          <feBlend mode="normal" in2="effect1_innerShadow_nabi_text" result="effect2_innerShadow_nabi_text" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dx="9" dy="6" />
+          <feGaussianBlur stdDeviation="4.28571" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0.825018 0 0 0 0 1 0 0 0 0 0.689547 0 0 0 0.9 0" />
+          <feBlend mode="normal" in2="effect2_innerShadow_nabi_text" result="effect3_innerShadow_nabi_text" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dx="25" />
+          <feGaussianBlur stdDeviation="9.15" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0.292619 0 0 0 0 0.359206 0 0 0 0 0.0738339 0 0 0 0.41 0" />
+          <feBlend mode="normal" in2="effect3_innerShadow_nabi_text" result="effect4_innerShadow_nabi_text" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dy="-102.857" />
+          <feGaussianBlur stdDeviation="58.2857" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0.630559 0 0 0 0 1 0 0 0 0 0.717881 0 0 0 0.6 0" />
+          <feBlend mode="normal" in2="effect4_innerShadow_nabi_text" result="effect5_innerShadow_nabi_text" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dy="-17" />
+          <feGaussianBlur stdDeviation="12.5" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.19 0" />
+          <feBlend mode="normal" in2="effect5_innerShadow_nabi_text" result="effect6_innerShadow_nabi_text" />
+        </filter>
+      </defs>
+    </svg>
+  );
+}
+
 export const FOLD_MS = 1500;
 const FOLD_EASE = 'cubic-bezier(0.4, 0, 0.15, 1)';
 
@@ -156,6 +287,44 @@ function clearFoldStyles(node) {
   ].forEach((key) => {
     node.style[key] = '';
   });
+}
+
+function clearLabelStyles(node) {
+  if (!node) return;
+  [
+    'position',
+    'left',
+    'right',
+    'top',
+    'bottom',
+    'display',
+    'alignItems',
+    'justifyContent',
+    'overflow',
+    'whiteSpace',
+    'margin',
+    'opacity',
+    'transition',
+    'fontSize',
+    'lineHeight',
+    'transform',
+    'color',
+  ].forEach((key) => {
+    node.style[key] = '';
+  });
+}
+
+function stackLabel(node) {
+  node.style.position = 'absolute';
+  node.style.left = '0';
+  node.style.right = '0';
+  node.style.top = '0';
+  node.style.bottom = '0';
+  node.style.display = 'flex';
+  node.style.alignItems = 'center';
+  node.style.justifyContent = 'center';
+  node.style.overflow = 'hidden';
+  node.style.margin = '0';
 }
 
 function FoldReplies({ folded, children }) {
@@ -197,10 +366,12 @@ function FoldReplies({ folded, children }) {
     stack.classList.add(styles.repliesFolded);
     const to = nodes.map((node) => {
       const computed = getComputedStyle(node);
+      const keyword = node.querySelector('[data-reply-keyword]');
       return {
         box: node.getBoundingClientRect(),
         radius: computed.borderRadius,
         padding: computed.padding,
+        fontSize: keyword ? getComputedStyle(keyword).fontSize : computed.fontSize,
       };
     });
     stack.classList.remove(styles.repliesFolded);
@@ -233,14 +404,25 @@ function FoldReplies({ folded, children }) {
       node.style.height = `${here.height}px`;
       node.style.padding = start.padding;
       node.style.borderRadius = start.radius;
+      node.style.overflow = 'hidden';
       const keyword = node.querySelector('[data-reply-keyword]');
+      const text = node.querySelector('[data-reply-text]');
+      if (text) {
+        stackLabel(text);
+        text.style.whiteSpace = 'normal';
+        text.style.opacity = '1';
+      }
       if (keyword?.textContent.trim()) {
-        keyword.style.display = 'block';
+        stackLabel(keyword);
+        keyword.style.whiteSpace = 'nowrap';
+        keyword.style.color = '#fff';
+        keyword.style.fontSize = end.fontSize;
+        keyword.style.lineHeight = '1.2';
         keyword.style.opacity = '0';
       }
       return {
         node,
-        text: node.querySelector('[data-reply-text]'),
+        text,
         keyword,
         next,
         radius: end.radius,
@@ -256,7 +438,6 @@ function FoldReplies({ folded, children }) {
       'height',
       'padding',
       'border-radius',
-      'font-size',
     ].map((prop) => `${prop} ${FOLD_MS}ms ${FOLD_EASE}`).join(', ');
     motions.forEach((item) => {
       item.node.style.transition = glide;
@@ -266,14 +447,11 @@ function FoldReplies({ folded, children }) {
       item.node.style.height = `${item.next.height}px`;
       item.node.style.padding = item.padding;
       item.node.style.borderRadius = item.radius;
-      if (!item.keyword?.textContent.trim()) item.node.style.fontSize = '0px';
       if (item.text) {
-        item.text.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}, font-size ${FOLD_MS}ms ${FOLD_EASE}`;
+        item.text.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}`;
         item.text.style.opacity = '0';
-        item.text.style.fontSize = '0px';
       }
       if (item.keyword?.textContent.trim()) {
-        item.keyword.style.display = 'block';
         item.keyword.style.transition = `opacity ${FOLD_MS}ms ${FOLD_EASE}`;
         item.keyword.style.opacity = '1';
       }
@@ -290,16 +468,8 @@ function FoldReplies({ folded, children }) {
       motions.forEach((item) => {
         item.node.style.transition = 'none';
         clearFoldStyles(item.node);
-        if (item.text) {
-          item.text.style.transition = 'none';
-          item.text.style.opacity = '';
-          item.text.style.fontSize = '';
-        }
-        if (item.keyword) {
-          item.keyword.style.transition = 'none';
-          item.keyword.style.opacity = '';
-          item.keyword.style.display = '';
-        }
+        clearLabelStyles(item.text);
+        clearLabelStyles(item.keyword);
       });
       setSettled(true);
     }, FOLD_MS + 40);
@@ -307,10 +477,7 @@ function FoldReplies({ folded, children }) {
     const unlockTimer = window.setTimeout(() => {
       motions.forEach((item) => {
         item.node.style.transition = '';
-        if (item.text) {
-          item.text.style.transition = '';
-          item.text.style.fontSize = '';
-        }
+        clearLabelStyles(item.text);
       });
     }, FOLD_MS + 140);
 
@@ -612,6 +779,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
 
   return (
     <div className={styles.canvasWrapper}>
+      <NabiFoldedTextFilter />
       <div className={styles.canvas} ref={canvasRef}>
         <div className={styles.imageFrame}>
           <div className={`${styles.streetBlur} ${revealed ? styles.streetSharp : ''}`}>
@@ -696,17 +864,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
               }}
             >
               <span className={styles.badge}>
-                <img
-                  className={styles.badgeRing}
-                  src={mark.cam === 'B' ? '/2/tag-b-ring.svg' : '/2/tag-a-ring.svg'}
-                  alt=""
-                />
-                <img
-                  className={styles.badgeFace}
-                  src={mark.cam === 'B' ? '/2/tag-b-face.svg' : '/2/tag-a-face.svg'}
-                  alt=""
-                />
-                <span className={styles.badgeLetter}>{mark.cam}</span>
+                {mark.cam === 'B' ? <SoraBadge uid={`sora-${mark.id}`} /> : <NabiBadge uid={`nabi-${mark.id}`} />}
               </span>
               {mark.lines.length > 0 && (
                 <div className={styles.speech}>

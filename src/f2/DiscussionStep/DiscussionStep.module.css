@@ -377,14 +377,15 @@
 
 .turn {
   position: absolute;
-  left: 1791px;
+  left: 1941px;
   top: 101px;
-  width: 300px;
+  width: max-content;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 34px;
   opacity: 0;
+  transform: translateX(-50%);
   transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -434,6 +435,7 @@
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.02em;
+  white-space: nowrap;
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.38);
   transition: opacity 0.7s ease;
 }
@@ -486,8 +488,8 @@
   opacity: 0;
   transform: translate3d(-50%, 16px, 0);
   transition:
-    opacity 0.72s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.72s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 0.18s cubic-bezier(0.22, 0, 0.36, 1),
+    transform 0.18s cubic-bezier(0.22, 0, 0.36, 1);
 }
 
 .promptOn {
@@ -540,7 +542,7 @@
   text-shadow: 0 1px 2px rgba(40, 60, 20, 0.35);
   opacity: 0;
   transform: translate3d(-50%, -50%, 0);
-  transition: opacity 0.7s cubic-bezier(0.45, 0, 0.2, 1);
+  transition: opacity 0.18s cubic-bezier(0.22, 0, 0.36, 1);
   animation: none;
 }
 

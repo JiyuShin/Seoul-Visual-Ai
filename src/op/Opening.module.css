@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Wanted Sans Variable';
+  src: url('/fonts/WantedSansVariable.woff2') format('woff2');
+  font-weight: 400 1000;
+  font-style: normal;
+  font-display: block;
+}
+
 .lensDefs {
   position: absolute;
   width: 0;
@@ -45,6 +53,17 @@
   transform: translate(-50%, -50%) scale(0.96);
   overflow: hidden;
   opacity: 1;
+}
+
+.titleCopy {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  width: 4074px;
+  height: 2274px;
+  transform: translate(-50%, -50%) scale(0.96);
+  pointer-events: none;
 }
 
 .titleBoardOut {
@@ -144,17 +163,19 @@
 
 .wordmark {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 895px;
   top: 356px;
+  width: 2032px;
+  height: 743px;
   margin: 0;
-  padding-right: 106px;
   box-sizing: border-box;
   text-align: center;
-  font-size: 965px;
-  font-weight: 800;
+  font-family: 'Wanted Sans Variable', sans-serif;
+  font-size: 965.172px;
+  font-weight: 700;
+  font-synthesis: none;
   line-height: 0.77;
-  letter-spacing: -106px;
+  letter-spacing: -106.169px;
   color: #fff;
   white-space: nowrap;
   transition: opacity 1.6s cubic-bezier(0.42, 0, 0.58, 1);
@@ -162,12 +183,16 @@
 
 .tagline {
   position: absolute;
-  left: 50%;
+  left: 1669px;
   top: 1158px;
+  width: 736px;
+  height: 78px;
   margin: 0;
-  transform: translateX(-50%);
+  text-align: center;
+  font-family: Pretendard, sans-serif;
   font-size: 60px;
   font-weight: 700;
+  font-synthesis: none;
   line-height: 1.3;
   color: #fff;
   white-space: nowrap;
@@ -238,6 +263,9 @@
   z-index: 3;
   transform-origin: top left;
   pointer-events: none;
+}
+
+.agentMoveOn {
   transition: transform 2.4s cubic-bezier(0.42, 0, 0.58, 1);
 }
 

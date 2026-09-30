@@ -115,7 +115,6 @@ function StillRoulette({ logoIndex }) {
 
 function Ring({ side, done }) {
   const left = side === 'A';
-  const gradientId = left ? 'fail-ring-a' : 'fail-ring-b';
   return (
     <div className={`${styles.ring} ${left ? styles.ringLeft : styles.ringRight}`}>
       {done ? (
@@ -123,26 +122,13 @@ function Ring({ side, done }) {
       ) : (
         <>
           <img className={styles.disc} src={left ? '/fail/ring-left-disc.svg' : '/fail/ring-right-disc.svg'} alt="" />
-          <svg className={styles.loader} viewBox="0 0 826 826" aria-hidden="true">
-            <defs>
-              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={left ? '#f4fff8' : '#f3e9ff'} />
-                <stop offset="55%" stopColor={left ? '#9cf0b4' : '#d7c4ff'} />
-                <stop offset="100%" stopColor={left ? '#3dce7a' : '#8a4fe0'} />
-              </linearGradient>
-            </defs>
-            <circle
-              className={styles.stroke}
-              cx="413"
-              cy="413"
-              r="236"
-              fill="none"
-              stroke={`url(#${gradientId})`}
-              strokeWidth="64"
-              strokeLinecap="round"
-              pathLength="100"
+          <div className={styles.spinner}>
+            <img
+              className={styles.track}
+              src={left ? '/fail/ring-left-track.svg' : '/fail/ring-right-track.svg'}
+              alt=""
             />
-          </svg>
+          </div>
         </>
       )}
       <p className={styles.label}>{done ? 'QR 인식 성공!' : 'QR 인식 중'}</p>
@@ -197,7 +183,7 @@ export default function FailScreen() {
       : '모바일 인식이 모두 완료되었어요';
   const subtitle = recognizedCount === 2
     ? '이제 모바일 웹에 접속하여 상상하신 대로 자유롭게 나만의 식물을 그려주세요'
-    : '화면 속 QR을 인식하시고 모바일 웹으로 접속해주세요';
+    : '화면 속 QR을 인식하고 모바일 웹으로 접속해주세요';
 
   return (
     <div className={arc.viewport}>

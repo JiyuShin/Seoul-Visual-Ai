@@ -1,48 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const NOVELTY_VOICE = /^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/;
+const SPEECH_REVISION = 'student-shimmer-22';
+const PITCH_RATE = 1.06;
 
-function isKoreanVoice(voice) {
-  const lang = (voice.lang || '').toLowerCase().replace('_', '-');
-  return lang === 'ko-kr' || lang.startsWith('ko');
-}
+const AFTER_AUDIO_MS = 160;
 
-function pickKoreanVoice(synth) {
-  const voices = synth.getVoices().filter(isKoreanVoice);
-  const natural = voices.filter((voice) => !NOVELTY_VOICE.test(voice.name));
-  return (
-    natural.find((voice) => voice.name === 'Yuna') ||
-    natural.find((voice) => /sora|google/i.test(voice.name)) ||
-    natural[0] ||
-    voices[0]
-  );
-}
-
-function spokenHoldMs(text) {
-  const chars = Array.from(text.replace(/\s/g, '')).length;
-  return Math.max(1600, chars * 240);
-}
-
-const OPEN_VOWELS = new Set([0, 2, 4, 6, 8, 12, 18, 20]);
-
-function syllableAmp(ch) {
-  if (/\s/.test(ch)) return 0;
-  if (/[.?!。？！,，、…~]/.test(ch)) return 0;
-  if (/[가-힣]/.test(ch)) {
-    const code = ch.charCodeAt(0) - 0xac00;
-    const jung = Math.floor((code % 588) / 28);
-    const open = OPEN_VOWELS.has(jung) ? 1 : 0.68;
-    return open * (0.78 + ((code * 13) % 17) / 70);
-  }
-  return 0.42;
-}
-
-function prepareSpoken(text) {
-  const spoken = text.trim();
-  // macOS 유나는 발화 맨 앞의 '안녕하세요'를 '넨넨하세요'로 읽는다.
-  // 한 단어로 넘기지 않으면 그 발음을 피한다.
-  if (!spoken.startsWith('안녕하세요')) return spoken;
-  return `안녕 하세요${spoken.slice('안녕하세요'.length)}`;
+function loadSpeech(text, cacheRef, inflightRef) {
+  const spoken = String(text || '').trim();
+  if (!spoken) return Promise.resolve(null);
+  const cacheKey = `${SPEECH_REVISION}:${spoken}`;
+  const cached = cacheRef.current.get(cacheKey);
+  if (cached) return Promise.resolve(cached);
+  const pending = inflightRef.current.get(cacheKey);
+  if (pending) return pending;
+  const task = fetch('/api/discussion-speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: spoken }),
+  }).then(async (response) => {
+    if (!response.ok) throw new Error('speech failed');
+    const blob = await response.blob();
+    if (!blob.size) throw new Error('empty audio');
+    const cache = cacheRef.current;
+    cache.set(cacheKey, blob);
+    if (cache.size > 12) cache.delete(cache.keys().next().value);
+    return blob;
+  }).finally(() => {
+    if (inflightRef.current.get(cacheKey) === task) inflightRef.current.delete(cacheKey);
+  });
+  inflightRef.current.set(cacheKey, task);
+  return task;
 }
 
 export function useSpeechOutput() {
@@ -54,19 +41,19 @@ export function useSpeechOutput() {
   const voiceLevelRef = useRef(0);
   const voiceLiveRef = useRef(false);
   const levelLoopRef = useRef(0);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const haltRef = useRef(null);
+  const abortRef = useRef(null);
+  const unlockRef = useRef(null);
+  const cacheRef = useRef(new Map());
+  const inflightRef = useRef(new Map());
 
-  useEffect(() => {
-    setIsSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
-
-    return () => {
-      sessionRef.current += 1;
-      window.cancelAnimationFrame(levelLoopRef.current);
-      voiceLiveRef.current = false;
-      voiceLevelRef.current = 0;
-      if (typeof window !== 'undefined') {
-        window.speechSynthesis?.cancel();
-      }
-    };
+  const clearUnlock = useCallback(() => {
+    if (!unlockRef.current) return;
+    window.removeEventListener('pointerdown', unlockRef.current, true);
+    window.removeEventListener('keydown', unlockRef.current, true);
+    unlockRef.current = null;
   }, []);
 
   const stopLevel = useCallback(() => {
@@ -83,166 +70,166 @@ export function useSpeechOutput() {
     levelLoopRef.current = window.requestAnimationFrame(ease);
   }, []);
 
+  const stopAudio = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    haltRef.current?.();
+    haltRef.current = null;
+  }, []);
+
   const stopSpeaking = useCallback(() => {
     sessionRef.current += 1;
+    clearUnlock();
+    stopAudio();
     stopLevel();
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
     setIsSpeaking(false);
     setVoiceLive(false);
-  }, [stopLevel]);
+  }, [clearUnlock, stopAudio, stopLevel]);
 
-  const speak = useCallback((text, onEnd, onAudioEnd) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || !text?.trim()) {
+  useEffect(() => {
+    setIsSupported(typeof window !== 'undefined' && (typeof Audio !== 'undefined' || 'speechSynthesis' in window));
+    return () => {
+      sessionRef.current += 1;
+      clearUnlock();
+      stopAudio();
+      window.cancelAnimationFrame(levelLoopRef.current);
+      voiceLiveRef.current = false;
+      voiceLevelRef.current = 0;
+      audioCtxRef.current?.close?.();
+      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+    };
+  }, [clearUnlock, stopAudio]);
+
+  const speak = useCallback((text, onEnd, onAudioEnd, onPlaybackStart) => {
+    const spoken = String(text || '').trim();
+    if (typeof window === 'undefined' || !spoken) {
       onEnd?.();
       return false;
     }
 
     const session = sessionRef.current + 1;
     sessionRef.current = session;
-    const synth = window.speechSynthesis;
-    const spoken = prepareSpoken(text);
-    let finished = false;
-    let keepAlive = 0;
+    clearUnlock();
+    stopAudio();
+    window.speechSynthesis?.cancel();
 
+    let finished = false;
     const finish = () => {
       if (finished || session !== sessionRef.current) return;
       finished = true;
-      window.clearInterval(keepAlive);
-      clearWords();
       stopLevel();
       setIsSpeaking(false);
       setVoiceLive(false);
       onEnd?.();
     };
 
-    const utterance = new SpeechSynthesisUtterance(spoken);
-    utterance.lang = 'ko-KR';
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    const minHold = spokenHoldMs(spoken);
-    let startedAt = 0;
-    let wordTimers = [];
-    const clearWords = () => {
-      wordTimers.forEach((id) => window.clearTimeout(id));
-      wordTimers = [];
-    };
-    const nudge = () => {
-      if (finished || session !== sessionRef.current) return;
-      setVoiceMark((mark) => mark + 1);
-    };
-
-    const weights = Array.from(spoken, syllableAmp);
-    let anchorIndex = 0;
-    let anchorAt = 0;
-    const followVoice = (now) => {
-      if (finished || session !== sessionRef.current || !voiceLiveRef.current) return;
-      const since = now - anchorAt;
-      const pos = anchorIndex + since / 175;
-      const index = Math.max(0, Math.floor(pos));
-      const within = index < weights.length;
-      const unit = within ? pos - index : (since % 175) / 175;
-      const amp = within ? weights[index] : 0.62;
-      const hump = amp === 0 ? 0 : Math.sin(Math.PI * Math.min(1, Math.max(0, unit))) ** 0.72;
-      voiceLevelRef.current = amp * hump;
-      levelLoopRef.current = window.requestAnimationFrame(followVoice);
-    };
-    const armVoice = () => {
-      anchorAt = performance.now();
-      anchorIndex = 0;
+    const armMeter = () => {
+      const samples = new Uint8Array(analyserRef.current?.fftSize || 512);
+      let peaked = false;
       voiceLiveRef.current = true;
-      window.cancelAnimationFrame(levelLoopRef.current);
-      levelLoopRef.current = window.requestAnimationFrame(followVoice);
       setVoiceLive(true);
+      const follow = () => {
+        if (finished || session !== sessionRef.current || !voiceLiveRef.current) return;
+        const analyser = analyserRef.current;
+        if (analyser) {
+          analyser.getByteTimeDomainData(samples);
+          let sum = 0;
+          for (let i = 0; i < samples.length; i += 1) {
+            const sample = (samples[i] - 128) / 128;
+            sum += sample * sample;
+          }
+          const rms = Math.sqrt(sum / samples.length);
+          const level = Math.min(1, Math.max(0, (rms - 0.012) * 7));
+          voiceLevelRef.current = level;
+          if (level > 0.42 && !peaked) {
+            peaked = true;
+            setVoiceMark((mark) => mark + 1);
+          } else if (level < 0.16) {
+            peaked = false;
+          }
+        }
+        levelLoopRef.current = window.requestAnimationFrame(follow);
+      };
+      window.cancelAnimationFrame(levelLoopRef.current);
+      levelLoopRef.current = window.requestAnimationFrame(follow);
+      audioCtxRef.current?.resume?.();
     };
-    utterance.onstart = () => {
-      if (session !== sessionRef.current) return;
-      startedAt = Date.now();
-      const elapsed = voiceLiveRef.current ? performance.now() - anchorAt : Infinity;
-      if (!voiceLiveRef.current || elapsed < 180) armVoice();
-      setIsSpeaking(true);
-    };
-    utterance.onboundary = (event) => {
-      if (session !== sessionRef.current) return;
-      if (event.name && event.name !== 'word') return;
-      if (typeof event.charIndex === 'number' && event.charIndex > anchorIndex) {
-        anchorIndex = event.charIndex;
-        anchorAt = performance.now();
+
+    const playBlob = async (blob) => {
+      if (finished || session !== sessionRef.current) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error('no audio');
+      if (!audioCtxRef.current) {
+        const ctx = new AudioCtx();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.72;
+        analyser.connect(ctx.destination);
+        audioCtxRef.current = ctx;
+        analyserRef.current = analyser;
       }
-      setVoiceMark((mark) => mark + 1);
+      const ctx = audioCtxRef.current;
+      const decoded = await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0));
+      if (finished || session !== sessionRef.current) return;
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      source.playbackRate.value = PITCH_RATE;
+      source.connect(analyserRef.current);
+      let halted = false;
+      let started = false;
+      haltRef.current = () => {
+        halted = true;
+        try { source.stop(); } catch { /* already stopped */ }
+        try { source.disconnect(); } catch { /* already disconnected */ }
+      };
+      source.onended = () => {
+        if (halted || session !== sessionRef.current) return;
+        stopLevel();
+        setVoiceLive(false);
+        onAudioEnd?.();
+        window.setTimeout(finish, AFTER_AUDIO_MS);
+      };
+      const begin = async () => {
+        if (started || halted || finished || session !== sessionRef.current) return;
+        await ctx.resume();
+        if (ctx.state === 'suspended') return;
+        started = true;
+        setIsSpeaking(true);
+        onPlaybackStart?.();
+        armMeter();
+        source.start();
+      };
+      await begin();
+      if (started || halted || finished || session !== sessionRef.current) return;
+      const unlock = () => {
+        clearUnlock();
+        begin().catch(() => finish());
+      };
+      unlockRef.current = unlock;
+      window.addEventListener('pointerdown', unlock, true);
+      window.addEventListener('keydown', unlock, true);
     };
-    utterance.onend = () => {
-      if (session !== sessionRef.current) return;
-      clearWords();
-      stopLevel();
-      setVoiceLive(false);
+
+    loadSpeech(spoken, cacheRef, inflightRef).then((blob) => {
+      if (finished || session !== sessionRef.current) return;
+      return playBlob(blob);
+    }).catch((error) => {
+      if (error?.name === 'AbortError' || finished || session !== sessionRef.current) return;
       onAudioEnd?.();
-      const elapsed = startedAt ? Date.now() - startedAt : minHold;
-      const remain = Math.max(0, minHold - elapsed);
-      window.setTimeout(finish, Math.max(0, remain - 300));
-    };
-    utterance.onerror = (event) => {
-      if (event.error === 'interrupted' || event.error === 'canceled' || event.error === 'cancelled') {
-        return;
-      }
       finish();
-    };
-
-    let ran = false;
-    const run = (force) => {
-      if (ran || finished || session !== sessionRef.current) return;
-      const voice = pickKoreanVoice(synth);
-      if (!voice && !force) return;
-      ran = true;
-      if (voice) utterance.voice = voice;
-      let queued = false;
-      const startMain = () => {
-        if (queued || finished || session !== sessionRef.current) return;
-        queued = true;
-        synth.resume();
-        synth.speak(utterance);
-        armVoice();
-        clearWords();
-        let at = 90;
-        spoken.split(/\s+/).filter(Boolean).forEach((word) => {
-          const delay = at;
-          at += Math.max(340, Array.from(word).length * 175);
-          wordTimers.push(window.setTimeout(nudge, delay));
-        });
-      };
-      const lead = new SpeechSynthesisUtterance(' ');
-      lead.volume = 0;
-      lead.lang = 'ko-KR';
-      lead.rate = 1;
-      if (voice) lead.voice = voice;
-      lead.onend = startMain;
-      const begin = () => {
-        if (finished || session !== sessionRef.current) return;
-        synth.resume();
-        synth.speak(lead);
-        window.setTimeout(startMain, 700);
-        keepAlive = window.setInterval(() => {
-          if (finished || session !== sessionRef.current || !synth.speaking) return;
-          synth.resume();
-        }, 8000);
-      };
-      if (synth.speaking || synth.pending) {
-        synth.cancel();
-        window.setTimeout(begin, 80);
-        return;
-      }
-      begin();
-    };
-
-    if (pickKoreanVoice(synth)) run(false);
-    else synth.addEventListener('voiceschanged', () => run(false), { once: true });
-    window.setTimeout(() => run(true), 700);
+    });
 
     return true;
-  }, [stopLevel]);
+  }, [clearUnlock, stopAudio, stopLevel]);
+
+  const warm = useCallback((text) => {
+    loadSpeech(text, cacheRef, inflightRef).catch(() => {});
+  }, []);
 
   return {
     speak,
+    warm,
     stopSpeaking,
     isSpeaking,
     isSupported,
