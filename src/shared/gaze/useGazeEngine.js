@@ -14,6 +14,8 @@ import {
 } from './calibrationSession';
 import { clearGazeSession, loadGazeSession, saveGazeSession } from './gazeSession';
 
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 const MOVE_MS = 800;
 const COLLECT_MS = 1000;
 const MIN_SAMPLES = 8;
@@ -157,7 +159,7 @@ export function useGazeEngine({ onSample, enabled = true } = {}) {
   }, []);
 
   // 페이지를 나갔다 들어와도 같은 탭의 보정 모델을 다시 쓴다.
-  useLayoutEffect(() => {
+  useIsoLayoutEffect(() => {
     const session = loadGazeSession();
     if (!session?.models) return;
     modelsRef.current = session.models;

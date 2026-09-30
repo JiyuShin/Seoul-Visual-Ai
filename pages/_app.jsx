@@ -23,7 +23,12 @@ function GlobalGazeCursor() {
 
   // 보정 화면에서는 점 타깃만 보이게 커서를 숨긴다.
   const visible =
-    isReady && !isCalibrating && router.pathname !== '/app' && router.pathname !== '/mobile';
+    isReady &&
+    !isCalibrating &&
+    router.pathname !== '/app' &&
+    router.pathname !== '/mobile' &&
+    router.pathname !== '/op' &&
+    router.pathname !== '/still';
 
   // 토론 중에는 지금 차례인 사람의 커서만 따라다닌다. 심어 둔 자리는 따로 남는다.
   const keys = router.pathname === '/2'

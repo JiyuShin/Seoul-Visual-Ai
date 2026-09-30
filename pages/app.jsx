@@ -44,8 +44,22 @@ export default function CalibrationPage() {
   } = useEntryFlow();
 
   useEffect(() => {
+    [
+      '/op/title-bg.png',
+      '/op/plant-right.png',
+      '/op/plant-flip.png',
+      '/op/plant-spin.png',
+      '/op/plant-lean.png',
+      '/op/sprout.png',
+    ].forEach((src) => {
+      const image = new Image();
+      image.src = src;
+    });
+  }, []);
+
+  useEffect(() => {
     if (setupComplete) {
-      router.push('/op');
+      router.push('/still');
     }
   }, [setupComplete, router]);
 

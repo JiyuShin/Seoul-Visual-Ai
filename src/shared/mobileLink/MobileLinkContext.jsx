@@ -30,6 +30,7 @@ export function MobileLinkProvider({ children }) {
   const [sessionId, setSessionId] = useState(null);
   const [role, setRole] = useState(null);
   const [status, setStatus] = useState('idle');
+  const [slots, setSlots] = useState({ A: false, B: false });
   const [districtFromKiosk, setDistrictFromKiosk] = useState(null);
   const [lastError, setLastError] = useState(null);
   const [mobilePublicOrigin, setMobilePublicOrigin] = useState(() => getMobilePublicOriginSync());
@@ -92,9 +93,16 @@ export function MobileLinkProvider({ children }) {
           setStatus(linkRole === 'kiosk' ? 'waiting_mobile' : 'waiting_kiosk');
           return;
         }
+        if (msg.type === MSG.SLOTS && msg.slots) {
+          setSlots({ A: Boolean(msg.slots.A), B: Boolean(msg.slots.B) });
+          return;
+        }
         if (msg.type === MSG.PAIRED) {
           setStatus('paired');
           if (msg.district) setDistrictFromKiosk(msg.district);
+          if (msg.slot === 'A' || msg.slot === 'B') {
+            setSlots((prev) => ({ ...prev, [msg.slot]: true }));
+          }
           return;
         }
         if (msg.type === MSG.STATE && msg.payload?.district) {
@@ -102,7 +110,14 @@ export function MobileLinkProvider({ children }) {
           return;
         }
         if (msg.type === MSG.PEER_LEFT) {
-          setStatus(linkRole === 'kiosk' ? 'waiting_mobile' : 'waiting_kiosk');
+          if (msg.slot === 'A' || msg.slot === 'B') {
+            setSlots((prev) => ({ ...prev, [msg.slot]: false }));
+          }
+          if (linkRole === 'mobile' && msg.role === 'kiosk') {
+            setStatus('waiting_kiosk');
+          } else if (linkRole === 'kiosk' && msg.role === 'mobile') {
+            setStatus('waiting_mobile');
+          }
           return;
         }
         if (msg.type === MSG.ERROR) {
@@ -175,6 +190,7 @@ export function MobileLinkProvider({ children }) {
       sessionId,
       role,
       status,
+      slots,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,
@@ -189,6 +205,7 @@ export function MobileLinkProvider({ children }) {
       sessionId,
       role,
       status,
+      slots,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,

@@ -499,8 +499,8 @@ export default function AreaSelection() {
       } catch {
         // 저장이 막혀도 화면 전환은 이어간다.
       }
-      router.push(`/4?district=${encodeURIComponent(name)}`);
-    }, MAP_FADE_OUT_MS + 2200);
+      router.push(`/fail?district=${encodeURIComponent(name)}`);
+    }, MAP_FADE_OUT_MS + 4200);
     return () => clearTimeout(timeout);
   }, [phase, router, district]);
 
