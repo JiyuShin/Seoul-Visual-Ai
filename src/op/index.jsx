@@ -63,7 +63,7 @@ const OPENING_SPEECH = {
   17: '그럼 시작해볼까요?',
 };
 const OPENING_SPEECH_FRAMES = Object.keys(OPENING_SPEECH).map(Number);
-const SPEECH_START_MS = 1700;
+const SPEECH_START_MS = 1800;
 
 function agentPose(frame) {
   let diameter = 2567;

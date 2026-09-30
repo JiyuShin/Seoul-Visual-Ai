@@ -3,7 +3,6 @@ import Head from 'next/head';
 import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
 import { MobileLinkProvider } from '../src/shared/mobileLink/MobileLinkContext';
-import DevQuickPassModal from '../src/shared/dev/DevQuickPassModal';
 import GazeReticle from '../src/shared/GazeReticle';
 import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../src/shared/gaze/participants';
 
@@ -60,7 +59,6 @@ function AppFrame({ Component, pageProps }) {
         <Component {...pageProps} />
       </div>
       <GlobalGazeCursor />
-      <DevQuickPassModal />
     </>
   );
 }
