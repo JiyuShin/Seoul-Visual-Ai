@@ -605,6 +605,7 @@
 .copyOn {
   opacity: 1;
   transform: translate3d(-50%, 0, 0);
+  transition-delay: 1.7s;
 }
 
 .pillTight {

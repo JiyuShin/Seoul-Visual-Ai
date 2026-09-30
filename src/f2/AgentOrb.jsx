@@ -121,6 +121,8 @@ export default function AgentOrb({
   userLevelRef,
   voiceLevelRef,
   voiceLiveRef,
+  voiceReactive = true,
+  haloVisible = true,
   lively = false,
   className,
 }) {
@@ -134,12 +136,14 @@ export default function AgentOrb({
   const levelSourceRef = useRef(userLevelRef);
   const voiceLevelSourceRef = useRef(voiceLevelRef);
   const voiceLiveSourceRef = useRef(voiceLiveRef);
+  const voiceReactiveRef = useRef(voiceReactive);
   const livelyRef = useRef(lively);
   agentSpeakingRef.current = agentSpeaking;
   userListeningRef.current = userListening;
   levelSourceRef.current = userLevelRef;
   voiceLevelSourceRef.current = voiceLevelRef;
   voiceLiveSourceRef.current = voiceLiveRef;
+  voiceReactiveRef.current = voiceReactive;
   livelyRef.current = lively;
 
   useEffect(() => {
@@ -150,9 +154,9 @@ export default function AgentOrb({
       canvas,
       alpha: true,
       antialias: true,
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
     });
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(0xffffff, 0);
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
     const scene = new THREE.Scene();
@@ -211,7 +215,7 @@ export default function AgentOrb({
       const motionTarget = 1 + level * 0.35 + vivid * 1.15;
       uniforms.motion.value += (motionTarget - uniforms.motion.value) * 0.12;
       uniforms.time.value += dt * 2.58 * (1 + level * 0.2) * (1 + vivid * 1.35);
-      const audible = Boolean(voiceLiveSourceRef.current?.current);
+      const audible = voiceReactiveRef.current && Boolean(voiceLiveSourceRef.current?.current);
       const voiceTarget = audible ? Math.min(1, voiceLevelSourceRef.current?.current || 0) : 0;
       const voiceTau = voiceTarget > voiceSmooth ? 0.055 : 0.16;
       voiceSmooth += (voiceTarget - voiceSmooth) * (1 - Math.exp(-dt / voiceTau));
@@ -231,7 +235,7 @@ export default function AgentOrb({
         const target = 8 + voiceSmooth * 20;
         haloBlur += (target - haloBlur) * (1 - Math.exp(-dt / 0.07));
         if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
-      } else if (agentSpeakingRef.current) {
+      } else if (voiceReactiveRef.current && agentSpeakingRef.current) {
         haloBlur += (8 - haloBlur) * 0.08;
         if (haloGroupRef.current) haloGroupRef.current.setAttribute('opacity', '1');
       } else if (drive > 0.04) {
@@ -284,8 +288,15 @@ export default function AgentOrb({
           pointerEvents: 'none',
         }}
       >
-        <g ref={haloGroupRef} filter="url(#agentHalo)">
-          <circle cx="122.938" cy="107.117" r="77.5" fill="#fff" />
+        <g
+          style={{
+            opacity: haloVisible ? 1 : 0,
+            transition: 'opacity 1.15s cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          <g ref={haloGroupRef} filter="url(#agentHalo)">
+            <circle cx="122.938" cy="107.117" r="77.5" fill="#fff" />
+          </g>
         </g>
         <g filter="url(#agentInner)">
           <circle cx="122.938" cy="107.117" r="77.5" fill="#fff" />

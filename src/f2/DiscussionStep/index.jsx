@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import { streetSceneForDistrict } from '../../shared/streetView';
+import OpeningAgent from '../../op/OpeningAgent';
 import AgentOrb from '../AgentOrb';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
@@ -863,7 +864,7 @@ export default function DiscussionStep({
   }, [onGazeClipChange]);
 
   const orbSize = 400;
-  const introOrbSize = 563;
+  const introOrbSize = 997;
   const finaleSize = 442;
   const morphing = beat === 'wait' || beat === 'analyze';
   const pillWidth = beat === 'analyze' ? 2082 : 1339;
@@ -952,7 +953,7 @@ export default function DiscussionStep({
             )}
 
             <div
-              className={`${styles.orbSlot} ${CLOSING_BEATS.has(beat) ? styles.orbFinale : ''} ${styles.orbIsAgent} ${morphing ? styles.orbPill : ''}`}
+              className={`${styles.orbSlot} ${CLOSING_BEATS.has(beat) ? styles.orbFinale : ''} ${styles.orbIsAgent} ${beat === 'intro' ? styles.orbIntro : ''} ${morphing ? styles.orbPill : ''}`}
               style={{
                 top: orbPose.top + orbPose.height / 2,
                 width: orbPose.width,
@@ -960,6 +961,11 @@ export default function DiscussionStep({
                 borderRadius: orbPose.radius,
               }}
             >
+              {(beat === 'intro' || beat === 'shrink') && (
+                <div className={`${styles.introAgent} ${beat === 'intro' ? styles.introAgentOn : ''}`}>
+                  <OpeningAgent speaking />
+                </div>
+              )}
               <div className={styles.agentFace}>
                 <div className={`${styles.orbPulse} ${FLOW1 && (beat === 'f1Surge' || beat === 'f1Summary') ? styles.orbLively : ''}`}>
                   <AgentOrb
@@ -968,6 +974,8 @@ export default function DiscussionStep({
                     userLevelRef={speech.levelRef}
                     voiceLevelRef={speechOutput.voiceLevelRef}
                     voiceLiveRef={speechOutput.voiceLiveRef}
+                    voiceReactive={beat !== 'intro'}
+                    haloVisible={beat !== 'intro'}
                     lively={FLOW1 && (beat === 'f1Surge' || beat === 'f1Summary')}
                     className={styles.orbCanvas}
                   />

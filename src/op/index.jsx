@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useSpeechOutput } from '../f2/useSpeechOutput';
 import OpeningAgent from './OpeningAgent';
 import styles from './Opening.module.css';
 
@@ -50,6 +51,19 @@ const TELLS = [
     ),
   },
 ];
+
+const OPENING_SPEECH = {
+  7: '아스팔트와 콘크리트로 가득한 서울 속에, 조금 더 많은 자연이 더해진다면 어떤 모습일까요?',
+  8: '우리가 바라보는 시선 끝에는 모두 각자의 관심이 담겨 있습니다. 그 시선과 목소리를 따라 내가 원하는 식물을 도시 곳곳에 더해보세요.',
+  9: '한 사람의 관심에서 시작된 작은 상상이 모이고 모여, 서울의 풍경을 바꾸고 자연과 공존하는 서울을 만들어갑니다.',
+  10: '온시를 통해 앞으로 우리가 만들어갈 서울이 어떤 모습으로 변화할 수 있을지 만나볼 수 있어요.',
+  13: '여러분이 상상하는 서울은 어떤 모습인가요?',
+  14: '이제 상상하는 서울을 직접 그려볼 시간이에요.',
+  15: '먼저, 여러분이 생각하는 서울의 모습을 이야기하며 서로의 생각을 나눠볼게요.',
+  17: '그럼 시작해볼까요?',
+};
+const OPENING_SPEECH_FRAMES = Object.keys(OPENING_SPEECH).map(Number);
+const SPEECH_START_MS = 1700;
 
 function agentPose(frame) {
   let diameter = 2567;
@@ -125,9 +139,12 @@ function agentSpeaking(frame) {
 export default function Opening() {
   const router = useRouter();
   const viewportRef = useRef(null);
+  const speechOutput = useSpeechOutput();
+  const speechOutputRef = useRef(speechOutput);
   const [scale, setScale] = useState(0);
   const [poseReady, setPoseReady] = useState(false);
   const [frame, setFrame] = useState(1);
+  speechOutputRef.current = speechOutput;
 
   useLayoutEffect(() => {
     const fit = () => {
@@ -153,6 +170,34 @@ export default function Opening() {
   }, [router]);
 
   useEffect(() => {
+    const upcomingFrame = OPENING_SPEECH_FRAMES.find((speechFrame) => (
+      speechFrame >= frame + (OPENING_SPEECH[frame] ? 1 : 0)
+    ));
+    if (upcomingFrame) speechOutputRef.current.warm(OPENING_SPEECH[upcomingFrame]);
+  }, [frame]);
+
+  useEffect(() => {
+    const speechLine = OPENING_SPEECH[frame];
+    if (speechLine) {
+      let cancelled = false;
+      let advanceTimer = 0;
+      const startTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        speechOutputRef.current.speak(speechLine, () => {
+          if (cancelled) return;
+          advanceTimer = window.setTimeout(() => {
+            setFrame((current) => (current === frame ? current + 1 : current));
+          }, 500);
+        });
+      }, SPEECH_START_MS);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(startTimer);
+        window.clearTimeout(advanceTimer);
+        speechOutputRef.current.stopSpeaking();
+      };
+    }
+
     const timer = window.setTimeout(() => {
       if (frame >= LAST_FRAME) {
         if (typeof document === 'undefined' || !document.startViewTransition) {
