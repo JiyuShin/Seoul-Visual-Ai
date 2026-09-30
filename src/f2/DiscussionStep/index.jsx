@@ -309,10 +309,13 @@ export default function DiscussionStep({
     const job = queueRef.current.shift();
     if (!job) return;
     pumpingRef.current = true;
-    if (job.display !== false) setAgentLine(job.line);
     const minHold = spokenHoldMs(job.line);
     let settled = false;
     let playbackStarted = false;
+    const reveal = () => {
+      if (job.display === false || !aliveRef.current) return;
+      setAgentLine(job.line);
+    };
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -326,13 +329,16 @@ export default function DiscussionStep({
       hangRef.current = window.setTimeout(finish, minHold + 12000);
     };
     speechOutputRef.current.speak(job.line, () => {
+      if (!playbackStarted) reveal();
       window.setTimeout(finish, AFTER_LINE_MS);
     }, () => {
+      if (!playbackStarted) reveal();
       job.onAudioEnd?.();
       if (job.releaseOnAudio) finish();
     }, () => {
       if (playbackStarted) return;
       playbackStarted = true;
+      reveal();
       armWatchdog();
     });
     hangRef.current = window.setTimeout(() => {
