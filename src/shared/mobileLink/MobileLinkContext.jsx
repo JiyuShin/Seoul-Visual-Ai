@@ -31,6 +31,7 @@ export function MobileLinkProvider({ children }) {
   const [role, setRole] = useState(null);
   const [status, setStatus] = useState('idle');
   const [slots, setSlots] = useState({ A: false, B: false });
+  const [mobileSlot, setMobileSlot] = useState(null);
   const [districtFromKiosk, setDistrictFromKiosk] = useState(null);
   const [lastError, setLastError] = useState(null);
   const [mobilePublicOrigin, setMobilePublicOrigin] = useState(() => getMobilePublicOriginSync());
@@ -48,7 +49,9 @@ export function MobileLinkProvider({ children }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [refreshMobilePublicOrigin]);
 
-  const disconnect = useCallback(() => {
+  const [disconnectedManually, setDisconnectedManually] = useState(false);
+
+  const disconnectInternal = useCallback(() => {
     const ws = wsRef.current;
     wsRef.current = null;
     if (ws) {
@@ -57,10 +60,17 @@ export function MobileLinkProvider({ children }) {
     }
   }, []);
 
+  const disconnect = useCallback(() => {
+    setDisconnectedManually(true);
+    disconnectInternal();
+    setStatus('closed');
+  }, [disconnectInternal]);
+
   const connect = useCallback(
     ({ sessionId: id, linkRole, district }) => {
       if (typeof window === 'undefined' || !id) return;
-      disconnect();
+      setDisconnectedManually(false);
+      disconnectInternal();
 
       setSessionId(id);
       setRole(linkRole);
@@ -90,6 +100,7 @@ export function MobileLinkProvider({ children }) {
         }
 
         if (msg.type === MSG.JOINED) {
+          if (msg.slot === 'A' || msg.slot === 'B') setMobileSlot(msg.slot);
           setStatus(linkRole === 'kiosk' ? 'waiting_mobile' : 'waiting_kiosk');
           return;
         }
@@ -169,6 +180,7 @@ export function MobileLinkProvider({ children }) {
 
   useEffect(() => {
     if (!router.isReady || router.pathname !== '/mobile') return undefined;
+    if (disconnectedManually) return undefined;
     const join = router.query.join;
     const id = typeof join === 'string' ? join : join?.[0];
     if (!id || mobileJoinRef.current === id) return undefined;
@@ -178,7 +190,7 @@ export function MobileLinkProvider({ children }) {
       mobileJoinRef.current = null;
       disconnect();
     };
-  }, [router.isReady, router.pathname, router.query.join, joinMobileSession, disconnect]);
+  }, [router.isReady, router.pathname, router.query.join, joinMobileSession, disconnect, disconnectedManually]);
 
   useEffect(() => () => disconnect(), [disconnect]);
 
@@ -191,6 +203,7 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
+      mobileSlot,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,
@@ -206,6 +219,7 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
+      mobileSlot,
       districtFromKiosk,
       lastError,
       mobilePublicOrigin,

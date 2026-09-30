@@ -59,6 +59,8 @@ function attachMobileLinkClient(ws, meta) {
     rooms.set(sessionId, room);
   }
 
+  let joinedSlot = null;
+
   if (role === 'kiosk') {
     if (room.kiosk) {
       try {
@@ -78,13 +80,12 @@ function attachMobileLinkClient(ws, meta) {
       ws.close();
       return;
     }
+    joinedSlot = slot;
     room[slot] = { ws, role: 'mobile', slot };
     send(ws, { type: 'joined', sessionId, role: 'mobile', slot });
     tellMobilePaired(sessionId, slot);
     tellKiosk(sessionId);
   }
-
-  const joinedSlot = role === 'mobile' ? room.A?.ws === ws ? 'A' : 'B' : null;
 
   ws.on('message', (raw) => {
     let msg;

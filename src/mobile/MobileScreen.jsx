@@ -1,7 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import MobileDrawingPage from './MobileDrawingPage';
+import MobileConvertPage from './MobileConvertPage';
+import MobileConvertShader from './MobileConvertShader';
 import MobileEndPage from './MobileEndPage';
+import MobileCompletePage from './MobileCompletePage';
 import MobileLoadingPage from './MobileLoadingPage';
 import MobilePlantVideo from './MobilePlantVideo';
 import MobileSavePage from './MobileSavePage';
@@ -14,17 +17,21 @@ import {
   DRAWING_TO_SAVE_MS,
   LOADING_TO_DRAWING_MS,
   SAVE_TO_TAG_MS,
-  TAG_TO_END_MS,
+  TAG2_TO_CONVERT_MS,
+  CONVERT_HOLD_MS,
+  CONVERT_TO_END_MS,
 } from './mobileTransition';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import { resolveMobileDistrictCopy } from './mobileDistrictCopy';
+import { pickEndPlantVariant } from './mobileEndPlantVariants';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
-  const { districtFromKiosk } = useMobileLink();
-  const { selectedDistrict } = useEntryFlow();
+  const { districtFromKiosk, sessionId, mobileSlot, sendState, disconnect } = useMobileLink();
+  const entryFlow = useEntryFlow();
+  const selectedDistrict = entryFlow?.selectedDistrict;
   const districtName =
-    districtFromKiosk?.name ?? selectedDistrict?.name ?? '용산구';
+    districtFromKiosk?.name ?? selectedDistrict?.name ?? '종로구';
   const districtCopy = useMemo(
     () => resolveMobileDistrictCopy(districtName),
     [districtName]
@@ -46,8 +53,17 @@ export default function MobileScreen() {
   const [tag2Mounted, setTag2Mounted] = useState(false);
   const [tag2Exit, setTag2Exit] = useState(false);
 
+  const [convertMounted, setConvertMounted] = useState(false);
+  const [convertExit, setConvertExit] = useState(false);
+
   const [plantDrawingUrl, setPlantDrawingUrl] = useState(null);
   const [plantName, setPlantName] = useState('');
+  const [endPlantVariant, setEndPlantVariant] = useState(null);
+  const [endMounted, setEndMounted] = useState(false);
+  const [endExit, setEndExit] = useState(false);
+  const [completeMounted, setCompleteMounted] = useState(false);
+
+  const isCompletedRef = useRef(false);
 
   const goDrawing = useCallback(() => {
     if (completedRef.current) return;
@@ -91,17 +107,75 @@ export default function MobileScreen() {
     setTag2Mounted(true);
   }, []);
 
-  const goEnd = useCallback((confirmedName) => {
-    const nextName = confirmedName?.trim() || plantName.trim();
-    if (!nextName) return;
-    setPlantName(nextName);
-    setTag2Exit(true);
+  const goConvert = useCallback(
+    (confirmedName) => {
+      const nextName = confirmedName?.trim() || plantName.trim();
+      if (!nextName) return;
+      setPlantName(nextName);
+      setTag2Exit(true);
+      setPhase(MOBILE_PHASE.CONVERT);
+      window.setTimeout(() => {
+        setTag2Mounted(false);
+        setTag2Exit(false);
+        setConvertMounted(true);
+      }, TAG2_TO_CONVERT_MS);
+    },
+    [plantName]
+  );
+
+  const goEnd = useCallback(() => {
+    setEndPlantVariant(pickEndPlantVariant(districtName, { sessionId, slot: mobileSlot }));
+    // 전송(END) 화면에서는 Figma처럼 깔끔한 그라디언트 배경(영상/강블러 없음)
+    setBgHeavyBlur(false);
+    setConvertExit(true);
     setPhase(MOBILE_PHASE.END);
+    setEndMounted(true);
     window.setTimeout(() => {
-      setTag2Mounted(false);
-      setTag2Exit(false);
-    }, TAG_TO_END_MS);
-  }, [plantName]);
+      setConvertMounted(false);
+      setConvertExit(false);
+    }, CONVERT_TO_END_MS);
+  }, [districtName, sessionId, mobileSlot]);
+
+  const handleSendComplete = useCallback(() => {
+    if (isCompletedRef.current) return;
+    isCompletedRef.current = true;
+
+    // 1. 키오스크로 완성된 식물 정보 전달 (슬롯 정보와 함께 전송)
+    try {
+      sendState({
+        type: 'plant_sent',
+        plantName: plantName.trim(),
+        plantVariant: endPlantVariant?.id ?? null,
+        district: districtName,
+        slot: mobileSlot,
+      });
+    } catch {
+      /* ignore */
+    }
+
+    // 2. 모바일 화면을 체험 완료(COMPLETE) 단계로 전환
+    setEndExit(true);
+    setPhase(MOBILE_PHASE.COMPLETE);
+    setCompleteMounted(true);
+    window.setTimeout(() => {
+      setEndMounted(false);
+      setEndExit(false);
+    }, 450);
+
+    // 3. 웹소켓 연결 종료하여 서버 및 키오스크의 참여 인원/슬롯에서 즉시 배제
+    // 짧은 지연(150ms)을 주어 sendState 패킷이 소켓 버퍼를 통해 안전하게 나간 뒤 close()
+    window.setTimeout(() => {
+      disconnect();
+    }, 150);
+  }, [disconnect, districtName, endPlantVariant?.id, mobileSlot, plantName, sendState]);
+
+  useEffect(() => {
+    if (phase !== MOBILE_PHASE.CONVERT || !convertMounted) return undefined;
+    const advance = window.setTimeout(() => {
+      goEnd();
+    }, CONVERT_HOLD_MS);
+    return () => window.clearTimeout(advance);
+  }, [phase, convertMounted, goEnd]);
 
   const { width, height } = MOBILE_LOADING_ARTBOARD;
 
@@ -111,7 +185,7 @@ export default function MobileScreen() {
     phase === MOBILE_PHASE.SAVE ||
     phase === MOBILE_PHASE.TAG ||
     phase === MOBILE_PHASE.TAG2 ||
-    phase === MOBILE_PHASE.END;
+    phase === MOBILE_PHASE.CONVERT;
 
   return (
     <div className={styles.mobileRoot}>
@@ -120,16 +194,23 @@ export default function MobileScreen() {
         <div
           className={`${styles.backdropGradient} ${
             loadingMounted ? styles.backdropGradientLoading : ''
-          } ${loadingExit ? styles.backdropGradientLoadingExit : ''}`}
+          } ${loadingExit ? styles.backdropGradientLoadingExit : ''          } ${
+            phase === MOBILE_PHASE.END || phase === MOBILE_PHASE.COMPLETE ? styles.backdropGradientEnd : ''
+          }`}
         />
         <div className={`${styles.bgBrighten} ${bgBrighten ? styles.bgBrightenActive : ''}`} />
         <div
           className={`${styles.bgHeavyBlur} ${bgHeavyBlur ? styles.bgHeavyBlurActive : ''} ${
-            phase === MOBILE_PHASE.TAG || phase === MOBILE_PHASE.TAG2
+            phase === MOBILE_PHASE.TAG ||
+            phase === MOBILE_PHASE.TAG2 ||
+            phase === MOBILE_PHASE.CONVERT
               ? styles.bgHeavyBlurSoft
               : ''
           }`}
         />
+        {(phase === MOBILE_PHASE.CONVERT || convertMounted) && (
+          <MobileConvertShader fading={phase !== MOBILE_PHASE.CONVERT} />
+        )}
       </div>
       <MobileStage width={width} height={height} fit="contain">
         <div className={styles.session}>
@@ -193,18 +274,41 @@ export default function MobileScreen() {
               plantName={plantName}
               exiting={tag2Exit}
               onPlantNameChange={setPlantName}
-              onConfirmName={goEnd}
+              onConfirmName={goConvert}
             />
           </div>
         )}
-        {phase === MOBILE_PHASE.END && (
-          <div className={`${styles.layer} ${styles.layerEnd}`}>
-            <MobileEndPage
+        {convertMounted && (
+          <div
+            className={`${styles.layer} ${styles.layerConvert} ${
+              convertExit ? styles.layerConvertExit : ''
+            }`}
+          >
+            <MobileConvertPage
               plantName={plantName}
               drawingUrl={plantDrawingUrl}
               enterFromTag
-              onSend={() => {}}
+              exiting={convertExit}
             />
+          </div>
+        )}
+        {(phase === MOBILE_PHASE.END || endMounted) && (
+          <div
+            className={`${styles.layer} ${styles.layerEnd} ${
+              endExit ? styles.layerEndExit : ''
+            }`}
+          >
+            <MobileEndPage
+              plantName={plantName}
+              plantVariant={endPlantVariant}
+              enterFromTag
+              onSend={handleSendComplete}
+            />
+          </div>
+        )}
+        {(phase === MOBILE_PHASE.COMPLETE || completeMounted) && (
+          <div className={`${styles.layer} ${styles.layerComplete}`}>
+            <MobileCompletePage plantName={plantName} plantVariant={endPlantVariant} />
           </div>
         )}
         </div>

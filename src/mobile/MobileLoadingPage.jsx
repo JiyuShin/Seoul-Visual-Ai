@@ -2,7 +2,7 @@ import styles from './MobileLoadingPage.module.css';
 
 /** Figma 1690:702 — 로딩 UI (1690:706 영상은 MobileScreen 공통 배경). */
 export default function MobileLoadingPage({
-  districtName = '용산구',
+  districtName = '종로구',
   loadingLead = '나만의 식물을 그려볼 준비, 되셨나요?',
   exiting = false,
 }) {

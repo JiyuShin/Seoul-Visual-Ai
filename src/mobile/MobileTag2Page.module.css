@@ -26,7 +26,6 @@
   padding: 0 28px;
   box-sizing: border-box;
   pointer-events: none;
-  transform: translateY(2px);
 }
 
 .nameFieldCursor {
@@ -42,7 +41,7 @@
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 22px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.35;
   letter-spacing: -0.44px;
   color: rgba(72, 89, 67, 0.38);
 }
@@ -66,7 +65,7 @@
   height: 100%;
   pointer-events: none;
   object-fit: fill;
-  object-position: center 46%;
+  object-position: center center;
 }
 
 .nameFieldEmpty .nameInput {
@@ -83,7 +82,6 @@
   padding: 0;
   border: none;
   background: transparent;
-  transform: translateY(-2px);
   text-align: center;
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 22px;
@@ -93,6 +91,51 @@
   color: #485943;
   outline: none;
   caret-color: #485943;
+}
+
+.nameField:not(.nameFieldEmpty) {
+  padding: 0 76px;
+}
+
+/* btn-next.svg는 viewBox 91 중 위쪽 80만 캡슐이고 아래는 그림자 → 캡슐 중심은 80 * 40/91 */
+.nameSubmit {
+  position: absolute;
+  right: 15px;
+  top: 35.2px;
+  z-index: 4;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #485943;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.9),
+    0 2px 8px rgba(72, 89, 67, 0.15);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: nameSubmitIn 0.28s ease-out both;
+}
+
+.nameSubmit:active {
+  transform: scale(0.94);
+}
+
+@keyframes nameSubmitIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .srForm {
@@ -141,6 +184,10 @@
   .nameFieldCursor {
     animation: none;
     opacity: 0.85;
+  }
+
+  .nameSubmit {
+    animation: none;
   }
 
   .artboardExiting .tagCopy,

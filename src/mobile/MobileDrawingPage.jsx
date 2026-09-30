@@ -8,7 +8,7 @@ import styles from './MobileDrawingPage.module.css';
 
 /** Figma 1672:833 — 드로잉 인풋 */
 export default function MobileDrawingPage({
-  districtName = '용산구',
+  districtName = '종로구',
   drawingLeadLines = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.drawingLeadLines,
   tags = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.tags,
   enterFromLoading = false,
