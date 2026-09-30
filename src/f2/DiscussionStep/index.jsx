@@ -4,7 +4,6 @@ import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import { streetSceneForDistrict } from '../../shared/streetView';
 import AgentOrb from '../AgentOrb';
-import VisionOrb from '../VisionOrb';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
 import StreetCanvas, { FOLD_MS } from './StreetCanvas';
@@ -273,7 +272,7 @@ export default function DiscussionStep({
   const showChrome = !['intro', 'shrink', 'dock', 'gather', 'wait', 'analyze'].includes(beat);
   const showPlace = showChrome && beat !== 'close';
   const showPrompt = Boolean(agentLine) && !['intro', 'shrink', 'done', 'close', 'gather', 'wait', 'analyze'].includes(beat);
-  const docked = beat !== 'intro' && beat !== 'shrink';
+  const docked = beat !== 'intro';
   const closingCopy = beat === 'close'
     ? CLOSE_LINE
     : beat === 'wait'
@@ -822,9 +821,8 @@ export default function DiscussionStep({
   }, [onGazeClipChange]);
 
   const orbSize = 400;
+  const introOrbSize = 563;
   const finaleSize = 442;
-  const showVisionCard = beat === 'intro' || beat === 'shrink';
-  const cardScale = (beat === 'intro' ? 563 : 306) / 563;
   const morphing = beat === 'wait' || beat === 'analyze';
   const pillWidth = beat === 'analyze' ? 2082 : 1339;
   const pillHeight = 227;
@@ -836,22 +834,20 @@ export default function DiscussionStep({
     radius: size / 2,
   });
   const orbPose = beat === 'intro'
-    ? circlePose(563, 722)
-    : beat === 'shrink'
-      ? circlePose(306, 784)
-      : morphing
-        ? {
-            left: (STAGE_W - pillWidth) / 2,
-            top: 978,
-            width: pillWidth,
-            height: pillHeight,
-            radius: pillHeight / 2,
-          }
-        : beat === 'close'
-          ? circlePose(finaleSize, 1542)
-          : CLOSING_BEATS.has(beat)
-            ? circlePose(finaleSize, 871)
-            : circlePose(orbSize, showPrompt ? 1744 : 1704);
+    ? circlePose(introOrbSize, (STAGE_H - introOrbSize) / 2)
+    : morphing
+      ? {
+          left: (STAGE_W - pillWidth) / 2,
+          top: 978,
+          width: pillWidth,
+          height: pillHeight,
+          radius: pillHeight / 2,
+        }
+      : beat === 'close'
+        ? circlePose(finaleSize, 1542)
+        : CLOSING_BEATS.has(beat)
+          ? circlePose(finaleSize, 871)
+          : circlePose(orbSize, showPrompt ? 1744 : 1704);
 
   return (
     <section className={styles.discussionStep}>
@@ -914,7 +910,7 @@ export default function DiscussionStep({
             )}
 
             <div
-              className={`${styles.orbSlot} ${CLOSING_BEATS.has(beat) ? styles.orbFinale : ''} ${showVisionCard ? '' : styles.orbIsAgent} ${morphing ? styles.orbPill : ''}`}
+              className={`${styles.orbSlot} ${CLOSING_BEATS.has(beat) ? styles.orbFinale : ''} ${styles.orbIsAgent} ${morphing ? styles.orbPill : ''}`}
               style={{
                 top: orbPose.top + orbPose.height / 2,
                 width: orbPose.width,
@@ -922,16 +918,6 @@ export default function DiscussionStep({
                 borderRadius: orbPose.radius,
               }}
             >
-              <div className={styles.visionCard} style={{ transform: `scale(${cardScale})` }}>
-                {showVisionCard && (
-                  <VisionOrb
-                    className={styles.visionOrb}
-                    lines={['']}
-                    voiceLive={speechOutput.voiceLive}
-                    voiceMark={speechOutput.voiceMark}
-                  />
-                )}
-              </div>
               <div className={styles.agentFace}>
                 <div className={`${styles.orbPulse} ${FLOW1 && (beat === 'f1Surge' || beat === 'f1Summary') ? styles.orbLively : ''}`}>
                   <AgentOrb

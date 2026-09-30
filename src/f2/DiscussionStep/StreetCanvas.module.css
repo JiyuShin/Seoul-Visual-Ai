@@ -253,7 +253,7 @@
 .markA .bubble {
   width: max-content;
   max-width: calc(1104px * var(--street-scale, 0.5));
-  padding: calc(54px * var(--street-scale, 0.5)) calc(69px * var(--street-scale, 0.5));
+  padding: calc(58px * var(--street-scale, 0.5)) calc(74px * var(--street-scale, 0.5));
   border-radius:
     calc(24px * var(--street-scale, 0.5))
     calc(73px * var(--street-scale, 0.5))
@@ -270,7 +270,7 @@
 .markB .bubble {
   width: max-content;
   max-width: calc(980px * var(--street-scale, 0.5));
-  padding: calc(54px * var(--street-scale, 0.5)) calc(69px * var(--street-scale, 0.5));
+  padding: calc(58px * var(--street-scale, 0.5)) calc(74px * var(--street-scale, 0.5));
   border-radius:
     calc(73px * var(--street-scale, 0.5))
     calc(24px * var(--street-scale, 0.5))
@@ -287,7 +287,8 @@
 
 .mainLine {
   margin: 0;
-  font-size: calc(43px * var(--street-scale, 0.5));
+  color: #372b2b;
+  font-size: calc(46px * var(--street-scale, 0.5));
   line-height: 1.4;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -325,14 +326,14 @@
   margin: 0;
   width: max-content;
   max-width: calc(1400px * var(--street-scale, 0.5));
-  padding: calc(45px * var(--street-scale, 0.5)) calc(79px * var(--street-scale, 0.5));
+  padding: calc(42px * var(--street-scale, 0.5)) calc(74px * var(--street-scale, 0.5));
   border-radius:
     calc(14px * var(--street-scale, 0.5))
     calc(91px * var(--street-scale, 0.5))
     calc(91px * var(--street-scale, 0.5))
     calc(91px * var(--street-scale, 0.5));
   color: #fff;
-  font-size: calc(46px * var(--street-scale, 0.5));
+  font-size: calc(43px * var(--street-scale, 0.5));
   font-weight: 500;
   line-height: 1.4;
   letter-spacing: -0.02em;
@@ -385,6 +386,13 @@
 
 .replyKeyword {
   display: none;
+}
+
+.replyText,
+.replyKeyword {
+  background: none !important;
+  color: #4b4b4b !important;
+  -webkit-text-fill-color: #4b4b4b !important;
 }
 
 .repliesFolded .reply {
