@@ -5,7 +5,7 @@ import styles from './MobileLinkStatus.module.css';
 export default function MobileLinkStatus() {
   const { status, isPaired, lastError } = useMobileLink();
 
-  if (status === 'idle') return null;
+  if (status === 'idle' || status === 'closed') return null;
 
   let label = '키오스크에 연결 중…';
   if (isPaired) label = '키오스크와 연결됨';

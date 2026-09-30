@@ -40,15 +40,18 @@
 
 /* Figma 1926:5223 — 전송(END) 화면 전체 배경 */
 .backdropGradientEnd.backdropGradient {
-  background: linear-gradient(
-    167.648deg,
-    rgb(213, 255, 185) 0%,
-    rgba(213, 255, 185, 0.55) 6%,
-    rgba(255, 255, 255, 0) 22%,
-    rgba(255, 255, 255, 0.22) 76.25%,
-    rgba(177, 214, 154, 0.5) 100%,
-    rgba(162, 180, 151, 0.77) 100%
-  );
+  background-color: #ffffff;
+  background:
+    linear-gradient(
+      167.648deg,
+      rgb(213, 255, 185) 0%,
+      rgba(213, 255, 185, 0.65) 8%,
+      rgba(255, 255, 255, 0.96) 24%,
+      rgba(255, 255, 255, 0.96) 72%,
+      rgba(177, 214, 154, 0.5) 100%,
+      rgba(162, 180, 151, 0.77) 100%
+    ),
+    #ffffff;
 }
 
 .backdropGradientLoadingExit {
@@ -151,6 +154,26 @@
 
 .layerEnd {
   z-index: 5;
+}
+
+.layerEndExit {
+  pointer-events: none;
+  animation: layerFadeOut 0.45s ease forwards;
+}
+
+@keyframes layerFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.layerComplete {
+  z-index: 6;
 }
 
 .layerDrawingExit {

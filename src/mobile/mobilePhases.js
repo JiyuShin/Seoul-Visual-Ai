@@ -7,4 +7,5 @@ export const MOBILE_PHASE = {
   TAG2: 'tag2',
   CONVERT: 'convert',
   END: 'end',
+  COMPLETE: 'complete',
 };

@@ -16,24 +16,31 @@ uniform float uIntro;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  float t = uTime * 0.18;
+  float t = uTime * 0.28;
 
-  float wave = sin(uv.y * 3.2 + t * 1.3) * 0.08 + sin(uv.y * 7.1 - t * 0.9) * 0.03;
+  float wave = sin(uv.y * 3.2 + t * 1.3) * 0.1 + sin(uv.y * 7.1 - t * 0.9) * 0.04;
   float x = uv.x + wave - t;
 
   float b1 = sin(x * 6.2831) * 0.5 + 0.5;
   float b2 = sin(x * 12.566 + 1.7) * 0.5 + 0.5;
 
   vec3 white = vec3(1.0);
-  vec3 mint = vec3(0.84, 1.0, 0.73);
-  vec3 leaf = vec3(0.62, 0.9, 0.5);
-  vec3 aqua = vec3(0.78, 0.98, 0.93);
+  vec3 mint = vec3(0.8, 1.0, 0.66);
+  vec3 leaf = vec3(0.55, 0.88, 0.42);
+  vec3 aqua = vec3(0.74, 0.98, 0.92);
 
   vec3 col = mix(white, mint, b1);
-  col = mix(col, leaf, smoothstep(0.55, 1.0, b1 * b2) * 0.6);
-  col = mix(col, aqua, (1.0 - b1) * b2 * 0.35);
+  col = mix(col, leaf, smoothstep(0.5, 1.0, b1 * b2) * 0.75);
+  col = mix(col, aqua, (1.0 - b1) * b2 * 0.4);
 
-  float a = (0.55 + 0.25 * b1) * uIntro;
+  // 가로로 빠르게 지나가는 밝은 빛줄기 (살짝 기울어짐)
+  float sx = uv.x - uv.y * 0.25 + sin(uv.y * 4.0 + t) * 0.05;
+  float s1 = fract(sx * 0.9 - uTime * 0.22);
+  float s2 = fract(sx * 1.6 - uTime * 0.35 + 0.37);
+  float streak = pow(1.0 - abs(s1 - 0.5) * 2.0, 18.0) + pow(1.0 - abs(s2 - 0.5) * 2.0, 28.0) * 0.7;
+  col = mix(col, white, clamp(streak, 0.0, 1.0));
+
+  float a = clamp((0.65 + 0.25 * b1 + streak * 0.5) * uIntro, 0.0, 1.0);
   gl_FragColor = vec4(col * a, a);
 }
 `;

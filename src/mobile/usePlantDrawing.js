@@ -61,7 +61,11 @@ export function usePlantDrawing(canvasRef, color) {
         width: 5,
         points: [point],
       };
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* ignore invalid pointer id */
+      }
     },
     [color, pointerPos]
   );

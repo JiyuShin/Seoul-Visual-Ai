@@ -6,7 +6,7 @@ import styles from './MobileSavePage.module.css';
 
 /** Figma 1693:965 — 세이브(미리보기) */
 export default function MobileSavePage({
-  districtName = '용산구',
+  districtName = '종로구',
   drawingLeadLines = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.drawingLeadLines,
   tags = DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED.tags,
   drawingUrl = null,

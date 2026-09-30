@@ -4,6 +4,7 @@ import MobileDrawingPage from './MobileDrawingPage';
 import MobileConvertPage from './MobileConvertPage';
 import MobileConvertShader from './MobileConvertShader';
 import MobileEndPage from './MobileEndPage';
+import MobileCompletePage from './MobileCompletePage';
 import MobileLoadingPage from './MobileLoadingPage';
 import MobilePlantVideo from './MobilePlantVideo';
 import MobileSavePage from './MobileSavePage';
@@ -26,10 +27,11 @@ import { pickEndPlantVariant } from './mobileEndPlantVariants';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
-  const { districtFromKiosk } = useMobileLink();
-  const { selectedDistrict } = useEntryFlow();
+  const { districtFromKiosk, sessionId, mobileSlot, sendState, disconnect } = useMobileLink();
+  const entryFlow = useEntryFlow();
+  const selectedDistrict = entryFlow?.selectedDistrict;
   const districtName =
-    districtFromKiosk?.name ?? selectedDistrict?.name ?? '용산구';
+    districtFromKiosk?.name ?? selectedDistrict?.name ?? '종로구';
   const districtCopy = useMemo(
     () => resolveMobileDistrictCopy(districtName),
     [districtName]
@@ -57,6 +59,11 @@ export default function MobileScreen() {
   const [plantDrawingUrl, setPlantDrawingUrl] = useState(null);
   const [plantName, setPlantName] = useState('');
   const [endPlantVariant, setEndPlantVariant] = useState(null);
+  const [endMounted, setEndMounted] = useState(false);
+  const [endExit, setEndExit] = useState(false);
+  const [completeMounted, setCompleteMounted] = useState(false);
+
+  const isCompletedRef = useRef(false);
 
   const goDrawing = useCallback(() => {
     if (completedRef.current) return;
@@ -117,16 +124,50 @@ export default function MobileScreen() {
   );
 
   const goEnd = useCallback(() => {
-    setEndPlantVariant(pickEndPlantVariant(districtName));
+    setEndPlantVariant(pickEndPlantVariant(districtName, { sessionId, slot: mobileSlot }));
     // 전송(END) 화면에서는 Figma처럼 깔끔한 그라디언트 배경(영상/강블러 없음)
     setBgHeavyBlur(false);
     setConvertExit(true);
     setPhase(MOBILE_PHASE.END);
+    setEndMounted(true);
     window.setTimeout(() => {
       setConvertMounted(false);
       setConvertExit(false);
     }, CONVERT_TO_END_MS);
-  }, [districtName]);
+  }, [districtName, sessionId, mobileSlot]);
+
+  const handleSendComplete = useCallback(() => {
+    if (isCompletedRef.current) return;
+    isCompletedRef.current = true;
+
+    // 1. 키오스크로 완성된 식물 정보 전달 (슬롯 정보와 함께 전송)
+    try {
+      sendState({
+        type: 'plant_sent',
+        plantName: plantName.trim(),
+        plantVariant: endPlantVariant?.id ?? null,
+        district: districtName,
+        slot: mobileSlot,
+      });
+    } catch {
+      /* ignore */
+    }
+
+    // 2. 모바일 화면을 체험 완료(COMPLETE) 단계로 전환
+    setEndExit(true);
+    setPhase(MOBILE_PHASE.COMPLETE);
+    setCompleteMounted(true);
+    window.setTimeout(() => {
+      setEndMounted(false);
+      setEndExit(false);
+    }, 450);
+
+    // 3. 웹소켓 연결 종료하여 서버 및 키오스크의 참여 인원/슬롯에서 즉시 배제
+    // 짧은 지연(150ms)을 주어 sendState 패킷이 소켓 버퍼를 통해 안전하게 나간 뒤 close()
+    window.setTimeout(() => {
+      disconnect();
+    }, 150);
+  }, [disconnect, districtName, endPlantVariant?.id, mobileSlot, plantName, sendState]);
 
   useEffect(() => {
     if (phase !== MOBILE_PHASE.CONVERT || !convertMounted) return undefined;
@@ -153,8 +194,8 @@ export default function MobileScreen() {
         <div
           className={`${styles.backdropGradient} ${
             loadingMounted ? styles.backdropGradientLoading : ''
-          } ${loadingExit ? styles.backdropGradientLoadingExit : ''} ${
-            phase === MOBILE_PHASE.END ? styles.backdropGradientEnd : ''
+          } ${loadingExit ? styles.backdropGradientLoadingExit : ''          } ${
+            phase === MOBILE_PHASE.END || phase === MOBILE_PHASE.COMPLETE ? styles.backdropGradientEnd : ''
           }`}
         />
         <div className={`${styles.bgBrighten} ${bgBrighten ? styles.bgBrightenActive : ''}`} />
@@ -251,14 +292,23 @@ export default function MobileScreen() {
             />
           </div>
         )}
-        {phase === MOBILE_PHASE.END && (
-          <div className={`${styles.layer} ${styles.layerEnd}`}>
+        {(phase === MOBILE_PHASE.END || endMounted) && (
+          <div
+            className={`${styles.layer} ${styles.layerEnd} ${
+              endExit ? styles.layerEndExit : ''
+            }`}
+          >
             <MobileEndPage
               plantName={plantName}
               plantVariant={endPlantVariant}
               enterFromTag
-              onSend={() => {}}
+              onSend={handleSendComplete}
             />
+          </div>
+        )}
+        {(phase === MOBILE_PHASE.COMPLETE || completeMounted) && (
+          <div className={`${styles.layer} ${styles.layerComplete}`}>
+            <MobileCompletePage plantName={plantName} plantVariant={endPlantVariant} />
           </div>
         )}
         </div>
