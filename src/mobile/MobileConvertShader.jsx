@@ -16,31 +16,38 @@ uniform float uIntro;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  float t = uTime * 0.28;
+  float aspect = uRes.x / uRes.y;
+  vec2 p = uv;
+  p.x *= aspect;
 
-  float wave = sin(uv.y * 3.2 + t * 1.3) * 0.1 + sin(uv.y * 7.1 - t * 0.9) * 0.04;
-  float x = uv.x + wave - t;
+  float t = uTime * 0.22; // 차분하고 우아한 앰비언트 호흡
 
-  float b1 = sin(x * 6.2831) * 0.5 + 0.5;
-  float b2 = sin(x * 12.566 + 1.7) * 0.5 + 0.5;
+  // 매우 큰 덩어리의 유기적 파동 (주파수를 대폭 낮춰 경계선 제로화)
+  vec2 q = vec2(
+    sin(p.x * 0.9 + t * 0.4) + cos(p.y * 0.8 - t * 0.35),
+    cos(p.x * 0.7 - t * 0.3) + sin(p.y * 1.0 + t * 0.45)
+  ) * 0.25;
 
-  vec3 white = vec3(1.0);
-  vec3 mint = vec3(0.8, 1.0, 0.66);
-  vec3 leaf = vec3(0.55, 0.88, 0.42);
-  vec3 aqua = vec3(0.74, 0.98, 0.92);
+  vec2 r = vec2(
+    sin(p.x * 0.6 + q.x * 1.5 + t * 0.25),
+    cos(p.y * 0.8 + q.y * 1.5 - t * 0.3)
+  );
 
-  vec3 col = mix(white, mint, b1);
-  col = mix(col, leaf, smoothstep(0.5, 1.0, b1 * b2) * 0.75);
-  col = mix(col, aqua, (1.0 - b1) * b2 * 0.4);
+  float n = (r.x + r.y) * 0.25 + 0.5; // 0.0 ~ 1.0 완만한 곡선
 
-  // 가로로 빠르게 지나가는 밝은 빛줄기 (살짝 기울어짐)
-  float sx = uv.x - uv.y * 0.25 + sin(uv.y * 4.0 + t) * 0.05;
-  float s1 = fract(sx * 0.9 - uTime * 0.22);
-  float s2 = fract(sx * 1.6 - uTime * 0.35 + 0.37);
-  float streak = pow(1.0 - abs(s1 - 0.5) * 2.0, 18.0) + pow(1.0 - abs(s2 - 0.5) * 2.0, 28.0) * 0.7;
-  col = mix(col, white, clamp(streak, 0.0, 1.0));
+  // 피그마 디자인에 맞춘 자연스럽고 은은한 파스텔 자연광 팔레트
+  vec3 cWhite = vec3(0.99, 1.0, 0.98);
+  vec3 cSoftMint = vec3(0.85, 0.98, 0.80);
+  vec3 cLightLime = vec3(0.78, 0.95, 0.72);
+  vec3 cAuraAqua = vec3(0.90, 0.99, 0.95);
 
-  float a = clamp((0.65 + 0.25 * b1 + streak * 0.5) * uIntro, 0.0, 1.0);
+  // 경계선이 전혀 생기지 않도록 완만한 선형/삼각함수 블렌딩
+  vec3 col = mix(cWhite, cSoftMint, smoothstep(0.15, 0.85, n));
+  col = mix(col, cLightLime, sin((q.x + q.y) * 1.0 + t * 0.2) * 0.14 + 0.14);
+  col = mix(col, cAuraAqua, cos((p.x - p.y) * 1.2 - t * 0.25) * 0.12 + 0.12);
+
+  // 부드러운 전체 반투명도 (은은하게 일렁이도록 알파 0.45 ~ 0.57)
+  float a = (0.45 + 0.12 * n) * uIntro;
   gl_FragColor = vec4(col * a, a);
 }
 `;
