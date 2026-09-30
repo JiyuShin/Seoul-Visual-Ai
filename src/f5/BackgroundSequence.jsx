@@ -97,13 +97,58 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
     fired.current = false;
     held.current = false;
     freezing.current = false;
-    window.cancelAnimationFrame(holdFrame.current);
+    window.clearInterval(holdFrame.current);
   }, [shot]);
+
+  useEffect(() => () => window.clearInterval(holdFrame.current), []);
 
   const go = useCallback(() => {
     if (!clock || fired.current) return;
     if (onAdvance()) fired.current = true;
   }, [clock, onAdvance]);
+  const goRef = useRef(go);
+  goRef.current = go;
+
+  const startFreeze = useCallback((video) => {
+    held.current = true;
+    freezing.current = true;
+    // 되감으면 화면이 몇 프레임 뒤로 튀므로, 멈춘 자리의 프레임을 그대로 둔다.
+    video.pause();
+    const start = performance.now();
+    const freezeMs = shot.freezeMs || 0;
+    const tick = () => {
+      if (!freezing.current) {
+        window.clearInterval(holdFrame.current);
+        return;
+      }
+      const elapsed = performance.now() - start;
+      progressRef.current?.({
+        index: shotIndex,
+        time: shot.freezeAt,
+        duration: video.duration,
+        frozen: elapsed < freezeMs,
+        freezeElapsed: elapsed,
+        freezeMs,
+      });
+      if (elapsed < freezeMs) return;
+      if (shot.advanceAfterFreeze) {
+        // 앞 전환이 아직 끝나지 않아 거절되면 다음 틱에 다시 시도한다.
+        goRef.current();
+        if (!fired.current) return;
+        window.clearInterval(holdFrame.current);
+        freezing.current = false;
+        return;
+      }
+      window.clearInterval(holdFrame.current);
+      freezing.current = false;
+      video.playbackRate = shot.slowRate || 0.2;
+      const pending = video.play();
+      if (pending && pending.catch) pending.catch(() => {});
+    };
+    window.clearInterval(holdFrame.current);
+    holdFrame.current = window.setInterval(tick, 50);
+    tick();
+  }, [shot, shotIndex]);
 
   useEffect(() => {
     const el = nodeRef.current;
@@ -111,7 +156,7 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
     el.dataset.live = '1';
     freezing.current = false;
     if (shot.freezeAt > 0) {
-      el.playbackRate = 1;
+      el.playbackRate = shot.approachRate || 1;
     } else {
       syncRate(el, shot);
     }
@@ -153,49 +198,29 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
             const video = event.currentTarget;
             if (!video.duration || !Number.isFinite(video.duration)) return;
             if (shot.freezeAt > 0 && !held.current && video.currentTime >= shot.freezeAt) {
-              held.current = true;
-              freezing.current = true;
-              video.pause();
-              try {
-                video.currentTime = shot.freezeAt;
-              } catch {
-                // keep the frame that is already on screen
-              }
-              const start = performance.now();
-              const freezeMs = shot.freezeMs || 0;
-              const tick = (now) => {
-                if (!freezing.current) return;
-                const elapsed = now - start;
-                progressRef.current?.({
-                  index: shotIndex,
-                  time: shot.freezeAt,
-                  duration: video.duration,
-                  frozen: elapsed < freezeMs,
-                  freezeElapsed: elapsed,
-                  freezeMs,
-                });
-                if (elapsed >= freezeMs) {
-                  freezing.current = false;
-                  video.playbackRate = shot.slowRate || 0.2;
-                  const pending = video.play();
-                  if (pending && pending.catch) pending.catch(() => {});
-                  return;
-                }
-                holdFrame.current = window.requestAnimationFrame(tick);
-              };
-              holdFrame.current = window.requestAnimationFrame(tick);
+              startFreeze(video);
               return;
             }
             if (shot.freezeAt > 0 && !held.current) {
-              video.playbackRate = 1;
+              video.playbackRate = shot.approachRate || 1;
+              if (shot.advanceAfterFreeze) {
+                onProgress?.({ index: shotIndex, time: video.currentTime, duration: video.duration });
+              }
               return;
             }
+            if (shot.advanceAfterFreeze) return;
             syncRate(video, shot);
             onProgress?.({ index: shotIndex, time: video.currentTime, duration: video.duration });
             if (video.duration - video.currentTime <= fadeOf(shot) / 1000) go();
           }}
-          onEnded={() => {
-            if (clock) go();
+          onEnded={(event) => {
+            if (!clock) return;
+            if (shot.freezeAt > 0 && !held.current) {
+              startFreeze(event.currentTarget);
+              return;
+            }
+            if (shot.advanceAfterFreeze) return;
+            go();
           }}
           onError={() => {
             if (clock) go();
@@ -274,7 +299,7 @@ export default function Sequence({ shots, onDone, onProgress }) {
         }
         const opening = shots[next];
         if (opening && opening.freezeAt > 0) {
-          incomingEl.playbackRate = 1;
+          incomingEl.playbackRate = opening.approachRate || 1;
         } else {
           incomingEl.playbackRate = rateForShot(opening, 0);
         }
