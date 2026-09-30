@@ -422,6 +422,14 @@
   letter-spacing: -1.1px;
 }
 
+.qrJoinStatus {
+  top: 1960px;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .resultLines {
   width: auto;
   white-space: nowrap;

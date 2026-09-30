@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
+import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
+import { bothSlotsConnected, bothSlotsHaveSent } from '../shared/mobileLink/slotPlants';
 import {
   DISTRICTS,
   ROULETTE_LOGOS,
@@ -139,7 +141,8 @@ function Ring({ side, done }) {
 export default function FailScreen() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
-  const { slots } = useMobileLink();
+  const { slots, qrTargetUrl, sessionId, startKioskSession, slotPlants, role, sendState } =
+    useMobileLink();
   const [scale, setScale] = useState(1);
   const [district, setDistrict] = useState(DISTRICTS[0]);
 
@@ -165,25 +168,56 @@ export default function FailScreen() {
     setDistrict(next);
   }, [router.isReady, router.query.district, selectedDistrict]);
 
+  useEffect(() => {
+    if (!district?.name) return undefined;
+    startKioskSession(district);
+    return undefined;
+  }, [district?.name, startKioskSession]);
+
+  useEffect(() => {
+    if (!district?.name || !sessionId || role !== 'kiosk') return undefined;
+    sendState({ district: { name: district.name } });
+    return undefined;
+  }, [district?.name, sessionId, role, sendState]);
+
   const recognized = { A: Boolean(slots.A), B: Boolean(slots.B) };
   const recognizedCount = Number(recognized.A) + Number(recognized.B);
 
+  const bothSent = bothSlotsHaveSent(slotPlants);
+  const bothJoined = bothSlotsConnected(slots);
+  const advancedToFourRef = useRef(false);
+  const advancedForSentRef = useRef(false);
+
   useEffect(() => {
-    if (!recognized.A || !recognized.B || !district?.name) return undefined;
+    if (!router.isReady || !bothJoined || !district?.name) return undefined;
+    if (role !== 'kiosk') return undefined;
     const timer = window.setTimeout(() => {
+      if (advancedToFourRef.current) return;
+      advancedToFourRef.current = true;
       router.push(`/4?district=${encodeURIComponent(district.name)}`);
-    }, 1600);
+    }, 1400);
     return () => window.clearTimeout(timer);
-  }, [recognized.A, recognized.B, district, router]);
+  }, [router.isReady, bothJoined, district?.name, role, router]);
+
+  useEffect(() => {
+    if (!router.isReady || !bothSent || !district?.name) return undefined;
+    const timer = window.setTimeout(() => {
+      if (advancedForSentRef.current) return;
+      advancedForSentRef.current = true;
+      router.push(`/4?district=${encodeURIComponent(district.name)}`);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [router.isReady, bothSent, district?.name, router]);
 
   const title = recognizedCount === 0
     ? '모바일 인식을 기다리고 있어요'
     : recognizedCount === 1
       ? '거의 다 완료되어가요'
       : '모바일 인식이 모두 완료되었어요';
-  const subtitle = recognizedCount === 2
-    ? '이제 모바일 웹에 접속하여 상상하신 대로 자유롭게 나만의 식물을 그려주세요'
-    : '화면 속 QR을 인식하고 모바일 웹으로 접속해주세요';
+  const subtitle =
+    recognizedCount === 2
+      ? '이제 모바일 웹에 접속하여 상상하신 대로 자유롭게 나만의 식물을 그려주세요'
+      : '화면 속 QR을 인식하고 모바일 웹으로 접속해주세요';
 
   return (
     <div className={arc.viewport}>
@@ -194,6 +228,11 @@ export default function FailScreen() {
           <div className={arc.rouletteLayer}>
             <StillRoulette logoIndex={district.logoIndex} />
           </div>
+          {qrTargetUrl ? (
+            <div className={styles.miniQr}>
+              <DynamicQrCode url={qrTargetUrl} alt="모바일 접속 QR 코드" />
+            </div>
+          ) : null}
           <p className={styles.title}>{title}</p>
           <p className={styles.subtitle}>{subtitle}</p>
           <div className={styles.veil} />

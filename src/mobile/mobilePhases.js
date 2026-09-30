@@ -1,6 +1,7 @@
-/** 모바일 플로우: loading → drawing → save → tag → tag2 → convert → end */
+/** 모바일 플로우: loading → prompt(연동) → drawing → … */
 export const MOBILE_PHASE = {
   LOADING: 'loading',
+  PROMPT: 'prompt',
   DRAWING: 'drawing',
   SAVE: 'save',
   TAG: 'tag',

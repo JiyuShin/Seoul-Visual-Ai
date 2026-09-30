@@ -124,8 +124,16 @@
   z-index: 1;
 }
 
-.layerDrawing {
+.layerPrompt {
   z-index: 2;
+}
+
+.layerPromptExit {
+  pointer-events: none;
+}
+
+.layerDrawing {
+  z-index: 3;
 }
 
 .layerSave {

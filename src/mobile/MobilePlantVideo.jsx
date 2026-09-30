@@ -6,6 +6,7 @@ export default function MobilePlantVideo({
   videoSrc = MOBILE_LOADING_VIDEO_SRC,
   posterSrc = MOBILE_LOADING_POSTER_SRC,
   onEnded,
+  loop = false,
 }) {
   return (
     <div className={styles.slot} data-figma-node="1690:706" aria-hidden="true">
@@ -17,7 +18,8 @@ export default function MobilePlantVideo({
         muted
         playsInline
         preload="auto"
-        onEnded={onEnded}
+        loop={loop}
+        onEnded={loop ? undefined : onEnded}
       />
     </div>
   );

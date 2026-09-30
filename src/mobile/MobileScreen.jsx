@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import MobileDrawingPage from './MobileDrawingPage';
 import MobileConvertPage from './MobileConvertPage';
@@ -6,6 +7,7 @@ import MobileConvertShader from './MobileConvertShader';
 import MobileEndPage from './MobileEndPage';
 import MobileCompletePage from './MobileCompletePage';
 import MobileLoadingPage from './MobileLoadingPage';
+import MobilePromptPage from './MobilePromptPage';
 import MobilePlantVideo from './MobilePlantVideo';
 import MobileSavePage from './MobileSavePage';
 import MobileTag2Page from './MobileTag2Page';
@@ -24,14 +26,23 @@ import {
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import { resolveMobileDistrictCopy } from './mobileDistrictCopy';
 import { pickEndPlantVariant } from './mobileEndPlantVariants';
+import { useDevMobileInput } from './useDevMobileInput';
 import styles from './MobileScreen.module.css';
 
 export default function MobileScreen() {
-  const { districtFromKiosk, sessionId, mobileSlot, sendState, disconnect } = useMobileLink();
+  const router = useRouter();
+  const { districtFromKiosk, sessionId, mobileSlot, slots, sendState, disconnect } =
+    useMobileLink();
   const entryFlow = useEntryFlow();
   const selectedDistrict = entryFlow?.selectedDistrict;
+  const districtFromQuery = useMemo(() => {
+    if (!router.isReady) return '';
+    const raw = router.query.district;
+    const name = typeof raw === 'string' ? raw : raw?.[0];
+    return name ? decodeURIComponent(name) : '';
+  }, [router.isReady, router.query.district]);
   const districtName =
-    districtFromKiosk?.name ?? selectedDistrict?.name ?? '종로구';
+    districtFromKiosk?.name ?? districtFromQuery ?? selectedDistrict?.name ?? '종로구';
   const districtCopy = useMemo(
     () => resolveMobileDistrictCopy(districtName),
     [districtName]
@@ -39,6 +50,8 @@ export default function MobileScreen() {
   const [phase, setPhase] = useState(MOBILE_PHASE.LOADING);
   const [loadingMounted, setLoadingMounted] = useState(true);
   const [loadingExit, setLoadingExit] = useState(false);
+  const [promptMounted, setPromptMounted] = useState(false);
+  const [promptExit, setPromptExit] = useState(false);
   const [bgBrighten, setBgBrighten] = useState(false);
   const [bgHeavyBlur, setBgHeavyBlur] = useState(false);
   const completedRef = useRef(false);
@@ -65,32 +78,93 @@ export default function MobileScreen() {
 
   const isCompletedRef = useRef(false);
 
-  const goDrawing = useCallback(() => {
+  const isLinkedSession = Boolean(sessionId && mobileSlot);
+  const bothPeersConnected = Boolean(sessionId && mobileSlot && slots.A && slots.B);
+
+  useEffect(() => {
+    completedRef.current = false;
+    isCompletedRef.current = false;
+  }, [sessionId, mobileSlot]);
+
+  useEffect(() => {
+    if (bothPeersConnected) {
+      completedRef.current = false;
+    }
+  }, [bothPeersConnected]);
+
+  const pushPlantDrawing = useCallback(
+    (drawingUrl, plantNameOverride) => {
+      if (!isLinkedSession || !drawingUrl || !mobileSlot) return;
+      try {
+        sendState({
+          type: 'plant_drawing',
+          slot: mobileSlot,
+          drawingUrl,
+          plantName: (plantNameOverride ?? plantName).trim(),
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [isLinkedSession, mobileSlot, plantName, sendState]
+  );
+
+  const goPrompt = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
     setBgBrighten(true);
     setLoadingExit(true);
-    setPhase(MOBILE_PHASE.DRAWING);
-    setDrawingEnterFromLoading(true);
-    setDrawingMounted(true);
+    setPhase(MOBILE_PHASE.PROMPT);
+    setPromptMounted(true);
     window.setTimeout(() => {
       setLoadingMounted(false);
       setLoadingExit(false);
       setBgBrighten(false);
+    }, LOADING_TO_DRAWING_MS);
+  }, []);
+
+  const goDrawingFromPrompt = useCallback(() => {
+    setPromptExit(true);
+    setPhase(MOBILE_PHASE.DRAWING);
+    setDrawingEnterFromLoading(true);
+    setDrawingMounted(true);
+    window.setTimeout(() => {
+      setPromptMounted(false);
+      setPromptExit(false);
       setDrawingEnterFromLoading(false);
     }, LOADING_TO_DRAWING_MS);
   }, []);
 
-  const goSave = useCallback((dataUrl) => {
-    setPlantDrawingUrl(dataUrl ?? null);
-    setDrawingExit(true);
-    setPhase(MOBILE_PHASE.SAVE);
-    setSaveMounted(true);
-    window.setTimeout(() => {
-      setDrawingMounted(false);
-      setDrawingExit(false);
-    }, DRAWING_TO_SAVE_MS);
-  }, []);
+  useEffect(() => {
+    if (!isLinkedSession || !bothPeersConnected) return undefined;
+    if (phase !== MOBILE_PHASE.LOADING) return undefined;
+    goPrompt();
+    return undefined;
+  }, [isLinkedSession, bothPeersConnected, phase, goPrompt]);
+
+  useEffect(() => {
+    if (phase !== MOBILE_PHASE.PROMPT || !bothPeersConnected) return undefined;
+    const timer = window.setTimeout(() => {
+      goDrawingFromPrompt();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [phase, bothPeersConnected, goDrawingFromPrompt]);
+
+  const goSave = useCallback(
+    (dataUrl) => {
+      const url = dataUrl ?? null;
+      setPlantDrawingUrl(url);
+      if (url) pushPlantDrawing(url, '');
+      setDrawingExit(true);
+      setPhase(MOBILE_PHASE.SAVE);
+      setSaveMounted(true);
+      window.setTimeout(() => {
+        setDrawingMounted(false);
+        setDrawingExit(false);
+      }, DRAWING_TO_SAVE_MS);
+    },
+    [pushPlantDrawing]
+  );
 
   const goTag = useCallback(() => {
     setBgHeavyBlur(true);
@@ -112,6 +186,7 @@ export default function MobileScreen() {
       const nextName = confirmedName?.trim() || plantName.trim();
       if (!nextName) return;
       setPlantName(nextName);
+      if (plantDrawingUrl) pushPlantDrawing(plantDrawingUrl, nextName);
       setTag2Exit(true);
       setPhase(MOBILE_PHASE.CONVERT);
       window.setTimeout(() => {
@@ -120,8 +195,14 @@ export default function MobileScreen() {
         setConvertMounted(true);
       }, TAG2_TO_CONVERT_MS);
     },
-    [plantName]
+    [plantDrawingUrl, plantName, pushPlantDrawing]
   );
+
+  useDevMobileInput({
+    phase,
+    setPlantName,
+    onConfirmName: goConvert,
+  });
 
   const goEnd = useCallback(() => {
     setEndPlantVariant(pickEndPlantVariant(districtName, { sessionId, slot: mobileSlot }));
@@ -146,6 +227,7 @@ export default function MobileScreen() {
         type: 'plant_sent',
         plantName: plantName.trim(),
         plantVariant: endPlantVariant?.id ?? null,
+        plantImage: endPlantVariant?.image ?? null,
         district: districtName,
         slot: mobileSlot,
       });
@@ -167,7 +249,7 @@ export default function MobileScreen() {
     window.setTimeout(() => {
       disconnect();
     }, 150);
-  }, [disconnect, districtName, endPlantVariant?.id, mobileSlot, plantName, sendState]);
+  }, [disconnect, districtName, endPlantVariant?.id, endPlantVariant?.image, mobileSlot, plantName, sendState]);
 
   useEffect(() => {
     if (phase !== MOBILE_PHASE.CONVERT || !convertMounted) return undefined;
@@ -181,6 +263,7 @@ export default function MobileScreen() {
 
   const showPlantVideo =
     phase === MOBILE_PHASE.LOADING ||
+    phase === MOBILE_PHASE.PROMPT ||
     phase === MOBILE_PHASE.DRAWING ||
     phase === MOBILE_PHASE.SAVE ||
     phase === MOBILE_PHASE.TAG ||
@@ -190,7 +273,12 @@ export default function MobileScreen() {
   return (
     <div className={styles.mobileRoot}>
       <div className={styles.backdropLayer} aria-hidden="true">
-        {showPlantVideo && <MobilePlantVideo onEnded={goDrawing} />}
+        {showPlantVideo && (
+          <MobilePlantVideo
+            loop={isLinkedSession && !bothPeersConnected}
+            onEnded={undefined}
+          />
+        )}
         <div
           className={`${styles.backdropGradient} ${
             loadingMounted ? styles.backdropGradientLoading : ''
@@ -223,8 +311,18 @@ export default function MobileScreen() {
             <MobileLoadingPage
               districtName={districtName}
               loadingLead={districtCopy.loadingLead}
+              waitingForPeer={isLinkedSession && !bothPeersConnected}
               exiting={loadingExit}
             />
+          </div>
+        )}
+        {promptMounted && (
+          <div
+            className={`${styles.layer} ${styles.layerPrompt} ${
+              promptExit ? styles.layerPromptExit : ''
+            }`}
+          >
+            <MobilePromptPage onStart={goDrawingFromPrompt} exiting={promptExit} />
           </div>
         )}
         {drawingMounted && (

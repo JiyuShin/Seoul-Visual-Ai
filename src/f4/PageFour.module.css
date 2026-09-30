@@ -325,6 +325,15 @@
   transform-origin: center center;
 }
 
+.plantUserDrawing {
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.plantPicked {
+  object-fit: contain;
+}
+
 .nameText {
   display: inline-block;
   opacity: 0;

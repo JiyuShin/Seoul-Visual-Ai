@@ -14,6 +14,7 @@ import { VIEWER_BY_CAM } from './gaze/participants';
 import GazeCameraFeeds from './gaze/GazeCameraFeeds';
 import GazeDebugHud from './gaze/GazeDebugHud';
 import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
+import { isDevAssistEnabled } from './dev/devEvents';
 
 const EntryFlowContext = createContext(null);
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -125,6 +126,14 @@ export function EntryFlowProvider({ children }) {
 
   const gazeEnabled = router.pathname !== '/mobile';
   const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
+
+  useEffect(() => {
+    if (!router.isReady || router.pathname !== '/2') return undefined;
+    if (!isDevAssistEnabled(router.query)) return undefined;
+    setMouseDev(true);
+    setSetupComplete(true);
+    return undefined;
+  }, [router.isReady, router.pathname, router.query.dev]);
 
   const handleGazeClipChange = useCallback((clip) => {
     setGazeClip(clip);

@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
-import {
-  buildMobileJoinUrl,
-  getMobilePublicOriginSync,
-} from '../../shared/mobileLink/publicOrigin';
 import DynamicQrCode from '../../shared/mobileLink/DynamicQrCode';
 import { useMobileLink } from '../../shared/mobileLink/MobileLinkContext';
 import {
@@ -411,7 +407,7 @@ function QrBorder() {
   return <div ref={borderRef} className={styles.qrGlow} />;
 }
 
-function QrCopy({ phase, qrUrl }) {
+function QrCopy({ phase, qrUrl, joinedCount = 0 }) {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -450,6 +446,12 @@ function QrCopy({ phase, qrUrl }) {
         </div>
         <QrBorder />
       </div>
+      {phase === 'q' && joinedCount > 0 ? (
+        <p className={`${styles.resultBody} ${motion} ${styles.qrJoinStatus}`} role="status">
+          모바일 접속 {joinedCount}/2
+          {joinedCount < 2 ? ' · 두 번째 기기도 같은 QR로 접속해 주세요' : ' · 잠시 후 다음 화면으로 이동합니다'}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -457,14 +459,14 @@ function QrCopy({ phase, qrUrl }) {
 export default function AreaSelection() {
   const router = useRouter();
   const { setSelectedDistrict } = useEntryFlow();
-  const { startKioskSession, qrTargetUrl, mobilePublicOrigin } = useMobileLink();
+  const { startKioskSession, qrTargetUrl, slots } = useMobileLink();
   const kioskSessionRef = useRef(false);
-  const [localQrUrl, setLocalQrUrl] = useState('');
   const [phase, setPhase] = useState('f');
   const [districtIndex, setDistrictIndex] = useState(0);
   const [districtReady, setDistrictReady] = useState(false);
   const district = DISTRICTS[districtIndex];
-  const displayQrUrl = qrTargetUrl || localQrUrl;
+  const displayQrUrl = qrTargetUrl;
+  const joinedCount = Number(slots.A) + Number(slots.B);
 
   const finishFinding = useCallback((landedOffset) => {
     const index = districtIndexForLandedOffset(landedOffset);
@@ -491,8 +493,10 @@ export default function AreaSelection() {
   }, [phase]);
 
   useEffect(() => {
-    if (phase !== 'q') return undefined;
+    if (!router.isReady || phase !== 'q') return undefined;
+    if (joinedCount < 1) return undefined;
     const name = district.name;
+    const delayMs = joinedCount >= 2 ? 800 : 1000;
     const timeout = setTimeout(() => {
       try {
         sessionStorage.setItem('seoul-district', name);
@@ -500,9 +504,9 @@ export default function AreaSelection() {
         // 저장이 막혀도 화면 전환은 이어간다.
       }
       router.push(`/fail?district=${encodeURIComponent(name)}`);
-    }, MAP_FADE_OUT_MS + 4200);
+    }, delayMs);
     return () => clearTimeout(timeout);
-  }, [phase, router, district]);
+  }, [router.isReady, phase, joinedCount, router, district]);
 
   useEffect(() => {
     if (!districtReady || !district?.name) return undefined;
@@ -514,7 +518,6 @@ export default function AreaSelection() {
   useLayoutEffect(() => {
     if (phase === 'f') {
       kioskSessionRef.current = false;
-      setLocalQrUrl('');
       return undefined;
     }
     if (phase !== 's' && phase !== 'q') return undefined;
@@ -522,14 +525,18 @@ export default function AreaSelection() {
 
     kioskSessionRef.current = true;
     try {
-      const id = startKioskSession(district);
-      const origin = mobilePublicOrigin || getMobilePublicOriginSync();
-      setLocalQrUrl(buildMobileJoinUrl(id, origin));
+      startKioskSession(district);
     } catch {
       kioskSessionRef.current = false;
     }
     return undefined;
-  }, [phase, district, startKioskSession, mobilePublicOrigin]);
+  }, [phase, district, startKioskSession]);
+
+  useEffect(() => {
+    if (phase !== 'q' || !district?.name) return undefined;
+    startKioskSession(district);
+    return undefined;
+  }, [phase, district?.name, startKioskSession]);
 
   return (
     <Stage>
@@ -545,7 +552,7 @@ export default function AreaSelection() {
       <MovingMap phase={phase} />
       <SelectedCopy district={district} phase={phase} />
       {phase !== 'f' && <DistrictGlow district={district} hidden={phase !== 's'} />}
-      <QrCopy phase={phase} qrUrl={displayQrUrl} />
+      <QrCopy phase={phase} qrUrl={displayQrUrl} joinedCount={joinedCount} />
     </Stage>
   );
 }
