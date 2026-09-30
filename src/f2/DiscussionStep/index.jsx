@@ -371,6 +371,10 @@ export default function DiscussionStep({
         if (aliveRef.current) setBeat('dock');
       }, 2600);
     };
+    const speech = speechOutputRef.current;
+    speech.warm(LINE_83);
+    speech.warm(gazeLine('A'));
+    speech.warm(MIC_LINE);
     say('intro', INTRO_LINE, beginUnveil, beginUnveil, true, false);
     return () => window.clearTimeout(dockTimer);
   }, [say]);

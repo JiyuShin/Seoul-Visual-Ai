@@ -160,7 +160,8 @@ export default function OpeningAgent({ speaking }) {
     let motion = 0;
 
     const resize = () => {
-      const size = Math.max(1, canvas.clientWidth || 640);
+      const size = canvas.clientWidth;
+      if (!size) return;
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
       renderer.setPixelRatio(ratio);
       renderer.setSize(size, size, false);
@@ -169,9 +170,9 @@ export default function OpeningAgent({ speaking }) {
 
     const render = (now) => {
       frameId = requestAnimationFrame(render);
-      const size = Math.max(1, canvas.clientWidth || 640);
+      const size = canvas.clientWidth;
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      if (Math.abs(canvas.width - size * ratio) > 2) resize();
+      if (size && Math.abs(canvas.width - size * ratio) > 2) resize();
       const dt = Math.min((now - (last || now)) / 1000, 0.05);
       last = now;
       const talking = speakingRef.current ? 1 : 0;

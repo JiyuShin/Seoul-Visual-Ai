@@ -3,9 +3,33 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const SPEECH_REVISION = 'student-shimmer-22';
 const PITCH_RATE = 1.06;
 
-function spokenHoldMs(text) {
-  const chars = Array.from(text.replace(/\s/g, '')).length;
-  return Math.max(1600, chars * 240);
+const AFTER_AUDIO_MS = 160;
+
+function loadSpeech(text, cacheRef, inflightRef) {
+  const spoken = String(text || '').trim();
+  if (!spoken) return Promise.resolve(null);
+  const cacheKey = `${SPEECH_REVISION}:${spoken}`;
+  const cached = cacheRef.current.get(cacheKey);
+  if (cached) return Promise.resolve(cached);
+  const pending = inflightRef.current.get(cacheKey);
+  if (pending) return pending;
+  const task = fetch('/api/discussion-speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: spoken }),
+  }).then(async (response) => {
+    if (!response.ok) throw new Error('speech failed');
+    const blob = await response.blob();
+    if (!blob.size) throw new Error('empty audio');
+    const cache = cacheRef.current;
+    cache.set(cacheKey, blob);
+    if (cache.size > 12) cache.delete(cache.keys().next().value);
+    return blob;
+  }).finally(() => {
+    if (inflightRef.current.get(cacheKey) === task) inflightRef.current.delete(cacheKey);
+  });
+  inflightRef.current.set(cacheKey, task);
+  return task;
 }
 
 export function useSpeechOutput() {
@@ -23,6 +47,7 @@ export function useSpeechOutput() {
   const abortRef = useRef(null);
   const unlockRef = useRef(null);
   const cacheRef = useRef(new Map());
+  const inflightRef = useRef(new Map());
 
   const clearUnlock = useCallback(() => {
     if (!unlockRef.current) return;
@@ -90,8 +115,6 @@ export function useSpeechOutput() {
     window.speechSynthesis?.cancel();
 
     let finished = false;
-    let startedAt = 0;
-    const minHold = spokenHoldMs(spoken);
     const finish = () => {
       if (finished || session !== sessionRef.current) return;
       finished = true;
@@ -165,16 +188,13 @@ export function useSpeechOutput() {
         stopLevel();
         setVoiceLive(false);
         onAudioEnd?.();
-        const elapsed = startedAt ? Date.now() - startedAt : minHold;
-        const remain = Math.max(0, minHold - elapsed);
-        window.setTimeout(finish, Math.max(0, remain - 300));
+        window.setTimeout(finish, AFTER_AUDIO_MS);
       };
       const begin = async () => {
         if (started || halted || finished || session !== sessionRef.current) return;
         await ctx.resume();
         if (ctx.state === 'suspended') return;
         started = true;
-        startedAt = Date.now();
         setIsSpeaking(true);
         onPlaybackStart?.();
         armMeter();
@@ -191,28 +211,7 @@ export function useSpeechOutput() {
       window.addEventListener('keydown', unlock, true);
     };
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const cacheKey = `${SPEECH_REVISION}:${spoken}`;
-    const cached = cacheRef.current.get(cacheKey);
-    const load = cached
-      ? Promise.resolve(cached)
-      : fetch('/api/discussion-speech', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: spoken }),
-        signal: controller.signal,
-      }).then(async (response) => {
-        if (!response.ok) throw new Error('speech failed');
-        const blob = await response.blob();
-        if (!blob.size) throw new Error('empty audio');
-        const cache = cacheRef.current;
-        cache.set(cacheKey, blob);
-        if (cache.size > 12) cache.delete(cache.keys().next().value);
-        return blob;
-      });
-
-    load.then((blob) => {
+    loadSpeech(spoken, cacheRef, inflightRef).then((blob) => {
       if (finished || session !== sessionRef.current) return;
       return playBlob(blob);
     }).catch((error) => {
@@ -224,8 +223,13 @@ export function useSpeechOutput() {
     return true;
   }, [clearUnlock, stopAudio, stopLevel]);
 
+  const warm = useCallback((text) => {
+    loadSpeech(text, cacheRef, inflightRef).catch(() => {});
+  }, []);
+
   return {
     speak,
+    warm,
     stopSpeaking,
     isSpeaking,
     isSupported,
