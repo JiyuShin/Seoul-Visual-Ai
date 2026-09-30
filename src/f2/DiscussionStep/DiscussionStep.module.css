@@ -568,6 +568,10 @@
     opacity 0.8s ease;
 }
 
+:global(html.discussion-page-transition) .orbSlot {
+  view-transition-name: none;
+}
+
 .orbFinale {
   transition:
     top 1.85s cubic-bezier(0.16, 1.22, 0.28, 1),

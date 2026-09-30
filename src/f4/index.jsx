@@ -4,10 +4,12 @@ import { useEntryFlow } from '../shared/EntryFlowContext';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import { bothSlotsHaveSent, bothSlotsConnected } from '../shared/mobileLink/slotPlants';
 import QuietStreet from './QuietStreet';
+import GlassSwirl from './GlassSwirl';
 import styles from './PageFour.module.css';
 
 const STAGE = { width: 3881, height: 2183 };
 const TRAVEL_MS = 7000;
+const SWIRL_AFTER_MS = 5600;
 const PLACES = ['종로구', '마포구', '강남구'];
 
 /** 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다. */
@@ -24,8 +26,8 @@ const KIOSK_PLANT_IMAGES = {
 };
 
 const PLACEHOLDER_PLANTS = [
-  { name: '몬스테라', image: '/4/plant-left.png', tone: 'lilac' },
-  { name: '금목서향새싹', image: '/4/plant-right.png', tone: 'mint' },
+  { name: '몬스테라', image: '/4/plant-left.png', tone: 'mint' },
+  { name: '금목서향새싹', image: '/4/plant-right.png', tone: 'lilac' },
 ];
 
 function readStoredPlace() {
@@ -46,6 +48,7 @@ export default function PageFour() {
   const [step, setStep] = useState('travel');
   const [streetReady, setStreetReady] = useState(false);
   const [placeName, setPlaceName] = useState('');
+  const [swirlOn, setSwirlOn] = useState(false);
   const travelStarted = useRef(false);
   const kioskEnsured = useRef(false);
 
@@ -113,6 +116,15 @@ export default function PageFour() {
     return undefined;
   }, [bothSent]);
 
+  useEffect(() => {
+    if (step !== 'slots') {
+      setSwirlOn(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSwirlOn(true), SWIRL_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
   const slotPlantsView = useMemo(
     () =>
       ['A', 'B'].map((slotKey, index) => {
@@ -163,10 +175,96 @@ export default function PageFour() {
           {step === 'slots' ? (
             <>
               <div className={`${styles.sproutCopy} ${styles.sproutSequence}`}>
-                <p className={styles.sproutTitle}>
-                  두 분의 식물이 <b>새싹을 틔웠어요!</b>
-                </p>
-                <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
+                {placeName === '강남구' ? (
+                  <>
+                    <svg className={styles.gangnamTitle} viewBox="0 0 2518 169" role="img" aria-label="두 분의 식물이 새싹을 틔웠어요!">
+                      <defs>
+                        <linearGradient id="gangnamTitleFill" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#070002" />
+                          <stop offset="1" stopColor="#657D82" />
+                        </linearGradient>
+                        <filter id="gangnamTitleShadow" x="-15%" y="-45%" width="130%" height="190%" colorInterpolationFilters="sRGB">
+                          <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#4d4d4d" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="122"
+                        textAnchor="middle"
+                        fill="url(#gangnamTitleFill)"
+                        filter="url(#gangnamTitleShadow)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="130"
+                        style={{ letterSpacing: '-2.6px' }}
+                      >
+                        두 분의 식물이 <tspan fontWeight="700">새싹을 틔웠어요!</tspan>
+                      </text>
+                    </svg>
+                    <svg className={styles.gangnamSub} viewBox="0 0 2518 84" role="img" aria-label={`이제 ${placeName}로 함께 이동해 직접 심어볼게요`}>
+                      <defs>
+                        <linearGradient id="gangnamSubFill" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#4A5860" />
+                          <stop offset="1" stopColor="#417097" />
+                        </linearGradient>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="60"
+                        textAnchor="middle"
+                        fill="url(#gangnamSubFill)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="60"
+                        fontWeight="600"
+                        style={{ letterSpacing: '-1.2px' }}
+                      >
+                        이제 {placeName}로 함께 이동해 직접 심어볼게요
+                      </text>
+                    </svg>
+                  </>
+                ) : placeName === '마포구' ? (
+                  <>
+                    <svg className={styles.mapoTitle} viewBox="0 0 2518 169" role="img" aria-label="두 분의 식물이 새싹을 틔웠어요!">
+                      <defs>
+                        <filter id="mapoTitleShadow" x="-15%" y="-45%" width="130%" height="190%" colorInterpolationFilters="sRGB">
+                          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#000" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="122"
+                        textAnchor="middle"
+                        fill="#FFFFFF"
+                        filter="url(#mapoTitleShadow)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="130"
+                        style={{ letterSpacing: '-2.6px' }}
+                      >
+                        두 분의 식물이 <tspan fontWeight="700">새싹을 틔웠어요!</tspan>
+                      </text>
+                    </svg>
+                    <svg className={styles.mapoSub} viewBox="0 0 2518 84" role="img" aria-label={`이제 ${placeName}로 함께 이동해 직접 심어볼게요`}>
+                      <text
+                        x="1259"
+                        y="60"
+                        textAnchor="middle"
+                        fill="#FFFFFF"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="60"
+                        fontWeight="600"
+                        style={{ letterSpacing: '-1.2px' }}
+                      >
+                        이제 {placeName}로 함께 이동해 직접 심어볼게요
+                      </text>
+                    </svg>
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.sproutTitle}>
+                      두 분의 식물이 <b>새싹을 틔웠어요!</b>
+                    </p>
+                    <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
+                  </>
+                )}
               </div>
               {slotPlantsView.map((plant, index) => (
                 <div
@@ -183,7 +281,17 @@ export default function PageFour() {
                         alt=""
                       />
                     </div>
-                    <img className={styles.orbRing} src="/4/orb-grown.svg" alt="" />
+                    <GlassSwirl live={swirlOn} phase={index === 0 ? 0 : 2.4} />
+                    <img
+                      className={`${styles.orbRing} ${swirlOn ? styles.orbRingFade : ''}`}
+                      src="/4/orb-grown.svg"
+                      alt=""
+                    />
+                    <img
+                      className={`${styles.orbRing} ${styles.orbRingClear} ${swirlOn ? styles.orbRingClearOn : ''}`}
+                      src="/4/orb-grown-clear.svg"
+                      alt=""
+                    />
                   </div>
                   <p className={`${styles.namePill} ${plant.tone === 'lilac' ? styles.nameLilac : styles.nameMint}`}>
                     <span className={styles.nameText}>{plant.name}</span>

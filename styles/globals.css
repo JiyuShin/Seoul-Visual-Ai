@@ -81,13 +81,41 @@ html.op-discussion-transition::view-transition-new(op-discussion-orb) {
   100% { opacity: 1; }
 }
 
+html.discussion-page-transition::view-transition-group(root) {
+  animation-duration: 2200ms;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+html.discussion-page-transition::view-transition-old(root) {
+  animation: discussion-page-out 2200ms cubic-bezier(0.45, 0, 0.2, 1) both;
+  mix-blend-mode: normal;
+}
+
+html.discussion-page-transition::view-transition-new(root) {
+  animation: discussion-page-in 2200ms cubic-bezier(0.45, 0, 0.2, 1) both;
+  mix-blend-mode: normal;
+}
+
+@keyframes discussion-page-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes discussion-page-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.op-discussion-transition::view-transition-group(root),
   html.op-discussion-transition::view-transition-group(op-discussion-orb),
   html.op-discussion-transition::view-transition-old(root),
   html.op-discussion-transition::view-transition-new(root),
   html.op-discussion-transition::view-transition-old(op-discussion-orb),
-  html.op-discussion-transition::view-transition-new(op-discussion-orb) {
+  html.op-discussion-transition::view-transition-new(op-discussion-orb),
+  html.discussion-page-transition::view-transition-group(root),
+  html.discussion-page-transition::view-transition-old(root),
+  html.discussion-page-transition::view-transition-new(root) {
     animation-duration: 1ms;
   }
 }

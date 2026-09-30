@@ -213,6 +213,26 @@
   letter-spacing: -1.2px;
 }
 
+.gangnamTitle,
+.gangnamSub,
+.mapoTitle,
+.mapoSub {
+  display: block;
+  width: 2518px;
+  overflow: visible;
+}
+
+.gangnamTitle,
+.mapoTitle {
+  height: 169px;
+}
+
+.gangnamSub,
+.mapoSub {
+  height: 84px;
+  margin-top: 26px;
+}
+
 .plantSlot {
   position: absolute;
   z-index: 3;
@@ -292,6 +312,48 @@
 .orb {
   position: absolute;
   inset: 0;
+  will-change: transform;
+}
+
+.slotLeft.slotSequence .orb {
+  animation: orbFloatLeft 4.6s ease-in-out var(--bubble-seq) infinite;
+}
+
+.slotRight.slotSequence .orb {
+  animation: orbFloatRight 5.1s ease-in-out calc(var(--bubble-seq) + 0.3s) infinite;
+}
+
+@keyframes orbFloatLeft {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  48% {
+    transform: translate3d(0, -54px, 0);
+  }
+  72% {
+    transform: translate3d(0, -35px, 0);
+  }
+}
+
+@keyframes orbFloatRight {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  42% {
+    transform: translate3d(0, -40px, 0);
+  }
+  68% {
+    transform: translate3d(0, -62px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slotLeft.slotSequence .orb,
+  .slotRight.slotSequence .orb {
+    animation: none;
+  }
 }
 
 .orbClip {
@@ -306,13 +368,42 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  z-index: 2;
+  z-index: 3;
   width: 149%;
   height: 149%;
   max-width: none;
   max-height: none;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  transition: opacity 1.8s cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.orbRingFade {
+  opacity: 0;
+}
+
+.orbRingClear {
+  opacity: 0;
+}
+
+.orbRingClearOn {
+  opacity: 1;
+}
+
+.orbSwirl {
+  position: absolute;
+  inset: 5%;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.8s cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.orbSwirlOn {
+  opacity: 1;
 }
 
 .plant {
@@ -408,21 +499,30 @@
 
 .nameLilac {
   background:
-    radial-gradient(circle at 50% 50%, #bd8fe6 0%, #dec7f2 45%, #fff 90%);
+    radial-gradient(
+      ellipse 157% 74% at -18% 50%,
+      rgba(189, 143, 230, 0.9) 0%,
+      rgba(255, 255, 255, 0.9) 90%
+    );
   box-shadow:
-    0 0 59px #dfc0ff,
-    inset 0 -11px 15px #fff,
-    inset 6px 6px 24px #a869df,
-    inset 7px 7px 19px rgba(255, 255, 255, 0.7);
+    0 0 59.4px #dfc0ff,
+    inset 7.49px 7.49px 18.72px rgba(255, 255, 255, 0.7),
+    inset 5.62px 5.62px 24.34px #a869df,
+    inset 0 -11.23px 14.98px #fff;
 }
 
 .nameMint {
   background:
-    radial-gradient(circle at 40% 45%, rgba(179, 242, 131, 0.95) 0%, rgba(217, 249, 193, 0.98) 50%, #fff 100%);
+    radial-gradient(
+      ellipse 121% 439% at -17% 45%,
+      rgba(179, 242, 131, 0.855) 0%,
+      rgba(255, 255, 255, 0.9) 100%
+    );
   box-shadow:
-    0 0 12px #fff,
-    0 0 19px rgba(210, 255, 214, 0.5),
-    inset 14px 7px 5px rgba(255, 255, 255, 0.5),
-    inset 0 -12px 24px #fff,
-    inset 5px 5px 60px rgba(158, 255, 84, 0.8);
+    0 0 19.44px rgba(210, 255, 214, 0.5),
+    0 0 11.8px #fff,
+    inset 21.99px 16.82px 13.64px rgba(255, 255, 255, 0.4),
+    inset 4.71px 4.71px 60.1px rgba(158, 255, 84, 0.8),
+    inset 0 -12px 24.11px #fff,
+    inset 14px 7px 5.2px rgba(255, 255, 255, 0.5);
 }

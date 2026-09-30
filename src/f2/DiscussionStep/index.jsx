@@ -405,7 +405,29 @@ export default function DiscussionStep({
       return () => window.clearTimeout(timer);
     }
     if (beat === 'analyze') {
-      const timer = window.setTimeout(() => router.push('/3'), 2800);
+      const timer = window.setTimeout(() => {
+        const go = () => {
+          const pending = router.push('/3');
+          return pending && typeof pending.then === 'function' ? pending : Promise.resolve();
+        };
+        if (typeof document === 'undefined' || !document.startViewTransition) {
+          go();
+          return;
+        }
+        document.documentElement.classList.add('discussion-page-transition');
+        const transition = document.startViewTransition(() =>
+          go().then(
+            () =>
+              new Promise((resolve) => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+              })
+          )
+        );
+        const finished = transition.finished || Promise.resolve();
+        finished.finally(() => {
+          document.documentElement.classList.remove('discussion-page-transition');
+        });
+      }, 2800);
       return () => window.clearTimeout(timer);
     }
     return undefined;
