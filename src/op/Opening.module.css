@@ -263,6 +263,7 @@
   z-index: 3;
   transform-origin: top left;
   pointer-events: none;
+  view-transition-name: op-discussion-orb;
 }
 
 .agentMoveOn {

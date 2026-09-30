@@ -149,9 +149,21 @@ export default function Opening() {
   }, [scale]);
 
   useEffect(() => {
+    router.prefetch('/2');
+  }, [router]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       if (frame >= LAST_FRAME) {
-        router.push('/2');
+        if (typeof document === 'undefined' || !document.startViewTransition) {
+          router.push('/2');
+          return;
+        }
+        document.documentElement.classList.add('op-discussion-transition');
+        const transition = document.startViewTransition(() => router.push('/2'));
+        transition.finished.finally(() => {
+          document.documentElement.classList.remove('op-discussion-transition');
+        });
         return;
       }
       setFrame((current) => current + 1);
