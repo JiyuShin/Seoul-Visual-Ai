@@ -75,7 +75,7 @@ export default function MobileSavePage({
         data-figma-node="1693:985"
         onClick={onComplete}
       >
-        <img className={drawingStyles.nextBg} src="/mobile/btn-next.svg" alt="" aria-hidden="true" />
+        <span className={drawingStyles.nextBg} aria-hidden="true" />
         <span className={drawingStyles.nextLabel}>내 식물 완성하기</span>
       </button>
     </div>

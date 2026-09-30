@@ -38,11 +38,11 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 451px;
+  top: 406px;
   z-index: 4;
   margin: 0;
   color: #fff;
-  font-size: 150px;
+  font-size: 135px;
   font-weight: 500;
   line-height: 1.2;
   letter-spacing: -3px;
@@ -54,11 +54,11 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 658px;
+  top: 603px;
   z-index: 4;
   margin: 0;
   color: #fff;
-  font-size: 55px;
+  font-size: 50px;
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: -1.1px;
@@ -68,11 +68,14 @@
 
 .ring {
   position: absolute;
-  top: 890px;
+  top: 1440px;
   z-index: 3;
   width: 826px;
   height: 826px;
   pointer-events: none;
+  /* 원 + 하단 라벨을 하나의 묶음으로 축소 (중심 위치 유지, 레이아웃만) */
+  transform: scale(0.38);
+  transform-origin: center center;
 }
 
 .disc,
@@ -83,6 +86,12 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* 체크 표시만 아주 살짝 축소 (중앙 기준) */
+.check {
+  transform: scale(0.92);
+  transform-origin: center center;
 }
 
 .spinner {
@@ -113,24 +122,106 @@
 }
 
 .ringLeft {
-  left: 1053px;
+  left: 1253px;
 }
 
 .ringRight {
-  left: 1990px;
+  left: 1790px;
 }
 
 .label {
   position: absolute;
   left: 50%;
-  top: 829px;
+  top: 866px;
   z-index: 2;
   margin: 0;
   color: #e2f0e9;
-  font-size: 60px;
+  font-size: 130px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -1.2px;
   white-space: nowrap;
   transform: translateX(-50%);
+}
+
+/* 페이지 3(AreaSelection)과 동일한 큰 QR UI 스타일 (QR 내용은 동일한 qrTargetUrl) */
+.qrFrame {
+  position: absolute;
+  left: 1421px;
+  top: 705px;
+  width: 1039px;
+  height: 1038.029px;
+  z-index: 5;
+  box-sizing: border-box;
+  overflow: hidden;
+  opacity: 1;
+  transform: scale(0.85);
+  transform-origin: center;
+  border: 1.781px solid #fff;
+  border-radius: 194.206px;
+  box-shadow: 0 0 19.323px rgba(255, 255, 255, 0.78);
+  background:
+    radial-gradient(
+      circle 666px at 50% 50%,
+      rgba(0, 96, 134, 0.3) 0%,
+      rgba(16, 106, 142, 0.287) 6.25%,
+      rgba(32, 116, 149, 0.274) 12.5%,
+      rgba(64, 136, 164, 0.248) 25%,
+      rgba(96, 156, 180, 0.222) 37.5%,
+      rgba(128, 176, 195, 0.197) 50%,
+      rgba(191, 215, 225, 0.145) 75%,
+      rgba(255, 255, 255, 0.093) 100%
+    ),
+    linear-gradient(
+      202.318deg,
+      rgba(65, 172, 194, 0.036) 2.97%,
+      rgba(255, 255, 255, 0.12) 57.25%,
+      rgba(50, 173, 255, 0.3) 117.89%
+    );
+}
+
+.qrImageLive {
+  position: absolute;
+  left: 178.781px;
+  top: 175.781px;
+  width: 686px;
+  height: 691px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3%;
+  box-sizing: border-box;
+}
+
+.qrImageLive img,
+.qrImageLive p {
+  position: static;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-width: 100%;
+}
+
+.qrLoading {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.qrGlow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 22.262px 21.816px rgba(255, 255, 255, 0.74),
+    inset -19.421px -19.421px 97.103px rgba(250, 151, 255, 0.58),
+    inset 0 8.014px 5.343px #fff,
+    inset -35.619px 0 36.687px rgba(254, 206, 255, 0.62),
+    inset 16.507px -23.305px 37.87px rgba(255, 255, 255, 0.6),
+    inset 0 8.905px 21.371px rgba(255, 203, 129, 0.88),
+    inset -3.562px -3.562px 15.405px rgba(255, 255, 255, 0.38),
+    inset -8.905px -8.905px 16.83px rgba(0, 0, 0, 0.25);
 }

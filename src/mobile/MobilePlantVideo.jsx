@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { MOBILE_LOADING_POSTER_SRC, MOBILE_LOADING_VIDEO_SRC } from './mobileConfig';
 import styles from './MobilePlantVideo.module.css';
 
@@ -7,10 +8,26 @@ export default function MobilePlantVideo({
   posterSrc = MOBILE_LOADING_POSTER_SRC,
   onEnded,
   loop = false,
+  paused = false,
 }) {
+  const videoRef = useRef(null);
+
+  // 대기 화면 → 그림판 전환 시 현재 프레임에서 자연스럽게 정지(배경 고정)
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (paused) {
+      el.pause();
+    } else {
+      const p = el.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  }, [paused]);
+
   return (
     <div className={styles.slot} data-figma-node="1690:706" aria-hidden="true">
       <video
+        ref={videoRef}
         className={styles.video}
         src={videoSrc}
         poster={posterSrc}
@@ -18,7 +35,7 @@ export default function MobilePlantVideo({
         muted
         playsInline
         preload="auto"
-        loop={loop}
+        loop={loop && !paused}
         onEnded={loop ? undefined : onEnded}
       />
     </div>

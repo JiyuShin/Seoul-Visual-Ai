@@ -63,7 +63,7 @@ export default function MobileEndPage({
         <MobilePlantNameChip name={plantName} />
       </div>
       <button type="button" className={styles.sendBtn} data-figma-node="1926:5235" onClick={onSend}>
-        <img className={styles.sendBtnBg} src="/mobile/btn-next.svg" alt="" aria-hidden="true" />
+        <span className={styles.sendBtnBg} aria-hidden="true" />
         <span className={styles.sendBtnLabel}>전송</span>
       </button>
     </div>

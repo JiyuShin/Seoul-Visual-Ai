@@ -276,6 +276,7 @@ export default function MobileScreen() {
         {showPlantVideo && (
           <MobilePlantVideo
             loop={isLinkedSession && !bothPeersConnected}
+            paused={phase !== MOBILE_PHASE.LOADING && phase !== MOBILE_PHASE.PROMPT}
             onEnded={undefined}
           />
         )}
@@ -300,7 +301,7 @@ export default function MobileScreen() {
           <MobileConvertShader fading={phase !== MOBILE_PHASE.CONVERT} />
         )}
       </div>
-      <MobileStage width={width} height={height} fit="contain">
+      <MobileStage width={width} height={height} fit="width">
         <div className={styles.session}>
         {loadingMounted && (
           <div

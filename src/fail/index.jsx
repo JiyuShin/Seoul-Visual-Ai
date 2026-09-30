@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
-import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import { bothSlotsConnected, bothSlotsHaveSent } from '../shared/mobileLink/slotPlants';
 import {
@@ -138,6 +137,90 @@ function Ring({ side, done }) {
   );
 }
 
+const QR_BORDER_SHADOWS = [
+  { x: 0, y: 22.262, blur: 21.816, color: 'rgba(255, 255, 255, 0.74)' },
+  { x: -19.421, y: -19.421, blur: 97.103, color: 'rgba(250, 151, 255, 0.58)' },
+  { x: 0, y: 8.014, blur: 5.343, color: '#fff' },
+  { x: -35.619, y: 0, blur: 36.687, color: 'rgba(254, 206, 255, 0.62)' },
+  { x: 16.507, y: -23.305, blur: 37.87, color: 'rgba(255, 255, 255, 0.6)' },
+  { x: 0, y: 8.905, blur: 21.371, color: 'rgba(255, 203, 129, 0.88)' },
+  { x: -3.562, y: -3.562, blur: 15.405, color: 'rgba(255, 255, 255, 0.38)' },
+  { x: -8.905, y: -8.905, blur: 16.83, color: 'rgba(0, 0, 0, 0.25)' },
+];
+const QR_BORDER_TURN_MS = 5000;
+
+function QrBorder() {
+  const borderRef = useRef(null);
+
+  useEffect(() => {
+    const border = borderRef.current;
+    if (!border) return undefined;
+    const started = performance.now();
+    let frame;
+
+    const tick = (now) => {
+      const angle = (((now - started) % QR_BORDER_TURN_MS) / QR_BORDER_TURN_MS) * Math.PI * 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      border.style.boxShadow = QR_BORDER_SHADOWS.map((shadow) => {
+        const x = shadow.x * cos - shadow.y * sin;
+        const y = shadow.x * sin + shadow.y * cos;
+        return `inset ${x.toFixed(2)}px ${y.toFixed(2)}px ${shadow.blur}px ${shadow.color}`;
+      }).join(', ');
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return <div ref={borderRef} className={styles.qrGlow} />;
+}
+
+/**
+ * QR 이미지 — 로드 실패/스톨 시 자동 재시도(캐시버스트)로 항상 표시되게 한다.
+ * DynamicQrCode(공유)를 건드리지 않기 위해 /fail 전용으로 둔다. 같은 /api/mobile-qr 사용.
+ */
+function FailQrImage({ url }) {
+  const [attempt, setAttempt] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  const src = url
+    ? `/api/mobile-qr?url=${encodeURIComponent(url)}&a=${attempt}`
+    : '';
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (!url || loaded) return undefined;
+    const timer = window.setTimeout(() => setAttempt((n) => n + 1), 2000);
+    return () => window.clearTimeout(timer);
+  }, [url, loaded, attempt]);
+
+  if (!url) return null;
+
+  return (
+    <>
+      {!loaded ? <div className={styles.qrLoading} aria-hidden="true" /> : null}
+      <img
+        key={src}
+        src={src}
+        alt="모바일 접속 QR 코드"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(false)}
+        style={
+          loaded
+            ? { width: '100%', height: '100%', objectFit: 'contain' }
+            : { position: 'absolute', width: 1, height: 1, opacity: 0 }
+        }
+      />
+    </>
+  );
+}
+
 export default function FailScreen() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
@@ -229,8 +312,11 @@ export default function FailScreen() {
             <StillRoulette logoIndex={district.logoIndex} />
           </div>
           {qrTargetUrl ? (
-            <div className={styles.miniQr}>
-              <DynamicQrCode url={qrTargetUrl} alt="모바일 접속 QR 코드" />
+            <div className={styles.qrFrame}>
+              <div className={styles.qrImageLive}>
+                <FailQrImage url={qrTargetUrl} />
+              </div>
+              <QrBorder />
             </div>
           ) : null}
           <p className={styles.title}>{title}</p>

@@ -106,7 +106,7 @@ export default function MobileDrawingPage({
         aria-disabled={!hasDrawing}
         onClick={handleNext}
       >
-        <img className={styles.nextBg} src="/mobile/btn-next.svg" alt="" aria-hidden="true" />
+        <span className={styles.nextBg} aria-hidden="true" />
         <span className={styles.nextLabel}>다음</span>
       </button>
     </div>

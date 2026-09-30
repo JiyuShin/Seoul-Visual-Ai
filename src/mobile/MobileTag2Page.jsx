@@ -51,7 +51,7 @@ export default function MobileTag2Page({
         className={`${styles.nameField} ${plantName ? '' : styles.nameFieldEmpty}`}
         data-figma-node="1693:920"
       >
-        <img className={styles.nameFieldBg} src="/mobile/btn-next.svg" alt="" aria-hidden="true" />
+        <span className={styles.nameFieldBg} aria-hidden="true" />
         {!plantName ? (
           <span className={styles.nameFieldNudge} aria-hidden="true">
             <span className={styles.nameFieldCursor} />
