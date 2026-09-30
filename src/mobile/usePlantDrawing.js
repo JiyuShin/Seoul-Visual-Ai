@@ -1,9 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+function strokePath(ctx, stroke) {
+  if (stroke.points.length < 2) return;
+  ctx.strokeStyle = stroke.color;
+  ctx.lineWidth = stroke.width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  for (let i = 1; i < stroke.points.length; i += 1) {
+    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  }
+  ctx.stroke();
+}
+
 export function usePlantDrawing(canvasRef, color) {
   const drawingRef = useRef(false);
   const strokesRef = useRef([]);
   const currentStrokeRef = useRef(null);
+  const logicalSizeRef = useRef({ w: 0, h: 0 });
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -11,20 +26,15 @@ export function usePlantDrawing(canvasRef, color) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    strokesRef.current.forEach((stroke) => {
-      if (stroke.points.length < 2) return;
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i += 1) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-      }
-      ctx.stroke();
-    });
+    const { w, h } = logicalSizeRef.current;
+    const clearW = w > 0 ? w : canvas.clientWidth;
+    const clearH = h > 0 ? h : canvas.clientHeight;
+    ctx.clearRect(0, 0, clearW, clearH);
+
+    strokesRef.current.forEach((stroke) => strokePath(ctx, stroke));
+    if (currentStrokeRef.current) {
+      strokePath(ctx, currentStrokeRef.current);
+    }
   }, [canvasRef]);
 
   const pointerPos = useCallback((event) => {
@@ -32,7 +42,6 @@ export function usePlantDrawing(canvasRef, color) {
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    // 화면 좌표 → 캔vas 논리 좌표 (ctx setTransform(dpr) 기준, MobileStage scale 포함)
     const logicalW = canvas.clientWidth;
     const logicalH = canvas.clientHeight;
     return {
@@ -67,21 +76,8 @@ export function usePlantDrawing(canvasRef, color) {
         setHasDrawing(true);
       }
       redraw();
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (!ctx || currentStrokeRef.current.points.length < 2) return;
-      const pts = currentStrokeRef.current.points;
-      const last = pts.length - 1;
-      ctx.strokeStyle = currentStrokeRef.current.color;
-      ctx.lineWidth = currentStrokeRef.current.width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(pts[last - 1].x, pts[last - 1].y);
-      ctx.lineTo(pts[last].x, pts[last].y);
-      ctx.stroke();
     },
-    [canvasRef, pointerPos, redraw]
+    [pointerPos, redraw]
   );
 
   const [hasDrawing, setHasDrawing] = useState(false);
@@ -109,8 +105,6 @@ export function usePlantDrawing(canvasRef, color) {
     updateHasDrawing();
   }, [redraw, updateHasDrawing]);
 
-  const [, setTick] = useState(0);
-
   useEffect(() => {
     redraw();
   }, [color, redraw]);
@@ -122,6 +116,9 @@ export function usePlantDrawing(canvasRef, color) {
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const w = parent.clientWidth;
     const h = parent.clientHeight;
+    if (!w || !h) return;
+
+    logicalSizeRef.current = { w, h };
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
     canvas.style.width = `${w}px`;
@@ -129,7 +126,6 @@ export function usePlantDrawing(canvasRef, color) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     redraw();
-    setTick((n) => n + 1);
   }, [canvasRef, redraw]);
 
   useEffect(() => {

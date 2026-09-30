@@ -38,6 +38,19 @@
   );
 }
 
+/* Figma 1926:5223 — 전송(END) 화면 전체 배경 */
+.backdropGradientEnd.backdropGradient {
+  background: linear-gradient(
+    167.648deg,
+    rgb(213, 255, 185) 0%,
+    rgba(213, 255, 185, 0.55) 6%,
+    rgba(255, 255, 255, 0) 22%,
+    rgba(255, 255, 255, 0.22) 76.25%,
+    rgba(177, 214, 154, 0.5) 100%,
+    rgba(162, 180, 151, 0.77) 100%
+  );
+}
+
 .backdropGradientLoadingExit {
   animation: backdropGradientFadeOut 0.9s ease forwards;
 }
@@ -125,6 +138,14 @@
 }
 
 .layerTagExit {
+  pointer-events: none;
+}
+
+.layerConvert {
+  z-index: 4;
+}
+
+.layerConvertExit {
   pointer-events: none;
 }
 

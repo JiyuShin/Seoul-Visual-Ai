@@ -26,7 +26,6 @@
   padding: 0 28px;
   box-sizing: border-box;
   pointer-events: none;
-  transform: translateY(2px);
 }
 
 .nameFieldCursor {
@@ -42,7 +41,7 @@
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 22px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.35;
   letter-spacing: -0.44px;
   color: rgba(72, 89, 67, 0.38);
 }
@@ -66,7 +65,7 @@
   height: 100%;
   pointer-events: none;
   object-fit: fill;
-  object-position: center 46%;
+  object-position: center center;
 }
 
 .nameFieldEmpty .nameInput {
@@ -83,7 +82,6 @@
   padding: 0;
   border: none;
   background: transparent;
-  transform: translateY(-2px);
   text-align: center;
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 22px;
