@@ -1,12 +1,14 @@
-// 종로구·마포구 엔딩이 함께 쓰는 멘트. 번호는 피그마 종로구1–17 프레임 번호다.
+// 종로구·마포구·강남구 엔딩이 함께 쓰는 멘트. 번호는 피그마 종로구1–17 프레임 번호다.
 // 말풍선 박스(2303×1295)를 3881×2183 스테이지로 옮긴 값이고, 오브는 화면 가로 가운데에 고정한다.
 // 각 영상(shot)의 story가 어떤 멘트를 띄울지 정하고, hold가 그 구간의 타이밍을 정한다.
 //   intro   1~2: 오브만 떠 있다가(1) 2 말풍선이 나타난다.
 //   grow    3~7: 멈춘 채 3 → 4, 그다음 슬로모션으로 5 → 7. 이 구간에 시선 링이 뜬다.
-//   spread  8: 9.
+//           hold.cue6From 이 있으면(강남구) 링이 다 찬 뒤 5 → 6 → 7.
+//   spread  8: 9. hold.cue9At 이 있으면(강남구 7~9) 그 시점까지 8, 그 뒤 9.
 //   bloom   9~10: 9, 끝 프레임에서 멈춘 채 10 → 11.
-//   rise    11~13(마포구): 말풍선 없이 오브만(12).
+//   rise    11~13(마포구·강남구): 말풍선 없이 오브만(12).
 //   finale  14~17: 16, 끝 프레임에서 멈춘 채 17.
+// 6·8은 피그마 강남구6·강남구8에만 있는 멘트다(종로구 번호에서 비어 있는 자리를 쓴다).
 export const AGENT_BOX = { left: (3881 - 440) / 2, top: 109, size: 440 };
 
 export const CUES = {
@@ -41,12 +43,20 @@ export const CUES = {
     ],
     bubble: { left: 1223, top: 398, width: 1433, height: 238 },
   },
+  6: {
+    lines: [[{ text: '새싹들이 조금씩 자라나는 모습이 보여서 기뻐요!' }]],
+    bubble: { left: 1368, top: 398, width: 1147, height: 167 },
+  },
   7: {
     lines: [
       [{ text: '두 분의 시선을 받아 식물들이 한 단계 더 자랐어요' }],
       [{ text: '이제 새싹들이 도시 곳곳으로 뻗어나가기 시작해요!' }],
     ],
     bubble: { left: 1347, top: 398, width: 1189, height: 238 },
+  },
+  8: {
+    lines: [[{ text: '새싹들이 도시 곳곳에서 자라나고 있어요!' }]],
+    bubble: { left: 1437, top: 398, width: 1007, height: 167 },
   },
   9: {
     lines: [
@@ -89,6 +99,13 @@ function growProgress(hold, time, detail) {
   return Math.max(0, Math.min(1, (time - hold.at) / rest));
 }
 
+// 슬로모션 구간의 멘트: 5, (링이 다 찬 뒤 6,) ringEnd 부터 7.
+function growCue(hold, progress) {
+  if (progress >= hold.ringEnd) return 7;
+  if (hold.cue6From != null && progress >= hold.cue6From) return 6;
+  return 5;
+}
+
 function cueIdFor(shot, time, detail) {
   const hold = shot?.hold;
   switch (shot?.story) {
@@ -97,9 +114,9 @@ function cueIdFor(shot, time, detail) {
     case 'grow':
       if (detail?.frozen) return detail.freezeElapsed < hold.cue3Ms ? 3 : 4;
       if (time < hold.at) return null;
-      return growProgress(hold, time, detail) < hold.ringEnd ? 5 : 7;
+      return growCue(hold, growProgress(hold, time, detail));
     case 'spread':
-      return 9;
+      return hold?.cue9At != null && time < hold.cue9At ? 8 : 9;
     case 'bloom':
       if (detail?.frozen) return detail.freezeElapsed < hold.cue10Ms ? 10 : 11;
       return time < hold.at ? 9 : 11;
