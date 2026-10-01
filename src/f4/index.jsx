@@ -14,17 +14,18 @@ const SWIRL_AFTER_MS = 5600;
 const LEAVE_AFTER_SWIRL_MS = 4000;
 const PLACES = ['종로구', '마포구', '강남구'];
 
-/** 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다. */
+/**
+ * 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다.
+ * 자치구마다 두 식물만 쓴다(src/mobile/mobileEndPlantVariants.js 와 같은 목록).
+ * jongno-c, mapo-a, gangnam-c 는 쓰지 않는다.
+ */
 const KIOSK_PLANT_IMAGES = {
   'jongno-a': '/4/plants/jongno-a.png',
   'jongno-b': '/4/plants/jongno-b.png',
-  'jongno-c': '/4/plants/jongno-c.png',
-  'mapo-a': '/4/plants/mapo-a.png',
   'mapo-b': '/4/plants/mapo-b.png',
   'mapo-c': '/4/plants/mapo-c.png',
   'gangnam-a': '/4/plants/gangnam-a.png',
   'gangnam-b': '/4/plants/gangnam-b.png',
-  'gangnam-c': '/4/plants/gangnam-c.png',
 };
 
 const PLACEHOLDER_PLANTS = [
