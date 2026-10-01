@@ -29,7 +29,8 @@ const SLIDERS = [
 
 const TUNABLE = SLIDERS.map((slider) => slider.key);
 // 이 페이지가 실제 센서라서, 여기서 맞춘 값이 그대로 /pre_opening 통과 조건이 된다.
-const DEFAULT_HOLD_MS = 4500;
+// 유지 시간은 저장하지 않고 늘 이 값에서 시작한다(브라우저에 남은 옛 값이 통과 시간을 바꾸지 않게).
+const DEFAULT_HOLD_MS = 4000;
 const CONFIG_KEY = 'seoul-presence-config';
 const STATE_SEND_MS = 250;
 const SENT_BANNER_MS = 2000;
@@ -45,7 +46,7 @@ function loadConfig() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(CONFIG_KEY) || '{}');
     TUNABLE.forEach((key) => {
-      if (typeof saved[key] === 'number') base[key] = saved[key];
+      if (key !== 'holdMs' && typeof saved[key] === 'number') base[key] = saved[key];
     });
   } catch {
     // 저장값이 깨졌으면 기본값을 쓴다.
@@ -352,7 +353,7 @@ export default function PresenceTest() {
 
         <p className={styles.hint}>
           이 페이지가 카메라를 보고 통과 신호를 보냅니다. 슬라이더 값은 이 브라우저에 저장되어 새로고침해도 그대로
-          적용됩니다. 아래 값은 체험 중 자리 비움 판정(<code>presence.js</code> 의 <code>PRESENCE</code>)에 옮길 때
+          적용됩니다(유지 시간은 예외로, 새로고침하면 {DEFAULT_HOLD_MS / 1000}초로 돌아옵니다). 아래 값은 체험 중 자리 비움 판정(<code>presence.js</code> 의 <code>PRESENCE</code>)에 옮길 때
           참고용입니다.
         </p>
         <pre className={styles.snippet}>{snippet}</pre>
