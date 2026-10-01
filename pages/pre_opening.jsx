@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import OpeningStill from '../src/op/OpeningStill';
-import usePresenceGate, { PRESENCE } from '../src/shared/gaze/usePresenceGate';
+import usePresenceGate from '../src/shared/gaze/usePresenceGate';
+import { PRESENCE } from '../src/shared/gaze/presence';
 
 const DEBUG_STYLE = {
   position: 'fixed',

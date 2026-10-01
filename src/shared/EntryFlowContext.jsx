@@ -178,6 +178,23 @@ export function EntryFlowProvider({ children }) {
   // 친구 프론트가 쓰던 이름. 보정 완료 = 참여 시작과 같다.
   const finishCalibration = completeSetup;
 
+  // 체험 도중 사람이 바뀌어 /pre_opening 으로 돌아갈 때, 앞사람의 선택을 지운다. 보정과 카메라는 그대로 둔다.
+  const resetFlow = useCallback(() => {
+    setWinnerCard(null);
+    setSelectedDistrict(null);
+    setPins([]);
+    setDiscussionDone(false);
+    setDiscussionCam('A');
+    setGazeClip(null);
+    dwellProgressRef.current = 0;
+    setDwellProgress(0);
+    try {
+      sessionStorage.removeItem('seoul-district');
+    } catch {
+      // 사생활 보호 모드 등에서 sessionStorage 를 못 쓰면 무시한다.
+    }
+  }, []);
+
   const reportDwellProgress = useCallback((progress) => {
     if (progress == null) return;
     const next = Math.round(progress * 50) / 50;
@@ -211,6 +228,7 @@ export function EntryFlowProvider({ children }) {
       setPins,
       discussionDone,
       setDiscussionDone,
+      resetFlow,
       dwellProgress,
       reportDwellProgress,
       gazePosition,
@@ -232,6 +250,7 @@ export function EntryFlowProvider({ children }) {
       discussionCam,
       pins,
       discussionDone,
+      resetFlow,
       dwellProgress,
       reportDwellProgress,
       gazePosition,

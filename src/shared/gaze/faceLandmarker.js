@@ -18,7 +18,10 @@ async function head(url) {
 }
 
 /** 로컬 public/mediapipe 자산을 우선 쓰고, 없으면 CDN 으로 폴백한다. */
-export async function createFaceLandmarker(onProgress = () => {}, { numFaces = 1 } = {}) {
+export async function createFaceLandmarker(
+  onProgress = () => {},
+  { numFaces = 1, detection = 0.5, presence = 0.5, tracking = 0.5 } = {}
+) {
   onProgress('wasm 로딩 중…');
   const wasmPath = (await head(`${LOCAL_WASM}/vision_wasm_internal.js`)) ? LOCAL_WASM : CDN_WASM;
   const fileset = await FilesetResolver.forVisionTasks(wasmPath);
@@ -32,9 +35,9 @@ export async function createFaceLandmarker(onProgress = () => {}, { numFaces = 1
     numFaces,
     outputFaceBlendshapes: false,
     outputFacialTransformationMatrixes: true,
-    minFaceDetectionConfidence: 0.5,
-    minFacePresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
+    minFaceDetectionConfidence: detection,
+    minFacePresenceConfidence: presence,
+    minTrackingConfidence: tracking,
   });
 
   try {

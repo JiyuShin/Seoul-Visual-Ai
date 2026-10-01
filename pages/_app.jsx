@@ -4,6 +4,7 @@ import '../styles/globals.css';
 import { EntryFlowProvider, useEntryFlow } from '../src/shared/EntryFlowContext';
 import { MobileLinkProvider } from '../src/shared/mobileLink/MobileLinkContext';
 import GazeReticle from '../src/shared/GazeReticle';
+import FlowIdleGuard from '../src/shared/gaze/FlowIdleGuard';
 import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../src/shared/gaze/participants';
 
 const STREET_POSTER = '/street/red/assets/street-panorama.webp';
@@ -60,6 +61,7 @@ function AppFrame({ Component, pageProps }) {
         <Component {...pageProps} />
       </div>
       <GlobalGazeCursor />
+      <FlowIdleGuard />
     </>
   );
 }

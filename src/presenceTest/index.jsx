@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { createFaceLandmarker } from '../shared/gaze/faceLandmarker';
 import {
   PRESENCE,
   advanceHold,
   evaluateFaces,
+  landmarkerOptions,
   openCamera,
   videoInputs,
-} from '../shared/gaze/usePresenceGate';
+} from '../shared/gaze/presence';
 import styles from './PresenceTest.module.css';
 
 const SLIDERS = [
@@ -16,15 +18,19 @@ const SLIDERS = [
   { key: 'maxYawDeg', label: '고개 좌우 허용 (°)', min: 5, max: 60, step: 1, digits: 0 },
   { key: 'pitchCenterDeg', label: '고개 위아래 기준 (°)', min: -45, max: 45, step: 1, digits: 0 },
   { key: 'maxPitchDeg', label: '고개 위아래 허용 (±°)', min: 5, max: 60, step: 1, digits: 0 },
+  { key: 'detectionConfidence', label: '얼굴 검출 기준 점수 (모자·그림자면 낮춤)', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
+  { key: 'presenceConfidence', label: '얼굴 유지 기준 점수', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
+  { key: 'trackingConfidence', label: '추적 기준 점수', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
   { key: 'graceMs', label: '끊김 허용 (ms)', min: 0, max: 3000, step: 100, digits: 0 },
   { key: 'holdMs', label: '유지 시간 (ms)', min: 1000, max: 30000, step: 500, digits: 0 },
 ];
 
 const TUNABLE = SLIDERS.map((slider) => slider.key);
-const PASS_BANNER_MS = 3000;
+// 테스트에서만 짧게 기다린다. /pre_opening 은 PRESENCE.holdMs(15초)를 그대로 쓴다.
+const TEST_HOLD_MS = 4500;
 
 function initialConfig() {
-  return Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]]));
+  return { ...Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]])), holdMs: TEST_HOLD_MS };
 }
 
 function drawFaces(canvas, video, faces) {
@@ -50,6 +56,9 @@ function drawFaces(canvas, video, faces) {
 }
 
 export default function PresenceTest() {
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [config, setConfig] = useState(initialConfig);
@@ -61,9 +70,19 @@ export default function PresenceTest() {
   const [activeId, setActiveId] = useState('');
   const [status, setStatus] = useState('준비 중…');
   const [view, setView] = useState({ faces: [], kept: 0, progress: 0, fps: 0 });
-  const [passes, setPasses] = useState(0);
-  const [bannerUntil, setBannerUntil] = useState(0);
   const holdRef = useRef({ heldMs: 0, lastOkAt: 0 });
+  const landmarkerRef = useRef(null);
+
+  const { detectionConfidence, presenceConfidence, trackingConfidence } = config;
+  useEffect(() => {
+    landmarkerRef.current
+      ?.setOptions({
+        minFaceDetectionConfidence: detectionConfidence,
+        minFacePresenceConfidence: presenceConfidence,
+        minTrackingConfidence: trackingConfidence,
+      })
+      .catch((err) => setStatus(`옵션 적용 실패: ${err?.message || err}`));
+  }, [detectionConfidence, presenceConfidence, trackingConfidence]);
 
   useEffect(() => {
     let alive = true;
@@ -77,6 +96,17 @@ export default function PresenceTest() {
     let fps = 0;
     const video = videoRef.current;
 
+    const release = () => {
+      alive = false;
+      window.clearTimeout(timer);
+      stream?.getTracks().forEach((track) => track.stop());
+      stream = null;
+      video.srcObject = null;
+      if (landmarkerRef.current === landmarker) landmarkerRef.current = null;
+      landmarker?.close();
+      landmarker = null;
+    };
+
     const step = () => {
       if (!alive) return;
       const now = performance.now();
@@ -87,7 +117,13 @@ export default function PresenceTest() {
         const stamp = Math.max(now, lastStamp + 1);
         lastStamp = stamp;
         const cfg = { ...PRESENCE, ...configRef.current };
-        const { faces, kept } = evaluateFaces(landmarker.detectForVideo(video, stamp), cfg);
+        let result = null;
+        try {
+          result = landmarker.detectForVideo(video, stamp);
+        } catch {
+          // 슬라이더로 옵션을 바꾸는 동안 그래프가 다시 만들어지면 한두 프레임 실패할 수 있다.
+        }
+        const { faces, kept } = evaluateFaces(result, cfg);
         const progress = advanceHold(holdRef.current, kept.length >= cfg.people, now, dt, cfg);
         drawFaces(canvasRef.current, video, faces);
 
@@ -100,9 +136,10 @@ export default function PresenceTest() {
         setView({ faces, kept: kept.length, progress, fps });
 
         if (progress >= 1) {
-          holdRef.current.heldMs = 0;
-          setPasses((count) => count + 1);
-          setBannerUntil(Date.now() + PASS_BANNER_MS);
+          release();
+          setStatus('통과 · /1 로 이동');
+          routerRef.current.push('/1');
+          return;
         }
       }
       timer = window.setTimeout(step, PRESENCE.intervalMs);
@@ -123,12 +160,16 @@ export default function PresenceTest() {
         setDevices(await videoInputs());
 
         setStatus('모델 불러오는 중…');
-        const created = await createFaceLandmarker(undefined, { numFaces: PRESENCE.maxFaces });
+        const created = await createFaceLandmarker(
+          undefined,
+          landmarkerOptions({ ...PRESENCE, ...configRef.current })
+        );
         if (!alive) {
           created.close();
           return;
         }
         landmarker = created;
+        landmarkerRef.current = created;
         const track = stream.getVideoTracks()[0];
         setStatus(`인식 중 · ${track?.label || '카메라'} · ${video.videoWidth}×${video.videoHeight}`);
         step();
@@ -137,26 +178,13 @@ export default function PresenceTest() {
       }
     })();
 
-    return () => {
-      alive = false;
-      window.clearTimeout(timer);
-      stream?.getTracks().forEach((track) => track.stop());
-      video.srcObject = null;
-      landmarker?.close();
-    };
+    return release;
   }, [want]);
 
-  const [now, setNow] = useState(0);
-  useEffect(() => {
-    if (!bannerUntil) return undefined;
-    setNow(Date.now());
-    const id = window.setTimeout(() => setNow(Date.now()), PASS_BANNER_MS);
-    return () => window.clearTimeout(id);
-  }, [bannerUntil]);
-  const showBanner = bannerUntil > now;
-
   const seconds = (view.progress * config.holdMs) / 1000;
-  const snippet = TUNABLE.map((key) => `  ${key}: ${config[key]},`).join('\n');
+  const snippet = TUNABLE.filter((key) => key !== 'holdMs')
+    .map((key) => `  ${key}: ${config[key]},`)
+    .join('\n');
 
   return (
     <div className={styles.page}>
@@ -164,12 +192,11 @@ export default function PresenceTest() {
         <div className={styles.frame}>
           <video ref={videoRef} className={styles.video} muted playsInline />
           <canvas ref={canvasRef} className={styles.overlay} />
-          {showBanner && <div className={styles.banner}>통과 · 실제 화면이면 /1 로 이동</div>}
         </div>
         <div className={styles.meter}>
           <div className={styles.meterFill} style={{ width: `${view.progress * 100}%` }} />
           <span className={styles.meterText}>
-            {seconds.toFixed(1)}s / {(config.holdMs / 1000).toFixed(0)}s
+            {seconds.toFixed(1)}s / {(config.holdMs / 1000).toFixed(1)}s
           </span>
         </div>
       </section>
@@ -197,10 +224,6 @@ export default function PresenceTest() {
           <div className={view.kept >= PRESENCE.people ? styles.good : ''}>
             <b>{view.kept}</b>
             <small>통과 인원 (필요 {PRESENCE.people})</small>
-          </div>
-          <div>
-            <b>{passes}</b>
-            <small>통과 횟수</small>
           </div>
           <div>
             <b>{view.fps.toFixed(1)}</b>
@@ -261,7 +284,8 @@ export default function PresenceTest() {
         </div>
 
         <p className={styles.hint}>
-          맞춘 값은 <code>src/shared/gaze/usePresenceGate.js</code> 의 <code>PRESENCE</code> 에 옮겨야 /pre_opening 에 반영됩니다.
+          맞춘 값은 <code>src/shared/gaze/presence.js</code> 의 <code>PRESENCE</code> 에 옮겨야 /pre_opening 에 반영됩니다.
+          유지 시간은 테스트 전용(4.5초)이라 옮기지 않습니다.
         </p>
         <pre className={styles.snippet}>{snippet}</pre>
       </aside>
