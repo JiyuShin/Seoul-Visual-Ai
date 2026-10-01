@@ -9,6 +9,8 @@
 //   rise    11~13(마포구·강남구): 말풍선 없이 오브만(12).
 //   finale  14~17: 16, 끝 프레임에서 멈춘 채 17.
 // 6·8은 피그마 강남구6·강남구8에만 있는 멘트다(종로구 번호에서 비어 있는 자리를 쓴다).
+// 멘트는 TTS로도 읽는다. 위 시간들은 최소 표시 시간이고, 말이 끝나지 않았으면 멘트 경계·영상 끝에서
+// 멈춰 기다린다(shot 의 speechStops·freezeStops, BackgroundSequence 의 waitRef).
 export const AGENT_BOX = { left: (3881 - 440) / 2, top: 109, size: 440 };
 
 export const CUES = {
@@ -97,6 +99,13 @@ export const CUES = {
 function growProgress(hold, time, detail) {
   const rest = Math.max((detail?.duration || 1) - hold.at, 0.01);
   return Math.max(0, Math.min(1, (time - hold.at) / rest));
+}
+
+// 슬로모션 구간의 멘트 경계(5 → 6 → 7)를 영상 초로 돌려준다. 말이 끝날 때까지 영상이 여기서 멈춰 기다린다.
+export function growSpeechStops(hold) {
+  return (duration) => [hold.cue6From, hold.ringEnd]
+    .filter((value) => value != null)
+    .map((fraction) => hold.at + fraction * Math.max(duration - hold.at, 0.01));
 }
 
 // 슬로모션 구간의 멘트: 5, (링이 다 찬 뒤 6,) ringEnd 부터 7.

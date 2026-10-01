@@ -2,6 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import styles from './Ending.module.css';
 
 const DEFAULT_FADE = 800;
+// 멘트 경계(speechStops, 영상 초)에 이만큼 앞서 멈춰 기다린다. timeupdate 간격(~0.25초)보다 길어야 한다.
+const STOP_LOOKAHEAD_S = 0.35;
+// 말이 끝났는지 다시 확인하는 간격.
+const WAIT_POLL_MS = 100;
+
+// waitRef.current() 가 true 인 동안은 "아직 말하는 중"이라 멘트 경계·영상 끝에서 멈춰 기다린다.
+function stillSpeaking(waitRef) {
+  return Boolean(waitRef?.current?.());
+}
 
 function fadeOf(shot) {
   return shot && shot.fade > 0 ? shot.fade : DEFAULT_FADE;
@@ -77,11 +86,22 @@ function fadeLayerIn(incomingEl, outgoingEl, ms, done) {
   window.requestAnimationFrame(tick);
 }
 
-function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgress }) {
+// 재생 중 멈춰 기다릴 지점(영상 초). 숫자 배열이거나 영상 길이를 받는 함수다.
+function speechStopsOf(shot, duration) {
+  const raw = shot.speechStops;
+  const list = typeof raw === 'function' ? raw(duration) : raw;
+  if (!Array.isArray(list)) return [];
+  return list.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+}
+
+function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgress, waitRef }) {
   const fired = useRef(false);
   const freezing = useRef(false);
   const held = useRef(false);
   const holdFrame = useRef(0);
+  const goWait = useRef(0);
+  // 재생 중 멘트 경계에서 멈춘 상태: 몇 번째 경계까지 지났는지, 지금 기다리는 중인지.
+  const stopState = useRef({ passed: 0, waiting: false, timer: 0 });
   const nodeRef = useRef(null);
   const rememberRef = useRef(remember);
   const progressRef = useRef(onProgress);
@@ -93,35 +113,106 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
     rememberRef.current(slotIndex, node);
   }, [slotIndex]);
 
+  const clearWaits = useCallback(() => {
+    window.clearInterval(goWait.current);
+    goWait.current = 0;
+    window.clearInterval(stopState.current.timer);
+    stopState.current = { passed: 0, waiting: false, timer: 0 };
+  }, []);
+
   useEffect(() => {
     fired.current = false;
     held.current = false;
     freezing.current = false;
     window.clearInterval(holdFrame.current);
-  }, [shot]);
+    clearWaits();
+  }, [shot, clearWaits]);
 
-  useEffect(() => () => window.clearInterval(holdFrame.current), []);
+  useEffect(() => () => {
+    window.clearInterval(holdFrame.current);
+    clearWaits();
+  }, [clearWaits]);
 
+  // 다음 영상으로. 아직 말하는 중이면 마지막 프레임에 머물렀다가 말이 끝난 뒤 넘어간다.
   const go = useCallback(() => {
     if (!clock || fired.current) return;
+    if (stillSpeaking(waitRef)) {
+      if (goWait.current) return;
+      goWait.current = window.setInterval(() => {
+        if (stillSpeaking(waitRef)) return;
+        window.clearInterval(goWait.current);
+        goWait.current = 0;
+        goRef.current();
+      }, WAIT_POLL_MS);
+      return;
+    }
     if (onAdvance()) fired.current = true;
-  }, [clock, onAdvance]);
+  }, [clock, onAdvance, waitRef]);
   const goRef = useRef(go);
   goRef.current = go;
+
+  // 재생 중 멘트 경계에 닿았는데 아직 말하는 중이면 영상을 멈추고, 말이 끝나면 이어서 튼다.
+  // 멈춘 동안은 경계 직전 시간을 알려 줘서 멘트가 바뀌지 않게 한다. 멈출 필요가 없으면 true.
+  const passStops = useCallback((video) => {
+    const state = stopState.current;
+    if (state.waiting) return false;
+    const stop = speechStopsOf(shot, video.duration)[state.passed];
+    if (stop == null || video.currentTime < stop - STOP_LOOKAHEAD_S) return true;
+    if (!stillSpeaking(waitRef)) {
+      state.passed += 1;
+      return true;
+    }
+    state.waiting = true;
+    video.pause();
+    progressRef.current?.({
+      index: shotIndex,
+      time: Math.min(video.currentTime, stop - 0.01),
+      duration: video.duration,
+    });
+    state.timer = window.setInterval(() => {
+      if (stillSpeaking(waitRef)) return;
+      window.clearInterval(state.timer);
+      state.timer = 0;
+      state.waiting = false;
+      state.passed += 1;
+      const pending = video.play();
+      if (pending && pending.catch) pending.catch(() => {});
+    }, WAIT_POLL_MS);
+    return false;
+  }, [shot, shotIndex, waitRef]);
 
   const startFreeze = useCallback((video) => {
     held.current = true;
     freezing.current = true;
     // 되감으면 화면이 몇 프레임 뒤로 튀므로, 멈춘 자리의 프레임을 그대로 둔다.
     video.pause();
-    const start = performance.now();
     const freezeMs = shot.freezeMs || 0;
+    // 멈춘 구간 안의 멘트 경계(freezeStops, ms)와 구간 끝. 말하는 중이면 경계 직전에서 시계를 세운다.
+    const stops = [...(shot.freezeStops || []), freezeMs]
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+    let last = performance.now();
+    let elapsed = 0;
+    let passed = 0;
     const tick = () => {
       if (!freezing.current) {
         window.clearInterval(holdFrame.current);
         return;
       }
-      const elapsed = performance.now() - start;
+      const now = performance.now();
+      const delta = now - last;
+      last = now;
+      const stop = stops[passed];
+      if (stop != null && elapsed + delta >= stop) {
+        if (stillSpeaking(waitRef)) {
+          elapsed = Math.max(elapsed, stop - 1);
+        } else {
+          elapsed += delta;
+          passed += 1;
+        }
+      } else {
+        elapsed += delta;
+      }
       progressRef.current?.({
         index: shotIndex,
         time: shot.freezeAt,
@@ -148,7 +239,7 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
     window.clearInterval(holdFrame.current);
     holdFrame.current = window.setInterval(tick, 50);
     tick();
-  }, [shot, shotIndex]);
+  }, [shot, shotIndex, waitRef]);
 
   useEffect(() => {
     const el = nodeRef.current;
@@ -197,6 +288,7 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
             if (!clock || freezing.current) return;
             const video = event.currentTarget;
             if (!video.duration || !Number.isFinite(video.duration)) return;
+            if (!passStops(video)) return;
             if (shot.freezeAt > 0 && !held.current && video.currentTime >= shot.freezeAt) {
               startFreeze(video);
               return;
@@ -237,7 +329,9 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
   );
 }
 
-export default function Sequence({ shots, onDone, onProgress }) {
+// waitRef: current() 가 true 면 아직 멘트를 읽는 중. 멘트 경계(speechStops·freezeStops)와 영상 끝에서
+// 말이 끝날 때까지 기다린다. 없으면 예전처럼 시간대로만 흐른다.
+export default function Sequence({ shots, onDone, onProgress, waitRef }) {
   const refs = useRef([null, null]);
   const activeSlot = useRef(0);
   const busy = useRef(false);
@@ -361,6 +455,7 @@ export default function Sequence({ shots, onDone, onProgress }) {
       remember={remember}
       onAdvance={advance}
       onProgress={onProgress}
+      waitRef={waitRef}
     />
   ));
 }

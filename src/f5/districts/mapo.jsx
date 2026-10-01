@@ -1,4 +1,5 @@
 import LightField from '../LightField';
+import { growSpeechStops } from '../endingCues';
 
 const plants = [
   { id: 'mapo-1', name: '몬스테라', image: '/4/plant-left.png', tone: 'lilac' },
@@ -29,6 +30,7 @@ const BLOOM_HOLD = { at: 4.8, cue10Ms: 4500, cue11Ms: 3500 };
 
 // 14~17 영상은 살짝 느리게 16, 끝 프레임에서 멈춘 채 16을 조금 더 보여 주고 17.
 const FINALE_HOLD = { at: 4.9, rate: 0.85, cue16Ms: 2500, cue17Ms: 7500 };
+// 위 시간들은 최소값이다. TTS가 아직 읽는 중이면 멘트 경계(speechStops·freezeStops)와 영상 끝에서 멈춰 기다린다.
 
 export const name = '마포구';
 export const assets = plants;
@@ -51,6 +53,8 @@ export const shots = [
     slowUntil: 1e9,
     slowRate: GROW_HOLD.slowRate,
     holdCue: true,
+    freezeStops: [GROW_HOLD.cue3Ms], // 3 → 4
+    speechStops: growSpeechStops(GROW_HOLD), // 5 → 7
   },
   { kind: 'video', src: '/5/mapo/8.mp4', fade: 1200, story: 'spread' },
   {
@@ -62,6 +66,8 @@ export const shots = [
     freezeAt: BLOOM_HOLD.at,
     freezeMs: BLOOM_HOLD.cue10Ms + BLOOM_HOLD.cue11Ms,
     advanceAfterFreeze: true,
+    speechStops: [BLOOM_HOLD.at], // 9 → 10
+    freezeStops: [BLOOM_HOLD.cue10Ms], // 10 → 11
   },
   { kind: 'video', src: '/5/mapo/11-13.mp4', fade: 1000, story: 'rise' },
   {
@@ -74,6 +80,7 @@ export const shots = [
     freezeMs: FINALE_HOLD.cue16Ms + FINALE_HOLD.cue17Ms,
     approachRate: FINALE_HOLD.rate,
     advanceAfterFreeze: true,
+    freezeStops: [FINALE_HOLD.cue16Ms], // 16 → 17
   },
 ];
 

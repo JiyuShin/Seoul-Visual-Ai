@@ -5,9 +5,11 @@ import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
 import { buildMobileJoinUrl, getMobilePublicOriginSync } from '../shared/mobileLink/publicOrigin';
 import AgentOrb from '../f2/AgentOrb';
+// /2 토론과 같은 TTS(목소리·톤·/api/discussion-speech)를 그대로 쓴다.
+import { useSpeechOutput } from '../f2/useSpeechOutput';
 import { sceneFor } from './districts';
 import BackgroundSequence from './BackgroundSequence';
-import { AGENT_BOX, cueForShot, cueLines, gazeRingState } from './endingCues';
+import { AGENT_BOX, CUES, cueForShot, cueLines, gazeRingState } from './endingCues';
 import { QR_LINES } from './sequence';
 import styles from './Ending.module.css';
 
@@ -18,6 +20,10 @@ const AGENT_EXIT_MS = 1200;
 const FINAL_ORB = { left: (3881 - 1045) / 2, top: 478, size: 1045 };
 // 말하는 동안 AgentOrb의 그라데이션을 조금 더 움직이게 하는 고정 입력값.
 const SPEAKING_LEVEL = { current: 0.3 };
+// 한 멘트를 다 읽은 뒤 다음 멘트로 넘어가기 전에 쉬는 숨.
+const SPEECH_BREATH_MS = 400;
+// 음성이 이만큼 지나도 안 끝나면(재생 차단·네트워크 등) 더 기다리지 않고 연출을 이어 간다.
+const SPEECH_WAIT_MAX_MS = 20000;
 
 function bubbleBox(bubble) {
   return {
@@ -31,6 +37,11 @@ function bubbleBox(bubble) {
 
 function lineKey(lines) {
   return lines.map((line) => line.map((part) => part.text).join('')).join('\n');
+}
+
+// 말풍선에 보이는 글 그대로 읽는다. 줄은 한 문장씩 이어 붙인다.
+function speechText(lines) {
+  return lines.map((line) => line.map((part) => part.text).join('')).join(' ').trim();
 }
 
 function CueText({ lines, className }) {
@@ -215,6 +226,14 @@ export default function EndingPage() {
   const leaveTimer = useRef(0);
   const [localUrl, setLocalUrl] = useState('');
   const [progress, setProgress] = useState({ index: 0, time: 0, duration: 0 });
+  const speech = useSpeechOutput();
+  const speechRef = useRef(speech);
+  speechRef.current = speech;
+  // 지금 멘트를 읽는 중인지(speak 호출부터 onEnd + 숨 고르기까지). 배경 시퀀스가 경계에서 이걸 보고 기다린다.
+  const speechBusy = useRef({ busy: false, since: 0, timer: 0 });
+  const waitRef = useRef(() => false);
+  waitRef.current = () =>
+    speechBusy.current.busy && performance.now() - speechBusy.current.since < SPEECH_WAIT_MAX_MS;
   const scene = sceneFor(placeName || '종로구');
   const storied = scene.shots.some((shot) => shot.story);
   const shot = scene.shots[progress.index];
@@ -263,6 +282,48 @@ export default function EndingPage() {
 
   useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
 
+  // 자치구가 정해지면 이 엔딩에서 읽을 멘트를 모두 미리 받아 둔다(이름이 바뀌면 그 문장만 다시).
+  useEffect(() => {
+    if (!placeName) return;
+    Object.values(CUES).forEach((item) => {
+      const text = speechText(cueLines(item, placeName, plantNames));
+      if (text) speechRef.current.warm(text);
+    });
+    speechRef.current.warm(speechText(QR_LINES));
+  }, [placeName, plantNames]);
+
+  // 말풍선이 바뀔 때마다 그 글을 읽는다. 배경 시퀀스는 이 음성이 끝나야 다음 멘트 경계를 넘는다.
+  const cueId = cue?.id ?? null;
+  const spokenText = speechText(lines);
+  useEffect(() => {
+    if (!cueId || !spokenText || leaving) return;
+    const state = speechBusy.current;
+    window.clearTimeout(state.timer);
+    state.busy = true;
+    state.since = performance.now();
+    speechRef.current.speak(spokenText, () => {
+      state.timer = window.setTimeout(() => {
+        state.busy = false;
+      }, SPEECH_BREATH_MS);
+    });
+  }, [cueId, spokenText, leaving]);
+
+  useEffect(() => {
+    const state = speechBusy.current;
+    return () => window.clearTimeout(state.timer);
+  }, []);
+
+  // 오브가 떠나는 동안은 조용히, QR 화면이 뜨면 마지막 안내를 읽는다.
+  useEffect(() => {
+    if (!leaving) return;
+    speechRef.current.stopSpeaking();
+    speechBusy.current.busy = false;
+  }, [leaving]);
+
+  useEffect(() => {
+    if (qrOn) speechRef.current.speak(speechText(QR_LINES));
+  }, [qrOn]);
+
   useEffect(() => {
     if (!qrOn || qrTargetUrl || localUrl) return undefined;
     try {
@@ -289,6 +350,7 @@ export default function EndingPage() {
             shots={scene.shots}
             onDone={finishSequence}
             onProgress={setProgress}
+            waitRef={waitRef}
           />
         ) : null}
         {storied ? (
