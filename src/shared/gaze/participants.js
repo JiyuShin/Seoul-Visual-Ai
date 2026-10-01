@@ -5,4 +5,5 @@ import { VOTE_VIEWER_IDS } from '../gazeConfig';
 export const CAM_KEYS = ['A', 'B'];
 export const VIEWER_BY_CAM = { A: VOTE_VIEWER_IDS[0], B: VOTE_VIEWER_IDS[1] };
 export const PERSON_LABEL = { A: 'NABI', B: 'SORA' };
-export const CAM_COLOR = { A: '#4caf6d', B: '#e08a3c' };
+// NABI 연두 / SORA 연보라. 시선 커서 glow 와 디버그 HUD 에 쓴다.
+export const CAM_COLOR = { A: '#9ae86b', B: '#c7a6f2' };

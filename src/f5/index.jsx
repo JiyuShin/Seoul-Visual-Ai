@@ -7,6 +7,9 @@ import { buildMobileJoinUrl, getMobilePublicOriginSync } from '../shared/mobileL
 import AgentOrb from '../f2/AgentOrb';
 // /2 토론과 같은 TTS(목소리·톤·/api/discussion-speech)를 그대로 쓴다.
 import { useSpeechOutput } from '../f2/useSpeechOutput';
+// /2 와 같은 NABI·SORA 시선 커서. 시선을 유도하는 멘트(CURSOR_CUES)에서만 보인다.
+import GazeReticle from '../shared/GazeReticle';
+import { CAM_COLOR, CAM_KEYS, VIEWER_BY_CAM } from '../shared/gaze/participants';
 import { sceneFor } from './districts';
 import BackgroundSequence from './BackgroundSequence';
 import { AGENT_BOX, CUES, cueForShot, cueLines, gazeRingState } from './endingCues';
@@ -24,6 +27,12 @@ const SPEAKING_LEVEL = { current: 0.3 };
 const SPEECH_BREATH_MS = 400;
 // 음성이 이만큼 지나도 안 끝나면(재생 차단·네트워크 등) 더 기다리지 않고 연출을 이어 간다.
 const SPEECH_WAIT_MAX_MS = 20000;
+// 시선 커서가 보이는 멘트. 시선을 유도하는 멘트에서만 나타났다가 다음 멘트로 넘어가면 사라진다.
+//   4  이제 각자의 새싹을 가만히 바라봐 주세요 / 꽃이 피어야 이 거리에 온전히 뿌리내릴 수 있어요
+//   5  [이름]과 [이름]의 새싹들이 반응하고 있어요 / 뿌리가 더 단단하게 자랄 수 있도록 조금만 더 바라봐주세요
+//   9  여러분들이 피운 새싹들이 도시와 더 어우러질 수 있도록 / 함께 화면을 바라봐주세요
+//  11  위쪽을 바라보면 변화된 공간으로 이동해요
+const CURSOR_CUES = new Set([4, 5, 9, 11]);
 
 function bubbleBox(bubble) {
   return {
@@ -210,7 +219,7 @@ function readStoredPlace() {
 
 export default function EndingPage() {
   const router = useRouter();
-  const { selectedDistrict } = useEntryFlow();
+  const { selectedDistrict, gazeRef } = useEntryFlow();
   const { qrTargetUrl, startKioskSession, mobilePublicOrigin, slotPlants } = useMobileLink();
   // 휴대폰에서 적은 식물 이름. 슬롯 A·B 모두 있어야 5 멘트에 이름이 들어간다.
   const plantNames = useMemo(
@@ -295,6 +304,15 @@ export default function EndingPage() {
   // 말풍선이 바뀔 때마다 그 글을 읽는다. 배경 시퀀스는 이 음성이 끝나야 다음 멘트 경계를 넘는다.
   const cueId = cue?.id ?? null;
   const spokenText = speechText(lines);
+
+  // 시선 커서는 CURSOR_CUES 멘트에서만 켜진다. 영상 전환 중 멘트가 잠깐 비는 순간(null)에는 상태를 유지해
+  // 깜빡이지 않게 한다.
+  const [cursorsOn, setCursorsOn] = useState(false);
+  useEffect(() => {
+    if (cueId == null) return;
+    setCursorsOn(CURSOR_CUES.has(cueId));
+  }, [cueId]);
+  const cursorsShown = cursorsOn && !leaving && !qrOn;
   useEffect(() => {
     if (!cueId || !spokenText || leaving) return;
     const state = speechBusy.current;
@@ -342,6 +360,16 @@ export default function EndingPage() {
 
   return (
     <div className={styles.viewport} ref={viewportRef} role="application" aria-label="엔딩">
+      {/* 시선 커서(body 로 포털됨). 항상 마운트해 두고 shown 으로만 서서히 켜고 끈다. */}
+      {CAM_KEYS.map((key) => (
+        <GazeReticle
+          key={key}
+          gazeRef={gazeRef}
+          viewerId={VIEWER_BY_CAM[key]}
+          color={CAM_COLOR[key]}
+          shown={cursorsShown}
+        />
+      ))}
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
       <div className={styles.stage} style={{ transform: `scale(${scale})` }}>
         {placeName ? (
