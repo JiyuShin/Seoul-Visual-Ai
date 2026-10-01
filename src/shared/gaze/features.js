@@ -105,7 +105,7 @@ function eyeFeature(lm, spec, aspect) {
   };
 }
 
-function eulerFromMatrix(data) {
+export function eulerFromMatrix(data) {
   // MediaPipe facialTransformationMatrix 는 column-major 4x4
   const r = (i, j) => data[j * 4 + i];
   const sy = Math.hypot(r(0, 0), r(1, 0));
