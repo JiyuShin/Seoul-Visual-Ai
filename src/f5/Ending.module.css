@@ -513,6 +513,12 @@
   transform: translateX(-50%) scale(1);
 }
 
+/* 안내를 다 읽으면 글자·말풍선이 구슬과 같이 빠지고, 그 자리에 도감 카드가 들어온다. */
+.finalGone .finalBubble {
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.42, 0, 0.58, 1);
+}
+
 .finalText {
   font-size: 75.8px;
   letter-spacing: -1.52px;

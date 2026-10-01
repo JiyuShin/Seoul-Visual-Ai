@@ -11,6 +11,7 @@ import { sceneFor } from './districts';
 import BackgroundSequence from './BackgroundSequence';
 import { AGENT_BOX, CUES, cueForShot, cueLines, gazeRingState } from './endingCues';
 import { QR_LINES } from './sequence';
+import PlantCards from './PlantCards';
 import styles from './Ending.module.css';
 
 const STAGE = { width: 3881, height: 2183 };
@@ -24,6 +25,12 @@ const SPEAKING_LEVEL = { current: 0.3 };
 const SPEECH_BREATH_MS = 400;
 // 음성이 이만큼 지나도 안 끝나면(재생 차단·네트워크 등) 더 기다리지 않고 연출을 이어 간다.
 const SPEECH_WAIT_MAX_MS = 20000;
+// 마지막 안내를 다 읽고 이만큼 더 보여 준 뒤에 글자·구슬을 지우고 도감 카드로 넘어간다.
+const CARD_HOLD_MS = 3000;
+// 음성이 자동재생에 막히거나 곧바로 끝났다고 알려와도, 글자는 최소한 이만큼 머문다.
+const CARD_MIN_TEXT_MS = 11000;
+// 그래도 끝났다는 신호가 없으면 여기서 끊고 카드로 넘어간다.
+const CARD_WAIT_MAX_MS = 20000;
 
 function bubbleBox(bubble) {
   return {
@@ -222,8 +229,10 @@ export default function EndingPage() {
   const [scale, setScale] = useState(1);
   const [placeName, setPlaceName] = useState('');
   const [qrOn, setQrOn] = useState(false);
+  const [cardsOn, setCardsOn] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const leaveTimer = useRef(0);
+  const cardTimer = useRef(0);
   const [localUrl, setLocalUrl] = useState('');
   const [progress, setProgress] = useState({ index: 0, time: 0, duration: 0 });
   const speech = useSpeechOutput();
@@ -282,6 +291,12 @@ export default function EndingPage() {
 
   useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
 
+  // 카드 배치만 확인할 때 쓰는 작업용 단축키. ?cards=1 이면 영상을 안 기다리고 마지막 화면으로 간다.
+  useEffect(() => {
+    if (!router.isReady || router.query.cards !== '1') return;
+    finishSequence();
+  }, [router.isReady, router.query.cards, finishSequence]);
+
   // 자치구가 정해지면 이 엔딩에서 읽을 멘트를 모두 미리 받아 둔다(이름이 바뀌면 그 문장만 다시).
   useEffect(() => {
     if (!placeName) return;
@@ -320,8 +335,24 @@ export default function EndingPage() {
     speechBusy.current.busy = false;
   }, [leaving]);
 
+  // 마지막 안내를 읽고 → 한 박자 쉬고 → 글자·구슬이 빠지면서 도감 카드가 들어온다.
   useEffect(() => {
-    if (qrOn) speechRef.current.speak(speechText(QR_LINES));
+    if (!qrOn) return undefined;
+    const shownAt = performance.now();
+    let handed = false;
+    const handOver = () => {
+      if (handed) return;
+      handed = true;
+      const stayed = performance.now() - shownAt;
+      const wait = Math.max(CARD_HOLD_MS, CARD_MIN_TEXT_MS - stayed);
+      cardTimer.current = window.setTimeout(() => setCardsOn(true), wait);
+    };
+    const guard = window.setTimeout(handOver, CARD_WAIT_MAX_MS);
+    speechRef.current.speak(speechText(QR_LINES), handOver);
+    return () => {
+      window.clearTimeout(guard);
+      window.clearTimeout(cardTimer.current);
+    };
   }, [qrOn]);
 
   useEffect(() => {
@@ -337,7 +368,7 @@ export default function EndingPage() {
   }, [qrOn, qrTargetUrl, localUrl, placeName, startKioskSession, mobilePublicOrigin]);
 
   const qrUrl = qrTargetUrl || localUrl;
-  const speaking = qrOn || (lines.length > 0 && !leaving);
+  const speaking = (qrOn && !cardsOn) || (lines.length > 0 && !leaving);
   const orbBox = qrOn ? FINAL_ORB : AGENT_BOX;
 
   return (
@@ -383,7 +414,7 @@ export default function EndingPage() {
           <div
             className={`${styles.agentLayer} ${leaving ? styles.agentLayerLeaving : ''} ${
               qrOn ? styles.agentLayerFinal : ''
-            }`}
+            } ${cardsOn ? styles.agentLayerOff : ''}`}
           >
             <div
               className={`${styles.agentOrb} ${speaking ? styles.agentOrbSpeaking : ''}`}
@@ -420,14 +451,12 @@ export default function EndingPage() {
             ) : null}
           </div>
         ) : null}
-        <div className={`${styles.finalPage} ${qrOn ? styles.finalOn : ''}`}>
+        <div className={`${styles.finalPage} ${qrOn ? styles.finalOn : ''} ${cardsOn ? styles.finalGone : ''}`}>
           <div className={styles.finalBubble}>
             <CueText lines={QR_LINES} className={styles.finalText} />
           </div>
-          <div className={styles.qrFrame}>
-            {qrUrl ? <DynamicQrCode url={qrUrl} alt="엔딩 QR 코드" /> : null}
-          </div>
         </div>
+        <PlantCards visible={cardsOn} district={placeName} />
       </div>
       </div>
     </div>

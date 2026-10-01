@@ -1,0 +1,26 @@
+/* 카드를 스테이지(3881×2183) 한가운데에 나란히 놓는다. 장수가 늘어도 간격을 유지한 채 가운데 정렬된다. */
+.cardLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 160px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s cubic-bezier(0.42, 0, 0.58, 1);
+}
+
+/* 글자·구슬이 거의 빠진 뒤에 들어오도록 한 박자 늦게 시작한다. */
+.cardLayerOn {
+  opacity: 1;
+  transition: opacity 1s cubic-bezier(0.42, 0, 0.58, 1) 0.5s;
+}
+
+/* 카드 원본 비율 505:769 를 그대로 키운 크기. */
+.card {
+  flex: none;
+  width: 700px;
+  height: 1066px;
+}
