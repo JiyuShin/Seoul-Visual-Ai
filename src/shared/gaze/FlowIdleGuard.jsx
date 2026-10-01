@@ -49,7 +49,7 @@ function seconds(ms) {
 export default function FlowIdleGuard() {
   const router = useRouter();
   const { resetFlow, dwellProgress } = useEntryFlow();
-  const { disconnect, status: linkStatus, slots, plantNames } = useMobileLink();
+  const { disconnect, status: linkStatus, slots, slotPlants } = useMobileLink();
   const active = IDLE_RESET.pages.includes(router.pathname);
 
   const stateRef = useRef({
@@ -94,7 +94,7 @@ export default function FlowIdleGuard() {
   // /4 에서 휴대폰으로 이름을 쓰는 동안은 고개를 숙여 얼굴이 안 잡힐 수 있다.
   useEffect(() => {
     markActive();
-  }, [linkStatus, slots, plantNames, markActive]);
+  }, [linkStatus, slots, slotPlants, markActive]);
 
   useEffect(() => {
     if (!router.isReady) return;

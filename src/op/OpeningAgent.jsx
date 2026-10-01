@@ -129,9 +129,9 @@ export default function OpeningAgent({ speaking }) {
       canvas,
       alpha: true,
       antialias: true,
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
     });
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(0xffffff, 0);
 
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);

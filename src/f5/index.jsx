@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
@@ -200,7 +200,12 @@ function readStoredPlace() {
 export default function EndingPage() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
-  const { qrTargetUrl, startKioskSession, mobilePublicOrigin, plantNames } = useMobileLink();
+  const { qrTargetUrl, startKioskSession, mobilePublicOrigin, slotPlants } = useMobileLink();
+  // 휴대폰에서 적은 식물 이름. 슬롯 A·B 모두 있어야 5 멘트에 이름이 들어간다.
+  const plantNames = useMemo(
+    () => ({ A: slotPlants?.A?.plantName || '', B: slotPlants?.B?.plantName || '' }),
+    [slotPlants]
+  );
   const viewportRef = useRef(null);
   const doneRef = useRef(false);
   const [scale, setScale] = useState(1);

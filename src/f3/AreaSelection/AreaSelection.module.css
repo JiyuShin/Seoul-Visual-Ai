@@ -308,7 +308,9 @@
 .fWait,
 .resultTitle,
 .resultBody,
-.qTitle {
+.qTitle,
+.qrHeading,
+.qrBody {
   z-index: 3;
 }
 
@@ -380,7 +382,7 @@
 
 .resultTitle {
   position: absolute;
-  left: 240px;
+  left: 355px;
   top: 681px;
   margin: 0;
   font-size: 210px;
@@ -410,9 +412,31 @@
   font-weight: 700;
 }
 
+.qrHeading {
+  position: absolute;
+  left: 1018px;
+  top: 480px;
+  width: 1846px;
+  height: 132px;
+  overflow: visible;
+}
+
+.qrBody {
+  position: absolute;
+  left: 641px;
+  top: 1820px;
+  width: 2600px;
+  margin: 0;
+  text-align: center;
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.96px;
+}
+
 .resultBody {
   position: absolute;
-  left: 240px;
+  left: 355px;
   top: 1761px;
   width: 1874px;
   margin: 0;
@@ -420,6 +444,14 @@
   font-weight: 500;
   line-height: 1.4;
   letter-spacing: -1.1px;
+}
+
+.qrJoinStatus {
+  top: 1960px;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .resultLines {
@@ -477,14 +509,15 @@
 
 .qrFrame {
   position: absolute;
-  left: 2213px;
-  top: 653.413px;
+  left: 1421px;
+  top: 672.486px;
   width: 1039px;
   height: 1038.029px;
   box-sizing: border-box;
   overflow: hidden;
   opacity: 0;
-  transform: translateX(80px);
+  transform: translateX(80px) scale(0.85);
+  transform-origin: center;
   border: 1.781px solid #fff;
   border-radius: 194.206px;
   box-shadow: 0 0 19.323px rgba(255, 255, 255, 0.78);
@@ -510,7 +543,7 @@
 
 .qrFrame.qrOn {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateX(0) scale(0.85);
 }
 
 .qrImage {

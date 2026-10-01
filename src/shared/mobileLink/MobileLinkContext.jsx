@@ -15,8 +15,34 @@ import {
 } from './publicOrigin';
 import { MSG, WS_PATH } from './protocol';
 import { createMobileSessionId } from './sessionId';
+import {
+  persistKioskSession,
+  readPersistedKioskSession,
+} from './kioskSessionPersist';
+import { normalizeLinkDistrict } from './normalizeDistrict';
+import { mergeSlotPlantFromState } from './slotPlants';
 
 const MobileLinkContext = createContext(null);
+
+function clientIdKey(sessionId) {
+  return `seoul-mobile-client-${sessionId}`;
+}
+
+function readMobileClientId(sessionId) {
+  try {
+    return sessionStorage.getItem(clientIdKey(sessionId)) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeMobileClientId(sessionId, clientId) {
+  try {
+    sessionStorage.setItem(clientIdKey(sessionId), clientId);
+  } catch {
+    /* ignore */
+  }
+}
 
 function wsUrl() {
   if (typeof window === 'undefined') return '';
@@ -27,12 +53,15 @@ function wsUrl() {
 export function MobileLinkProvider({ children }) {
   const router = useRouter();
   const wsRef = useRef(null);
+  const linkSessionIdRef = useRef(null);
   const [sessionId, setSessionId] = useState(null);
   const [role, setRole] = useState(null);
   const [status, setStatus] = useState('idle');
   const [slots, setSlots] = useState({ A: false, B: false });
-  const [plantNames, setPlantNames] = useState({ A: '', B: '' });
+  const [mobileSlot, setMobileSlot] = useState(null);
   const [districtFromKiosk, setDistrictFromKiosk] = useState(null);
+  const [linkDistrict, setLinkDistrict] = useState(null);
+  const [slotPlants, setSlotPlants] = useState({ A: {}, B: {} });
   const [lastError, setLastError] = useState(null);
   const [mobilePublicOrigin, setMobilePublicOrigin] = useState(() => getMobilePublicOriginSync());
 
@@ -43,30 +72,102 @@ export function MobileLinkProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refreshMobilePublicOrigin();
-    const onFocus = () => refreshMobilePublicOrigin();
+    const refreshUnlessMobile = () => {
+      if (window.location.pathname !== '/mobile') refreshMobilePublicOrigin();
+    };
+    refreshUnlessMobile();
+    const onFocus = () => refreshUnlessMobile();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [refreshMobilePublicOrigin]);
 
-  const disconnect = useCallback(() => {
+  const [disconnectedManually, setDisconnectedManually] = useState(false);
+  const manualCloseRef = useRef(false);
+  const lastConnectRef = useRef(null);
+  const connectRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const readyRef = useRef(false);
+  const pendingStateRef = useRef([]);
+  const closeAfterFlushRef = useRef(false);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const disconnectInternal = useCallback(() => {
+    clearReconnectTimer();
     const ws = wsRef.current;
     wsRef.current = null;
     if (ws) {
       ws.onclose = null;
       ws.close();
     }
+  }, [clearReconnectTimer]);
+
+  const disconnect = useCallback(() => {
+    if (pendingStateRef.current.length > 0 && !manualCloseRef.current) {
+      closeAfterFlushRef.current = true;
+      return;
+    }
+    manualCloseRef.current = true;
+    setDisconnectedManually(true);
+    disconnectInternal();
+    setStatus('closed');
+  }, [disconnectInternal]);
+
+  const flushPendingState = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !readyRef.current) return;
+    const queue = pendingStateRef.current;
+    pendingStateRef.current = [];
+    queue.forEach((msg) => ws.send(JSON.stringify(msg)));
+    if (closeAfterFlushRef.current) {
+      closeAfterFlushRef.current = false;
+      window.setTimeout(() => disconnect(), 150);
+    }
+  }, [disconnect]);
+
+  const applyDistrict = useCallback((raw) => {
+    const next = normalizeLinkDistrict(raw);
+    if (next) setDistrictFromKiosk(next);
+    return next;
   }, []);
 
   const connect = useCallback(
     ({ sessionId: id, linkRole, district }) => {
       if (typeof window === 'undefined' || !id) return;
-      disconnect();
+      manualCloseRef.current = false;
+      setDisconnectedManually(false);
+      disconnectInternal();
 
+      const normalizedDistrict = normalizeLinkDistrict(district);
+      lastConnectRef.current = { sessionId: id, linkRole, district: normalizedDistrict };
+      if (linkRole === 'kiosk' && normalizedDistrict) {
+        setLinkDistrict(normalizedDistrict);
+        setDistrictFromKiosk(normalizedDistrict);
+      }
+
+      const sessionChanged = linkSessionIdRef.current !== id;
+      linkSessionIdRef.current = id;
+      readyRef.current = false;
+      if (sessionChanged) {
+        pendingStateRef.current = [];
+        closeAfterFlushRef.current = false;
+      }
       setSessionId(id);
       setRole(linkRole);
       setStatus('connecting');
       setLastError(null);
+      if (sessionChanged) {
+        setSlots({ A: false, B: false });
+        setSlotPlants({ A: {}, B: {} });
+      }
+      if (linkRole === 'mobile') {
+        setMobileSlot(null);
+      }
 
       const ws = new WebSocket(wsUrl());
       wsRef.current = ws;
@@ -77,9 +178,26 @@ export function MobileLinkProvider({ children }) {
             type: MSG.JOIN,
             sessionId: id,
             role: linkRole,
-            district: district ?? null,
+            district: normalizedDistrict,
           })
         );
+        if (linkRole === 'mobile') {
+          ws.send(
+            JSON.stringify({ type: 'claim', sessionId: id, clientId: readMobileClientId(id) })
+          );
+        }
+        if (linkRole === 'kiosk') {
+          persistKioskSession(id, normalizedDistrict);
+          if (normalizedDistrict) {
+            ws.send(
+              JSON.stringify({
+                type: MSG.STATE,
+                sessionId: id,
+                payload: { district: normalizedDistrict },
+              })
+            );
+          }
+        }
       };
 
       ws.onmessage = (event) => {
@@ -91,6 +209,12 @@ export function MobileLinkProvider({ children }) {
         }
 
         if (msg.type === MSG.JOINED) {
+          if (msg.slot === 'A' || msg.slot === 'B') setMobileSlot(msg.slot);
+          if (linkRole === 'mobile' && typeof msg.clientId === 'string') {
+            storeMobileClientId(id, msg.clientId);
+          }
+          readyRef.current = true;
+          flushPendingState();
           setStatus(linkRole === 'kiosk' ? 'waiting_mobile' : 'waiting_kiosk');
           return;
         }
@@ -100,17 +224,19 @@ export function MobileLinkProvider({ children }) {
         }
         if (msg.type === MSG.PAIRED) {
           setStatus('paired');
-          if (msg.district) setDistrictFromKiosk(msg.district);
+          applyDistrict(msg.district);
           if (msg.slot === 'A' || msg.slot === 'B') {
             setSlots((prev) => ({ ...prev, [msg.slot]: true }));
           }
           return;
         }
         if (msg.type === MSG.STATE) {
-          if (msg.payload?.district) setDistrictFromKiosk(msg.payload.district);
-          const name = typeof msg.payload?.name === 'string' ? msg.payload.name.trim() : '';
-          if (name && (msg.slot === 'A' || msg.slot === 'B')) {
-            setPlantNames((prev) => ({ ...prev, [msg.slot]: name }));
+          if (msg.payload?.district) {
+            applyDistrict(msg.payload.district);
+          }
+          const slot = msg.slot === 'A' || msg.slot === 'B' ? msg.slot : null;
+          if (linkRole === 'kiosk' && slot && msg.payload) {
+            setSlotPlants((prev) => mergeSlotPlantFromState(prev, slot, msg.payload));
           }
           return;
         }
@@ -126,6 +252,7 @@ export function MobileLinkProvider({ children }) {
           return;
         }
         if (msg.type === MSG.ERROR) {
+          if (msg.message === 'replaced') manualCloseRef.current = true;
           setLastError(msg.message || 'link error');
           setStatus('error');
         }
@@ -137,23 +264,68 @@ export function MobileLinkProvider({ children }) {
       };
 
       ws.onclose = () => {
-        if (wsRef.current === ws) {
-          wsRef.current = null;
-          setStatus((s) => (s === 'error' ? s : 'closed'));
+        if (wsRef.current !== ws) return;
+        wsRef.current = null;
+        readyRef.current = false;
+        setStatus((s) => (s === 'error' ? s : 'closed'));
+        if (linkRole === 'kiosk') {
+          setSlots({ A: false, B: false });
         }
+        if (manualCloseRef.current) return;
+        clearReconnectTimer();
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          const last = lastConnectRef.current;
+          if (manualCloseRef.current || !last || last.sessionId !== id) return;
+          connectRef.current?.(last);
+        }, 1000);
       };
     },
-    [disconnect]
+    [applyDistrict, clearReconnectTimer, disconnectInternal, flushPendingState]
   );
+
+  connectRef.current = connect;
 
   const startKioskSession = useCallback(
     (district) => {
       refreshMobilePublicOrigin();
+      const normalized = normalizeLinkDistrict(district);
+      const districtName = normalized?.name ?? '';
+
+      const ws = wsRef.current;
+      if (
+        sessionId &&
+        role === 'kiosk' &&
+        ws &&
+        (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+      ) {
+        if (normalized) {
+          setLinkDistrict(normalized);
+          setDistrictFromKiosk(normalized);
+          persistKioskSession(sessionId, normalized);
+          if (lastConnectRef.current?.sessionId === sessionId) {
+            lastConnectRef.current = { ...lastConnectRef.current, district: normalized };
+          }
+        }
+        return sessionId;
+      }
+
+      const persisted = readPersistedKioskSession();
+      if (persisted?.sessionId && districtName && persisted.districtName === districtName) {
+        connect({
+          sessionId: persisted.sessionId,
+          linkRole: 'kiosk',
+          district: normalized ?? { name: persisted.districtName },
+        });
+        return persisted.sessionId;
+      }
+
       const id = createMobileSessionId();
-      connect({ sessionId: id, linkRole: 'kiosk', district });
+      persistKioskSession(id, normalized);
+      connect({ sessionId: id, linkRole: 'kiosk', district: normalized });
       return id;
     },
-    [connect, refreshMobilePublicOrigin]
+    [connect, refreshMobilePublicOrigin, sessionId, role]
   );
 
   const joinMobileSession = useCallback(
@@ -165,30 +337,53 @@ export function MobileLinkProvider({ children }) {
   );
 
   const sendState = useCallback((payload) => {
+    if (!sessionId) return;
+    const msg = { type: MSG.STATE, sessionId, payload };
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    ws.send(JSON.stringify({ type: MSG.STATE, sessionId, payload }));
-  }, [sessionId]);
+    if (ws && ws.readyState === WebSocket.OPEN && readyRef.current) {
+      ws.send(JSON.stringify(msg));
+      return;
+    }
+    if (role === 'mobile') pendingStateRef.current.push(msg);
+  }, [sessionId, role]);
 
   const mobileJoinRef = useRef(null);
 
   useEffect(() => {
-    if (!router.isReady || router.pathname !== '/mobile') return undefined;
-    const join = router.query.join;
+    const pathname = window.location.pathname || router.pathname;
+    if (pathname !== '/mobile') return undefined;
+    if (disconnectedManually) return undefined;
+    const search = new URLSearchParams(window.location.search);
+    const join = router.query.join ?? search.get('join');
     const id = typeof join === 'string' ? join : join?.[0];
     if (!id || mobileJoinRef.current === id) return undefined;
     mobileJoinRef.current = id;
+
+    const districtQuery = router.query.district ?? search.get('district');
+    const districtName =
+      typeof districtQuery === 'string' ? districtQuery : districtQuery?.[0];
+    if (districtName) {
+      applyDistrict(districtName);
+    }
+
     joinMobileSession(id);
     return () => {
       mobileJoinRef.current = null;
       disconnect();
     };
-  }, [router.isReady, router.pathname, router.query.join, joinMobileSession, disconnect]);
-
-  useEffect(() => () => disconnect(), [disconnect]);
+  }, [
+    router.pathname,
+    joinMobileSession,
+    disconnect,
+    disconnectedManually,
+    applyDistrict,
+  ]);
 
   const qrOrigin = mobilePublicOrigin || getMobilePublicOriginSync();
-  const qrTargetUrl = sessionId ? buildMobileJoinUrl(sessionId, qrOrigin) : '';
+  const qrDistrictName = districtFromKiosk?.name ?? linkDistrict?.name ?? '';
+  const qrTargetUrl = sessionId
+    ? buildMobileJoinUrl(sessionId, qrOrigin, qrDistrictName)
+    : '';
 
   const value = useMemo(
     () => ({
@@ -196,8 +391,9 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
-      plantNames,
+      mobileSlot,
       districtFromKiosk,
+      slotPlants,
       lastError,
       mobilePublicOrigin,
       qrTargetUrl,
@@ -212,8 +408,9 @@ export function MobileLinkProvider({ children }) {
       role,
       status,
       slots,
-      plantNames,
+      mobileSlot,
       districtFromKiosk,
+      slotPlants,
       lastError,
       mobilePublicOrigin,
       qrTargetUrl,

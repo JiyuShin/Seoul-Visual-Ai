@@ -1,4 +1,9 @@
 import styles from './CalibrationOverlay.module.css';
+import {
+  NABI_BADGE_TEXT_SVG,
+  SORA_BADGE_BACKGROUND_SVG,
+} from './nabiCalibrationBadgeAssets';
+import { CALIBRATION_TARGET_SVG } from './calibrationTargetAsset';
 
 /**
  * 사람별로 차례대로 진행하는 보정·검증 오버레이.
@@ -20,6 +25,7 @@ export default function CalibrationOverlay({
   stageTotal,
   summary,
   onStart,
+  embedded = false,
 }) {
   const title = mode === 'validate' ? '정확도 측정' : '시선 보정';
 
@@ -57,24 +63,61 @@ export default function CalibrationOverlay({
 
   if (!point) return null;
 
+  // 차오르는 게이지(.fill) 색은 사람별로 다르게 — NABI 초록 / SORA 보라 (적당한 채도).
+  const fillColor =
+    personLabel === 'NABI'
+      ? 'rgba(124, 201, 130, 0.5)'
+      : personLabel === 'SORA'
+        ? 'rgba(170, 120, 214, 0.5)'
+        : 'rgba(255, 255, 255, 0.42)';
+
   return (
-    <div className={styles.overlay}>
-      <div className={styles.hud}>
-        <span className={styles.badge} style={{ borderColor: color }}>
-          {title} · {personLabel}
-        </span>
-        <span>
-          {index + 1} / {total}
-        </span>
-        <span className={styles.hudHint}>점 한가운데를 계속 응시하세요 · ESC 취소</span>
-      </div>
+    <div className={`${styles.overlay} ${embedded ? styles.overlayEmbedded : ''}`}>
+      {personLabel === 'NABI' || personLabel === 'SORA' ? (
+        <div className={styles.nabiHud} aria-hidden="true">
+          {personLabel === 'NABI' ? (
+            <div
+              className={styles.nabiHudText}
+              dangerouslySetInnerHTML={{ __html: NABI_BADGE_TEXT_SVG }}
+            />
+          ) : (
+            <div className={`${styles.nabiHudText} ${styles.soraHudText}`}>
+              <div
+                className={styles.soraBadgeSvg}
+                dangerouslySetInnerHTML={{ __html: SORA_BADGE_BACKGROUND_SVG }}
+              />
+              <span className={styles.soraBadgeText}>
+                SORA님, 점 한가운데를 계속 응시하세요
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={styles.hud}>
+          <span className={styles.badge} style={{ borderColor: color }}>
+            {title} · {personLabel}
+          </span>
+          <span>
+            {index + 1} / {total}
+          </span>
+        </div>
+      )}
 
       <div
         className={styles.target}
-        style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%`, '--target-color': color }}
+        style={{
+          left: `${point.x * 100}%`,
+          top: `${point.y * 100}%`,
+          '--target-color': color,
+          '--fill-color': fillColor,
+        }}
         data-phase={phase}
       >
-        <div className={styles.halo} />
+        <div
+          className={styles.glass}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: CALIBRATION_TARGET_SVG }}
+        />
         <div
           className={styles.fill}
           style={{ animationDuration: `${collectMs}ms` }}

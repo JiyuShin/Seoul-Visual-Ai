@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const SPEECH_REVISION = 'student-shimmer-22';
+const SPEECH_REVISION = 'opening-reference-23';
 const PITCH_RATE = 1.06;
 
 const AFTER_AUDIO_MS = 160;

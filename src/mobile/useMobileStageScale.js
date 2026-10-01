@@ -8,8 +8,14 @@ function isSoftKeyboardOpen() {
   if (typeof window === 'undefined') return false;
   const vv = window.visualViewport;
   if (!vv) return false;
-  const layoutH = window.innerHeight;
-  return layoutH - vv.height > KEYBOARD_HEIGHT_DELTA_PX && vv.height < layoutH * 0.85;
+  // iOS Safari 주소창으로 인한 innerHeight/visualViewport 차이를 키보드로
+  // 오판하지 않도록, 실제 입력 포커스가 있을 때만 키보드로 판정한다.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  const tag = active?.tagName;
+  const editing =
+    tag === 'INPUT' || tag === 'TEXTAREA' || active?.isContentEditable === true;
+  if (!editing) return false;
+  return window.innerHeight - vv.height > KEYBOARD_HEIGHT_DELTA_PX;
 }
 
 /**
@@ -27,8 +33,10 @@ export function useMobileStageScale(viewportRef, artboardWidth, artboardHeight, 
     const box = viewportRef.current;
     if (!box) return;
 
+    // 높이는 .safe 인라인 높이 반영 타이밍에 의존하지 않도록 실제 가시 영역을 직접 사용.
+    const vv = window.visualViewport;
     const w = box.clientWidth;
-    const h = box.clientHeight;
+    const h = Math.round(vv?.height ?? box.clientHeight);
     if (!w || !h) return;
 
     const next = computeMobileStageScale(w, h, artboardWidth, artboardHeight, fit);

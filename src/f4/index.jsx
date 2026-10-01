@@ -1,19 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
+import { bothSlotsHaveSent, bothSlotsConnected } from '../shared/mobileLink/slotPlants';
 import QuietStreet from './QuietStreet';
+import GlassSwirl from './GlassSwirl';
 import styles from './PageFour.module.css';
 
 const STAGE = { width: 3881, height: 2183 };
 const TRAVEL_MS = 7000;
-const DRAW_HOLD_MS = 5600;
-const ASSET_SEQUENCE_MS = 5600;
-const ASSET_HOLD_MS = 1800;
+const SWIRL_AFTER_MS = 5600;
 const PLACES = ['종로구', '마포구', '강남구'];
-const PLANT_FRAMES = [
-  { slot: 'A', image: '/4/plant-left.png', tone: 'lilac' },
-  { slot: 'B', image: '/4/plant-right.png', tone: 'mint' },
+
+/** 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다. */
+const KIOSK_PLANT_IMAGES = {
+  'jongno-a': '/4/plants/jongno-a.png',
+  'jongno-b': '/4/plants/jongno-b.png',
+  'jongno-c': '/4/plants/jongno-c.png',
+  'mapo-a': '/4/plants/mapo-a.png',
+  'mapo-b': '/4/plants/mapo-b.png',
+  'mapo-c': '/4/plants/mapo-c.png',
+  'gangnam-a': '/4/plants/gangnam-a.png',
+  'gangnam-b': '/4/plants/gangnam-b.png',
+  'gangnam-c': '/4/plants/gangnam-c.png',
+};
+
+const PLACEHOLDER_PLANTS = [
+  { name: '몬스테라', image: '/4/plant-left.png', tone: 'mint' },
+  { name: '금목서향새싹', image: '/4/plant-right.png', tone: 'lilac' },
 ];
 
 function readStoredPlace() {
@@ -28,13 +42,15 @@ function readStoredPlace() {
 export default function PageFour() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
-  const { plantNames } = useMobileLink();
+  const { startKioskSession, sessionId, role, slotPlants, slots } = useMobileLink();
   const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [step, setStep] = useState('travel');
   const [streetReady, setStreetReady] = useState(false);
   const [placeName, setPlaceName] = useState('');
+  const [swirlOn, setSwirlOn] = useState(false);
   const travelStarted = useRef(false);
+  const kioskEnsured = useRef(false);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -60,25 +76,73 @@ export default function PageFour() {
   useEffect(() => {
     if (!streetReady || travelStarted.current) return undefined;
     travelStarted.current = true;
-    const timer = window.setTimeout(() => setStep('draw'), TRAVEL_MS);
+    if (bothSlotsHaveSent(slotPlants)) {
+      setStep('slots');
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setStep((current) => {
+        if (current === 'slots') return current;
+        if (!bothSlotsConnected(slots)) return 'travel';
+        return 'draw';
+      });
+    }, TRAVEL_MS);
     return () => window.clearTimeout(timer);
-  }, [streetReady]);
+  }, [streetReady, slotPlants, slots]);
 
   useEffect(() => {
-    if (step !== 'draw') return undefined;
-    // 모바일 전송 신호가 연결되면 이 타이머 대신 그 신호로 slots로 넘긴다.
-    const timer = window.setTimeout(() => setStep('slots'), DRAW_HOLD_MS);
+    if (!streetReady || bothSlotsHaveSent(slotPlants)) return undefined;
+    if (!bothSlotsConnected(slots)) return undefined;
+    setStep((current) => (current === 'slots' ? current : 'draw'));
+    return undefined;
+  }, [streetReady, slots, slotPlants]);
+
+  useEffect(() => {
+    if (!placeName || kioskEnsured.current) return undefined;
+    if (sessionId && role === 'kiosk') {
+      kioskEnsured.current = true;
+      return undefined;
+    }
+    kioskEnsured.current = true;
+    startKioskSession({ name: placeName });
+    return undefined;
+  }, [placeName, sessionId, role, startKioskSession]);
+
+  const bothSent = bothSlotsHaveSent(slotPlants);
+
+  useEffect(() => {
+    if (!bothSent) return undefined;
+    setStep('slots');
+    return undefined;
+  }, [bothSent]);
+
+  useEffect(() => {
+    if (step !== 'slots') {
+      setSwirlOn(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSwirlOn(true), SWIRL_AFTER_MS);
     return () => window.clearTimeout(timer);
   }, [step]);
 
-  useEffect(() => {
-    if (step !== 'slots') return undefined;
-    const timer = window.setTimeout(() => {
-      const next = placeName ? `/5?district=${encodeURIComponent(placeName)}` : '/5';
-      router.push(next);
-    }, ASSET_SEQUENCE_MS + ASSET_HOLD_MS);
-    return () => window.clearTimeout(timer);
-  }, [step, router, placeName]);
+  const slotPlantsView = useMemo(
+    () =>
+      ['A', 'B'].map((slotKey, index) => {
+        const fallback = PLACEHOLDER_PLANTS[index];
+        const live = slotPlants[slotKey];
+        const plantImage = KIOSK_PLANT_IMAGES[live?.plantVariant] || live?.plantImage;
+        const drawingUrl = plantImage ? null : live?.drawingUrl;
+        return {
+          key: slotKey,
+          name: live?.plantName?.trim() || fallback.name,
+          image: plantImage || drawingUrl || fallback.image,
+          tone: fallback.tone,
+          isUserDrawing: Boolean(drawingUrl),
+          isPicked: Boolean(plantImage),
+        };
+      }),
+    [slotPlants]
+  );
 
   return (
     <div className={styles.viewport} ref={viewportRef}>
@@ -111,32 +175,129 @@ export default function PageFour() {
           {step === 'slots' ? (
             <>
               <div className={`${styles.sproutCopy} ${styles.sproutSequence}`}>
-                <p className={styles.sproutTitle}>
-                  두 분의 식물이 <b>새싹을 틔웠어요!</b>
-                </p>
-                <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
+                {placeName === '강남구' ? (
+                  <>
+                    <svg className={styles.gangnamTitle} viewBox="0 0 2518 169" role="img" aria-label="두 분의 식물이 새싹을 틔웠어요!">
+                      <defs>
+                        <linearGradient id="gangnamTitleFill" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#070002" />
+                          <stop offset="1" stopColor="#657D82" />
+                        </linearGradient>
+                        <filter id="gangnamTitleShadow" x="-15%" y="-45%" width="130%" height="190%" colorInterpolationFilters="sRGB">
+                          <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#4d4d4d" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="122"
+                        textAnchor="middle"
+                        fill="url(#gangnamTitleFill)"
+                        filter="url(#gangnamTitleShadow)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="130"
+                        style={{ letterSpacing: '-2.6px' }}
+                      >
+                        두 분의 식물이 <tspan fontWeight="700">새싹을 틔웠어요!</tspan>
+                      </text>
+                    </svg>
+                    <svg className={styles.gangnamSub} viewBox="0 0 2518 84" role="img" aria-label={`이제 ${placeName}로 함께 이동해 직접 심어볼게요`}>
+                      <defs>
+                        <linearGradient id="gangnamSubFill" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#4A5860" />
+                          <stop offset="1" stopColor="#417097" />
+                        </linearGradient>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="60"
+                        textAnchor="middle"
+                        fill="url(#gangnamSubFill)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="60"
+                        fontWeight="600"
+                        style={{ letterSpacing: '-1.2px' }}
+                      >
+                        이제 {placeName}로 함께 이동해 직접 심어볼게요
+                      </text>
+                    </svg>
+                  </>
+                ) : placeName === '마포구' ? (
+                  <>
+                    <svg className={styles.mapoTitle} viewBox="0 0 2518 169" role="img" aria-label="두 분의 식물이 새싹을 틔웠어요!">
+                      <defs>
+                        <filter id="mapoTitleShadow" x="-15%" y="-45%" width="130%" height="190%" colorInterpolationFilters="sRGB">
+                          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#000" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
+                      <text
+                        x="1259"
+                        y="122"
+                        textAnchor="middle"
+                        fill="#FFFFFF"
+                        filter="url(#mapoTitleShadow)"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="130"
+                        style={{ letterSpacing: '-2.6px' }}
+                      >
+                        두 분의 식물이 <tspan fontWeight="700">새싹을 틔웠어요!</tspan>
+                      </text>
+                    </svg>
+                    <svg className={styles.mapoSub} viewBox="0 0 2518 84" role="img" aria-label={`이제 ${placeName}로 함께 이동해 직접 심어볼게요`}>
+                      <text
+                        x="1259"
+                        y="60"
+                        textAnchor="middle"
+                        fill="#FFFFFF"
+                        fontFamily="Pretendard, sans-serif"
+                        fontSize="60"
+                        fontWeight="600"
+                        style={{ letterSpacing: '-1.2px' }}
+                      >
+                        이제 {placeName}로 함께 이동해 직접 심어볼게요
+                      </text>
+                    </svg>
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.sproutTitle}>
+                      두 분의 식물이 <b>새싹을 틔웠어요!</b>
+                    </p>
+                    <p className={styles.sproutSub}>이제 {placeName}로 함께 이동해 직접 심어볼게요</p>
+                  </>
+                )}
               </div>
-              {PLANT_FRAMES.map((frame) => {
-                const name = plantNames[frame.slot] || '';
-                return (
-                  <div
-                    key={frame.slot}
-                    className={`${styles.plantSlot} ${frame.slot === 'A' ? styles.slotLeft : styles.slotRight} ${styles.slotSequence}`}
-                  >
-                    <div className={styles.orb}>
-                      <div className={styles.orbClip}>
-                        <img className={styles.plant} src={frame.image} alt="" />
-                      </div>
-                      <img className={styles.orbRing} src="/4/orb-grown.svg" alt="" />
+              {slotPlantsView.map((plant, index) => (
+                <div
+                  key={plant.key}
+                  className={`${styles.plantSlot} ${index === 0 ? styles.slotLeft : styles.slotRight} ${styles.slotSequence}`}
+                >
+                  <div className={styles.orb}>
+                    <div className={styles.orbClip}>
+                      <img
+                        className={`${styles.plant} ${plant.isUserDrawing ? styles.plantUserDrawing : ''} ${
+                          plant.isPicked ? styles.plantPicked : ''
+                        }`}
+                        src={plant.image}
+                        alt=""
+                      />
                     </div>
-                    {name ? (
-                      <p className={`${styles.namePill} ${frame.tone === 'lilac' ? styles.nameLilac : styles.nameMint}`}>
-                        <span className={styles.nameText}>{name}</span>
-                      </p>
-                    ) : null}
+                    <GlassSwirl live={swirlOn} phase={index === 0 ? 0 : 2.4} />
+                    <img
+                      className={`${styles.orbRing} ${swirlOn ? styles.orbRingFade : ''}`}
+                      src="/4/orb-grown.svg"
+                      alt=""
+                    />
+                    <img
+                      className={`${styles.orbRing} ${styles.orbRingClear} ${swirlOn ? styles.orbRingClearOn : ''}`}
+                      src="/4/orb-grown-clear.svg"
+                      alt=""
+                    />
                   </div>
-                );
-              })}
+                  <p className={`${styles.namePill} ${plant.tone === 'lilac' ? styles.nameLilac : styles.nameMint}`}>
+                    <span className={styles.nameText}>{plant.name}</span>
+                  </p>
+                </div>
+              ))}
             </>
           ) : null}
         </div>

@@ -51,7 +51,7 @@ export default function MobileTag2Page({
         className={`${styles.nameField} ${plantName ? '' : styles.nameFieldEmpty}`}
         data-figma-node="1693:920"
       >
-        <img className={styles.nameFieldBg} src="/mobile/btn-next.svg" alt="" aria-hidden="true" />
+        <span className={styles.nameFieldBg} aria-hidden="true" />
         {!plantName ? (
           <span className={styles.nameFieldNudge} aria-hidden="true">
             <span className={styles.nameFieldCursor} />
@@ -79,6 +79,25 @@ export default function MobileTag2Page({
             }
           }}
         />
+        {plantName.trim() && !exiting ? (
+          <button
+            type="button"
+            className={styles.nameSubmit}
+            aria-label="이름 확정하고 다음으로"
+            onClick={submit}
+          >
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M5 12h13M13 6l6 6-6 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
       </label>
       <form
         className={styles.srForm}

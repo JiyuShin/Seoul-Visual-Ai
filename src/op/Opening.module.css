@@ -263,6 +263,7 @@
   z-index: 3;
   transform-origin: top left;
   pointer-events: none;
+  view-transition-name: op-discussion-orb;
 }
 
 .agentMoveOn {
@@ -604,6 +605,7 @@
 .copyOn {
   opacity: 1;
   transform: translate3d(-50%, 0, 0);
+  transition-delay: 1.7s;
 }
 
 .pillTight {

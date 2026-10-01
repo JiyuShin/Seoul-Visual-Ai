@@ -42,6 +42,8 @@ export function EntryFlowProvider({ children }) {
   const [dwellProgress, setDwellProgress] = useState(0);
   const [gazeClip, setGazeClip] = useState(null);
   const [gazePosition, setGazePosition] = useState(null);
+  // /2 거리뷰 블러(veil) 레이어가 다 걷혔는지. 걷히기 전엔 시선 커서를 숨긴다.
+  const [streetUnveiled, setStreetUnveiled] = useState(false);
 
   // 운영자가 카메라를 잡고 보정을 마친 뒤 시작을 누르면 참여 화면으로 넘어간다.
   const [setupComplete, setSetupComplete] = useState(false);
@@ -126,13 +128,28 @@ export function EntryFlowProvider({ children }) {
   const gazeEnabled = router.pathname !== '/mobile';
   const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
 
+  useEffect(() => {
+    if (!router.isReady || router.pathname !== '/2') return undefined;
+    const dev = router.query?.dev;
+    if (dev !== '1' && dev !== 'true') return undefined;
+    setMouseDev(true);
+    setSetupComplete(true);
+    return undefined;
+  }, [router.isReady, router.pathname, router.query.dev]);
+
   const handleGazeClipChange = useCallback((clip) => {
     setGazeClip(clip);
+  }, []);
+
+  // /2 의 DiscussionStep 이 veil 페이드가 끝나면 호출한다.
+  const reportStreetUnveiled = useCallback(() => {
+    setStreetUnveiled(true);
   }, []);
 
   useEffect(() => {
     if (router.pathname !== '/2') {
       setGazeClip(null);
+      setStreetUnveiled(false);
     }
   }, [router.pathname]);
 
@@ -211,7 +228,7 @@ export function EntryFlowProvider({ children }) {
       mouseDev,
       enableMouseDev,
       // 준비가 끝나기 전에는 참여 화면이 보정 화면으로 돌려보낸다.
-      isCalibrating: !setupComplete,
+      isCalibrating: !setupComplete || Boolean(engine.calibUi),
       setupComplete,
       completeSetup,
       finishCalibration,
@@ -234,6 +251,9 @@ export function EntryFlowProvider({ children }) {
       gazePosition,
       // 친구 GazeReticle / GlobalGazeCursor 가 읽는 이름
       reticlePosition: gazePosition,
+      // /2 거리뷰 블러(veil)가 다 걷힌 뒤부터 시선 커서를 보인다.
+      streetUnveiled,
+      reportStreetUnveiled,
       registerGazeHandler,
       handleGazeClipChange,
     }),
@@ -254,6 +274,8 @@ export function EntryFlowProvider({ children }) {
       dwellProgress,
       reportDwellProgress,
       gazePosition,
+      streetUnveiled,
+      reportStreetUnveiled,
       registerGazeHandler,
       handleGazeClipChange,
     ]

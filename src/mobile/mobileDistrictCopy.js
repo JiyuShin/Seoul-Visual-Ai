@@ -3,7 +3,7 @@
 
 /** @typedef {{ loadingLead: string, drawingLeadLines: MobileLeadLine[], tags: string[] }} MobileDistrictCopy */
 
-/** 용산구 등 — 기존 Figma 기본 카피 */
+/** 기본 fallback 카피 (종로구 등) */
 export const DEFAULT_MOBILE_DISTRICT_COPY = {
   loadingLead: '나만의 식물을 그려볼 준비, 되셨나요?',
   drawingLeadLines: [
@@ -15,7 +15,7 @@ export const DEFAULT_MOBILE_DISTRICT_COPY = {
     },
     { parts: [{ text: '나만의 식물을 자유롭게 그려주세요' }] },
   ],
-  tags: ['환기', '쾌적한', '상쾌한'],
+  tags: ['균형', '힐링', '편안함'],
 };
 
 /** @type {Record<string, Partial<MobileDistrictCopy>>} */
@@ -34,26 +34,12 @@ const MOBILE_DISTRICT_COPY_BY_NAME = {
     ],
     tags: ['맑은 공기', '쾌적한', '시원함'],
   },
-  송파구: {
-    drawingLeadLines: [
-      { parts: [{ text: '적당한 크기의 나무와 식물이 필요한' }] },
-      { parts: [{ text: '송파구를 위해 식물을 자유롭게 그려주세요' }] },
-    ],
-    tags: ['조화', '따뜻함', '균형'],
-  },
   강남구: {
     drawingLeadLines: [
       { parts: [{ text: '빌딩 숲 사이로 틈새 식물이 가득한 강남구를 만들기 위해' }] },
       { parts: [{ text: '식물을 자유롭게 그려주세요' }] },
     ],
     tags: ['맑음', '청량함', '휴식'],
-  },
-  성동구: {
-    drawingLeadLines: [
-      { parts: [{ text: '생활권 곳곳에 녹지가 필요한 성동구를 위해' }] },
-      { parts: [{ text: '나만의 식물을 자유롭게 그려주세요' }] },
-    ],
-    tags: ['편안함', '높은 채도', '균형'],
   },
 };
 
@@ -85,5 +71,5 @@ export function resolveMobileDistrictCopy(districtName) {
   };
 }
 
-/** 컴포넌트 단독 렌더 시 기본값 (용산구 카피) */
-export const DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED = resolveMobileDistrictCopy('용산구');
+/** 컴포넌트 단독 렌더 시 기본값 (종로구 카피) */
+export const DEFAULT_MOBILE_DISTRICT_COPY_RESOLVED = resolveMobileDistrictCopy('종로구');

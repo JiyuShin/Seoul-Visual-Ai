@@ -12,6 +12,7 @@ export function createSession({
   points,
   moveMs = 800,
   collectMs = 1000,
+  settleMs = 0,
   minSamples = 8,
 }) {
   return {
@@ -20,6 +21,10 @@ export function createSession({
     points,
     moveMs,
     collectMs,
+    // 이동 대기(move)가 끝나고 수집(collect)을 시작해도, 바로 그 순간엔 눈이 아직
+    // 미세하게 안착하는 중이라 초반 프레임은 노이즈가 된다. collect 앞 settleMs 동안은
+    // 샘플을 버리고, 눈이 멈춘 뒤의 안정적인 샘플만 학습에 쓴다.
+    settleMs,
     minSamples,
     stageIdx: 0,
     idx: 0,
@@ -61,7 +66,8 @@ export function step(s, now, hasSample) {
   }
 
   let sampleIndex = -1;
-  if (hasSample) {
+  // collect 앞 settleMs 동안은 눈이 안착 중이라 샘플을 버린다(학습 제외).
+  if (hasSample && elapsed >= s.settleMs) {
     s.pointSamples += 1;
     sampleIndex = s.idx;
   }
