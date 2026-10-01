@@ -1,9 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import OpeningStill from '../src/op/OpeningStill';
-import usePresenceGate from '../src/shared/gaze/usePresenceGate';
-import { PRESENCE } from '../src/shared/gaze/presence';
+import usePresenceLink from '../src/shared/gaze/usePresenceLink';
 
 const DEBUG_STYLE = {
   position: 'fixed',
@@ -19,19 +18,38 @@ const DEBUG_STYLE = {
   pointerEvents: 'none',
 };
 
-function presenceText(state) {
-  const faces = state.faces
-    .map((face) => `w${face.width.toFixed(2)} yaw${face.yaw.toFixed(0)} pitch${face.pitch.toFixed(0)}`)
-    .join('\n');
-  return `${state.status} · 통과 ${state.kept}명 · ${((state.progress * PRESENCE.holdMs) / 1000).toFixed(1)}s\n${faces}`;
-}
-
+/**
+ * 인원 인식은 /presence_test(센서)가 한다. 이 화면은 카메라를 열지 않고,
+ * 센서가 보낸 통과 신호를 받으면 /1 로 넘어간다.
+ */
 export default function PreOpeningPage() {
   const router = useRouter();
   const debug = router.query.presenceDebug === '1';
-  const camera = typeof router.query.presenceCam === 'string' ? router.query.presenceCam : '';
-  const goNext = useCallback(() => router.replace('/1'), [router]);
-  const presence = usePresenceGate({ enabled: router.isReady, onPass: goNext, camera, report: debug });
+  const [sensorState, setSensorState] = useState(null);
+  const passedRef = useRef(false);
+
+  const goNext = useCallback(() => {
+    if (passedRef.current) return;
+    passedRef.current = true;
+    router.replace('/1');
+  }, [router]);
+
+  const onMessage = useCallback(
+    (msg) => {
+      if (msg.type === 'pass' || (msg.type === 'joined' && msg.passAt)) goNext();
+      if (msg.type === 'state' || (msg.type === 'joined' && msg.state)) setSensorState(msg.state || msg);
+    },
+    [goNext]
+  );
+
+  const link = usePresenceLink('display', onMessage);
+
+  const debugText = [
+    `서버 ${link.connected ? '연결됨' : '끊김'} · 센서 ${link.peers.sensors}대`,
+    sensorState
+      ? `얼굴 ${sensorState.faces}명 · 통과 ${sensorState.kept}명 · ${Math.round((sensorState.progress || 0) * 100)}%`
+      : '센서 신호 없음',
+  ].join('\n');
 
   return (
     <>
@@ -45,7 +63,7 @@ export default function PreOpeningPage() {
         />
       </Head>
       <OpeningStill />
-      {debug && <div style={DEBUG_STYLE}>{presenceText(presence)}</div>}
+      {debug && <div style={DEBUG_STYLE}>{debugText}</div>}
     </>
   );
 }

@@ -29,6 +29,12 @@ export const PRESENCE = {
   detectionConfidence: 0.3,
   presenceConfidence: 0.3,
   trackingConfidence: 0.3,
+  // 모자를 쓰면 검출이 한두 프레임씩 끊기고 고개 각도도 튄다.
+  // stickyMs 동안은 마지막 위치로 사람을 붙잡아 두고, poseSmooth 로 각도를 눌러 떨림을 없앤다.
+  stickyMs: 900,
+  poseSmooth: 0.3,
+  // 같은 사람으로 이을 때 허용하는 얼굴 중심 이동량(화면 비율).
+  matchDist: 0.15,
   cameraLabel: /facetime|built-in|내장/i,
   cameraStorageKey: 'seoul-presence-camera',
 };
@@ -59,6 +65,7 @@ function measureFace(lm, matrix) {
     maxX,
     minY,
     maxY,
+    cx: (minX + maxX) / 2,
     cy: (minY + maxY) / 2,
     width: maxX - minX,
     yaw: pose ? pose.yaw * DEG : 0,
@@ -66,29 +73,95 @@ function measureFace(lm, matrix) {
   };
 }
 
-/**
- * 얼굴마다 통과하지 못한 이유(reasons)를 붙이고, 통과한 얼굴(kept)을 큰 순서로 돌려준다.
- * near 는 고개 방향과 상관없이 키오스크 앞에 서 있는 얼굴이다.
- */
+/** near 는 고개 방향과 상관없이 키오스크 앞에 서 있는 얼굴이다. */
+function judge(face, largest, config) {
+  const reasons = [];
+  if (face.width < config.minFaceWidth) reasons.push('멀다');
+  else if (face.width < largest * config.minRelativeWidth) reasons.push('뒤쪽');
+  const near = reasons.length === 0;
+  if (face.minX < config.edgeMargin || face.maxX > 1 - config.edgeMargin || face.cy <= 0 || face.cy >= 1) {
+    reasons.push('가장자리');
+  }
+  if (Math.abs(face.yaw) > config.maxYawDeg) reasons.push('고개 좌우');
+  if (Math.abs(face.pitch - config.pitchCenterDeg) > config.maxPitchDeg) reasons.push('고개 위아래');
+  return { reasons, near, ok: reasons.length === 0 };
+}
+
+/** 한 프레임만 보고 판정한다. 끊김을 메우지 않으니, 사람 수를 세려면 createPresenceTracker 를 쓴다. */
 export function evaluateFaces(result, config = PRESENCE) {
   const measured = (result?.faceLandmarks || []).map((lm, i) =>
     measureFace(lm, result.facialTransformationMatrixes?.[i]?.data)
   );
   const largest = measured.reduce((max, face) => Math.max(max, face.width), 0);
-  const faces = measured.map((face) => {
-    const reasons = [];
-    if (face.width < config.minFaceWidth) reasons.push('멀다');
-    else if (face.width < largest * config.minRelativeWidth) reasons.push('뒤쪽');
-    const near = reasons.length === 0;
-    if (face.minX < config.edgeMargin || face.maxX > 1 - config.edgeMargin || face.cy <= 0 || face.cy >= 1) {
-      reasons.push('가장자리');
-    }
-    if (Math.abs(face.yaw) > config.maxYawDeg) reasons.push('고개 좌우');
-    if (Math.abs(face.pitch - config.pitchCenterDeg) > config.maxPitchDeg) reasons.push('고개 위아래');
-    return { ...face, reasons, near, ok: reasons.length === 0 };
-  });
+  const faces = measured.map((face) => ({ ...face, ...judge(face, largest, config) }));
   const kept = faces.filter((face) => face.ok).sort((a, b) => b.width - a.width);
   return { faces, kept };
+}
+
+/**
+ * 프레임마다 같은 사람을 이어 보면서 판정한다.
+ * 검출이 끊겨도 stickyMs 동안은 마지막 자리에 사람이 있다고 보고(stale), 고개 각도는 눌러서 쓴다.
+ * 모자나 그림자 때문에 한두 프레임 놓쳐도 인원수가 흔들리지 않는다.
+ */
+export function createPresenceTracker() {
+  let tracks = [];
+  let nextId = 1;
+
+  return {
+    update(result, now, config = PRESENCE) {
+      const measured = (result?.faceLandmarks || []).map((lm, i) =>
+        measureFace(lm, result.facialTransformationMatrixes?.[i]?.data)
+      );
+
+      const taken = new Set();
+      tracks.forEach((track) => {
+        let best = -1;
+        let bestDist = config.matchDist;
+        measured.forEach((face, i) => {
+          if (taken.has(i)) return;
+          const dist = Math.hypot(face.cx - track.cx, face.cy - track.cy);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+          }
+        });
+        if (best < 0) {
+          track.fresh = false;
+          return;
+        }
+        taken.add(best);
+        const face = measured[best];
+        const blend = Math.min(1, Math.max(0.05, config.poseSmooth));
+        track.fresh = true;
+        track.seenAt = now;
+        track.cx = face.cx;
+        track.cy = face.cy;
+        track.minX = face.minX;
+        track.maxX = face.maxX;
+        track.minY = face.minY;
+        track.maxY = face.maxY;
+        track.width += (face.width - track.width) * blend;
+        track.yaw += (face.yaw - track.yaw) * blend;
+        track.pitch += (face.pitch - track.pitch) * blend;
+      });
+
+      measured.forEach((face, i) => {
+        if (taken.has(i)) return;
+        tracks.push({ ...face, id: nextId++, fresh: true, seenAt: now });
+      });
+
+      tracks = tracks.filter((track) => now - track.seenAt <= config.stickyMs);
+
+      const largest = tracks.reduce((max, track) => Math.max(max, track.width), 0);
+      const faces = tracks.map((track) => ({
+        ...track,
+        ...judge(track, largest, config),
+        stale: !track.fresh,
+      }));
+      const kept = faces.filter((face) => face.ok).sort((a, b) => b.width - a.width);
+      return { faces, kept };
+    },
+  };
 }
 
 /** 검출이 graceMs 넘게 끊기면 누적 시간을 0으로 돌린다. hold 는 { heldMs, lastOkAt } 를 그대로 고친다. */

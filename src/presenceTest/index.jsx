@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
 import { createFaceLandmarker } from '../shared/gaze/faceLandmarker';
+import usePresenceLink from '../shared/gaze/usePresenceLink';
 import {
   PRESENCE,
   advanceHold,
-  evaluateFaces,
+  createPresenceTracker,
   landmarkerOptions,
   openCamera,
   videoInputs,
@@ -21,16 +21,36 @@ const SLIDERS = [
   { key: 'detectionConfidence', label: '얼굴 검출 기준 점수 (모자·그림자면 낮춤)', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
   { key: 'presenceConfidence', label: '얼굴 유지 기준 점수', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
   { key: 'trackingConfidence', label: '추적 기준 점수', min: 0.05, max: 0.9, step: 0.05, digits: 2 },
+  { key: 'stickyMs', label: '얼굴 붙잡기 (ms · 모자면 올림)', min: 0, max: 3000, step: 100, digits: 0 },
+  { key: 'poseSmooth', label: '고개 각도 흔들림 누르기 (낮을수록 강함)', min: 0.05, max: 1, step: 0.05, digits: 2 },
   { key: 'graceMs', label: '끊김 허용 (ms)', min: 0, max: 3000, step: 100, digits: 0 },
   { key: 'holdMs', label: '유지 시간 (ms)', min: 1000, max: 30000, step: 500, digits: 0 },
 ];
 
 const TUNABLE = SLIDERS.map((slider) => slider.key);
-// 테스트에서만 짧게 기다린다. /pre_opening 은 PRESENCE.holdMs(15초)를 그대로 쓴다.
-const TEST_HOLD_MS = 4500;
+// 이 페이지가 실제 센서라서, 여기서 맞춘 값이 그대로 /pre_opening 통과 조건이 된다.
+const DEFAULT_HOLD_MS = 4500;
+const CONFIG_KEY = 'seoul-presence-config';
+const STATE_SEND_MS = 250;
+const SENT_BANNER_MS = 2000;
 
-function initialConfig() {
-  return { ...Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]])), holdMs: TEST_HOLD_MS };
+function defaultConfig() {
+  return { ...Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]])), holdMs: DEFAULT_HOLD_MS };
+}
+
+// 슬라이더 값은 이 브라우저에 저장해 두고 새로고침해도 유지한다.
+function loadConfig() {
+  const base = defaultConfig();
+  if (typeof window === 'undefined') return base;
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(CONFIG_KEY) || '{}');
+    TUNABLE.forEach((key) => {
+      if (typeof saved[key] === 'number') base[key] = saved[key];
+    });
+  } catch {
+    // 저장값이 깨졌으면 기본값을 쓴다.
+  }
+  return base;
 }
 
 function drawFaces(canvas, video, faces) {
@@ -49,21 +69,35 @@ function drawFaces(canvas, video, faces) {
     const x = face.minX * width;
     const y = face.minY * height;
     ctx.strokeStyle = color;
+    // 검출이 끊겨 붙잡아 둔 얼굴은 점선으로 구분한다.
+    ctx.setLineDash(face.stale ? [14, 10] : []);
     ctx.strokeRect(x, y, (face.maxX - face.minX) * width, (face.maxY - face.minY) * height);
+    ctx.setLineDash([]);
     ctx.fillStyle = color;
-    ctx.fillText(`${index + 1} ${face.ok ? '통과' : face.reasons.join('·')}`, x, y - 6);
+    const label = face.ok ? '통과' : face.reasons.join('·');
+    ctx.fillText(`${index + 1} ${label}${face.stale ? ' (붙잡음)' : ''}`, x, y - 6);
   });
 }
 
 export default function PresenceTest() {
-  const router = useRouter();
-  const routerRef = useRef(router);
-  routerRef.current = router;
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [config, setConfig] = useState(initialConfig);
+  const [config, setConfig] = useState(loadConfig);
   const configRef = useRef(config);
   configRef.current = config;
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    } catch {
+      // 저장 못 해도 동작에는 지장 없다.
+    }
+  }, [config]);
+
+  const link = usePresenceLink('sensor');
+  const sendRef = useRef(link.send);
+  sendRef.current = link.send;
+  const [sentCount, setSentCount] = useState(0);
+  const [sentAt, setSentAt] = useState(0);
 
   const [devices, setDevices] = useState([]);
   const [want, setWant] = useState('');
@@ -71,6 +105,8 @@ export default function PresenceTest() {
   const [status, setStatus] = useState('준비 중…');
   const [view, setView] = useState({ faces: [], kept: 0, progress: 0, fps: 0 });
   const holdRef = useRef({ heldMs: 0, lastOkAt: 0 });
+  const trackerRef = useRef(null);
+  if (!trackerRef.current) trackerRef.current = createPresenceTracker();
   const landmarkerRef = useRef(null);
 
   const { detectionConfidence, presenceConfidence, trackingConfidence } = config;
@@ -94,6 +130,7 @@ export default function PresenceTest() {
     let frames = 0;
     let fpsSince = performance.now();
     let fps = 0;
+    let lastSentAt = 0;
     const video = videoRef.current;
 
     const release = () => {
@@ -123,7 +160,7 @@ export default function PresenceTest() {
         } catch {
           // 슬라이더로 옵션을 바꾸는 동안 그래프가 다시 만들어지면 한두 프레임 실패할 수 있다.
         }
-        const { faces, kept } = evaluateFaces(result, cfg);
+        const { faces, kept } = trackerRef.current.update(result, now, cfg);
         const progress = advanceHold(holdRef.current, kept.length >= cfg.people, now, dt, cfg);
         drawFaces(canvasRef.current, video, faces);
 
@@ -135,11 +172,17 @@ export default function PresenceTest() {
         }
         setView({ faces, kept: kept.length, progress, fps });
 
+        if (now - lastSentAt >= STATE_SEND_MS) {
+          lastSentAt = now;
+          sendRef.current({ type: 'state', faces: faces.length, kept: kept.length, progress });
+        }
+
+        // 통과하면 디스플레이(/pre_opening)에 신호만 보내고, 이 페이지는 계속 인식한다.
         if (progress >= 1) {
-          release();
-          setStatus('통과 · /1 로 이동');
-          routerRef.current.push('/1');
-          return;
+          holdRef.current.heldMs = 0;
+          sendRef.current({ type: 'pass' });
+          setSentCount((count) => count + 1);
+          setSentAt(Date.now());
         }
       }
       timer = window.setTimeout(step, PRESENCE.intervalMs);
@@ -186,12 +229,26 @@ export default function PresenceTest() {
     .map((key) => `  ${key}: ${config[key]},`)
     .join('\n');
 
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!sentAt) return undefined;
+    setNow(Date.now());
+    const id = window.setTimeout(() => setNow(Date.now()), SENT_BANNER_MS);
+    return () => window.clearTimeout(id);
+  }, [sentAt]);
+  const showSent = sentAt + SENT_BANNER_MS > now;
+
+  const linkText = link.connected
+    ? `서버 연결됨 · 디스플레이(/pre_opening) ${link.peers.displays}대`
+    : '서버 연결 끊김 · 다시 연결 중…';
+
   return (
     <div className={styles.page}>
       <section className={styles.stage}>
         <div className={styles.frame}>
           <video ref={videoRef} className={styles.video} muted playsInline />
           <canvas ref={canvasRef} className={styles.overlay} />
+          {showSent && <div className={styles.banner}>통과 신호 보냄 → /pre_opening 이 /1 로 이동</div>}
         </div>
         <div className={styles.meter}>
           <div className={styles.meterFill} style={{ width: `${view.progress * 100}%` }} />
@@ -202,8 +259,11 @@ export default function PresenceTest() {
       </section>
 
       <aside className={styles.panel}>
-        <h1 className={styles.title}>인원 인식 테스트</h1>
+        <h1 className={styles.title}>인원 인식 센서</h1>
         <p className={styles.status}>{status}</p>
+        <p className={`${styles.status} ${link.connected && link.peers.displays ? styles.good : styles.bad}`}>
+          {linkText}
+        </p>
 
         <label className={styles.field}>
           <span>카메라</span>
@@ -224,6 +284,10 @@ export default function PresenceTest() {
           <div className={view.kept >= PRESENCE.people ? styles.good : ''}>
             <b>{view.kept}</b>
             <small>통과 인원 (필요 {PRESENCE.people})</small>
+          </div>
+          <div>
+            <b>{sentCount}</b>
+            <small>보낸 통과 신호</small>
           </div>
           <div>
             <b>{view.fps.toFixed(1)}</b>
@@ -248,7 +312,10 @@ export default function PresenceTest() {
                 <td>{face.width.toFixed(3)}</td>
                 <td>{face.yaw.toFixed(0)}</td>
                 <td>{face.pitch.toFixed(0)}</td>
-                <td>{face.ok ? '통과' : face.reasons.join(', ')}</td>
+                <td>
+                  {face.ok ? '통과' : face.reasons.join(', ')}
+                  {face.stale ? ' (붙잡음)' : ''}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -278,14 +345,15 @@ export default function PresenceTest() {
           <button type="button" onClick={() => { holdRef.current.heldMs = 0; }}>
             타이머 리셋
           </button>
-          <button type="button" onClick={() => setConfig(initialConfig())}>
+          <button type="button" onClick={() => setConfig(defaultConfig())}>
             기본값으로
           </button>
         </div>
 
         <p className={styles.hint}>
-          맞춘 값은 <code>src/shared/gaze/presence.js</code> 의 <code>PRESENCE</code> 에 옮겨야 /pre_opening 에 반영됩니다.
-          유지 시간은 테스트 전용(4.5초)이라 옮기지 않습니다.
+          이 페이지가 카메라를 보고 통과 신호를 보냅니다. 슬라이더 값은 이 브라우저에 저장되어 새로고침해도 그대로
+          적용됩니다. 아래 값은 체험 중 자리 비움 판정(<code>presence.js</code> 의 <code>PRESENCE</code>)에 옮길 때
+          참고용입니다.
         </p>
         <pre className={styles.snippet}>{snippet}</pre>
       </aside>

@@ -39,6 +39,20 @@
   pointer-events: none;
 }
 
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: #3ddc84;
+  color: #08130c;
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .meter {
   position: relative;
   height: 36px;
@@ -80,6 +94,14 @@
   font-size: 13px;
   color: #9a9daa;
   word-break: break-all;
+}
+
+.status.good {
+  color: #3ddc84;
+}
+
+.status.bad {
+  color: #ff8a8a;
 }
 
 .field {
