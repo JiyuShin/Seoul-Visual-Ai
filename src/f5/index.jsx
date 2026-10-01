@@ -456,7 +456,12 @@ export default function EndingPage() {
             <CueText lines={QR_LINES} className={styles.finalText} />
           </div>
         </div>
-        <PlantCards visible={cardsOn} district={placeName} />
+        <PlantCards
+          visible={cardsOn}
+          district={placeName}
+          qrUrl={qrUrl}
+          plantNames={plantNames}
+        />
       </div>
       </div>
     </div>
