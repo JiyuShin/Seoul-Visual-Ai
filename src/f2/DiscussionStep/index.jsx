@@ -62,11 +62,11 @@ const CLOSING_BEATS = new Set(['close', 'gather', 'wait', 'analyze']);
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
 const NABI_CALIBRATION_LINE =
-  '첫 번째 참가자 NABI님, 화면 앞에 자리를 잡고, 미리보기에서 얼굴이 잡히는지 확인한 후 시작해 주세요. 진행 중에는 고개를 크게 움직이지 말고 점만 눈으로 따라가 주세요.';
+  '첫 번째 참가자 NABI님 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요.';
 const CALIBRATION_HANDOFF_LINE =
   '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요.';
 const CALIBRATION_COMPLETE_LINE =
-  'NABI와 SORA님 모두 시선 보정이 완료되었어요!';
+  'NABI와 SORA님 모두 시선 보정이 완료되었어요! 여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요.';
 
 // 구슬이 아래로 내려가 고정되는 데 걸리는 시간(아래 CSS 트랜지션과 동일) + 고정 후 안내 텍스트가 뜨기까지의 여유.
 const CALIB_ORB_SETTLE_MS = 1150;
@@ -257,6 +257,7 @@ export default function DiscussionStep({
     beginCalibration,
     startStage,
     mouseDev,
+    reportStreetUnveiled,
   } = useEntryFlow();
   const scene = streetSceneForDistrict(selectedDistrict);
   const [speakerIndex, setSpeakerIndex] = useState(0);
@@ -407,11 +408,15 @@ export default function DiscussionStep({
     if (unveilStartedRef.current || !aliveRef.current) return;
     unveilStartedRef.current = true;
     setBeat('shrink');
+    // veil(블러) 레이어가 다 걷히면(페이드 완료) 시선 커서 표시를 허용한다.
+    window.setTimeout(() => {
+      if (aliveRef.current) reportStreetUnveiled?.();
+    }, VEIL_FADE_MS);
     window.clearTimeout(dockTimerRef.current);
     dockTimerRef.current = window.setTimeout(() => {
       if (aliveRef.current) setBeat('dock');
     }, 2600);
-  }, []);
+  }, [reportStreetUnveiled]);
 
   useEffect(() => {
     const speech = speechOutputRef.current;
@@ -1133,9 +1138,8 @@ export default function DiscussionStep({
                 }`}
                 aria-hidden={calibrationGuide !== 'nabi'}
               >
-                <p>첫 번째 참가자 <strong>NABI</strong>님,</p>
-                <p>화면 앞에 자리를 잡고, 미리보기에서 얼굴이 잡히는지 확인한 후 시작해 주세요.</p>
-                <p><strong>진행 중에는 고개를 크게 움직이지 말고 점만 눈으로 따라가 주세요.</strong></p>
+                <p>첫 번째 참가자 <strong>NABI</strong>님 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이</p>
+                <p><strong>시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요.</strong></p>
               </div>
               <div
                 className={`${styles.calibrationCard} ${styles.calibrationCardHandoff} ${
@@ -1153,6 +1157,7 @@ export default function DiscussionStep({
                 aria-hidden={calibrationGuide !== 'complete'}
               >
                 <p>NABI와 SORA님 모두 시선 보정이 완료되었어요!</p>
+                <p><strong>여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요.</strong></p>
               </div>
             </div>
 

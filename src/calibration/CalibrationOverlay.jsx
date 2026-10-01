@@ -3,6 +3,7 @@ import {
   NABI_BADGE_TEXT_SVG,
   SORA_BADGE_BACKGROUND_SVG,
 } from './nabiCalibrationBadgeAssets';
+import { CALIBRATION_TARGET_SVG } from './calibrationTargetAsset';
 
 /**
  * 사람별로 차례대로 진행하는 보정·검증 오버레이.
@@ -62,6 +63,14 @@ export default function CalibrationOverlay({
 
   if (!point) return null;
 
+  // 차오르는 게이지(.fill) 색은 사람별로 다르게 — NABI 초록 / SORA 보라 (적당한 채도).
+  const fillColor =
+    personLabel === 'NABI'
+      ? 'rgba(124, 201, 130, 0.5)'
+      : personLabel === 'SORA'
+        ? 'rgba(170, 120, 214, 0.5)'
+        : 'rgba(255, 255, 255, 0.42)';
+
   return (
     <div className={`${styles.overlay} ${embedded ? styles.overlayEmbedded : ''}`}>
       {personLabel === 'NABI' || personLabel === 'SORA' ? (
@@ -96,10 +105,19 @@ export default function CalibrationOverlay({
 
       <div
         className={styles.target}
-        style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%`, '--target-color': color }}
+        style={{
+          left: `${point.x * 100}%`,
+          top: `${point.y * 100}%`,
+          '--target-color': color,
+          '--fill-color': fillColor,
+        }}
         data-phase={phase}
       >
-        <div className={styles.halo} />
+        <div
+          className={styles.glass}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: CALIBRATION_TARGET_SVG }}
+        />
         <div
           className={styles.fill}
           style={{ animationDuration: `${collectMs}ms` }}

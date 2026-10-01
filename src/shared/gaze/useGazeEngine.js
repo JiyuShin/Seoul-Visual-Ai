@@ -17,7 +17,10 @@ import { clearGazeSession, loadGazeSession, saveGazeSession } from './gazeSessio
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 const MOVE_MS = 800;
-const COLLECT_MS = 1000;
+const COLLECT_MS = 1300;
+// collect 시작 직후 ~200ms 는 눈이 아직 안착 중이라 샘플을 버린다. 실질 수집 구간은
+// [SETTLE_MS, COLLECT_MS] 로, 더 깨끗한 고정(fixation) 샘플만 회귀 학습에 들어간다.
+const SETTLE_MS = 200;
 const MIN_SAMPLES = 8;
 
 // 특징이 19차원인데 보정 타깃은 9~16개뿐이라, 약하게 걸면 2차·교차항이 학습 점만
@@ -729,6 +732,7 @@ export function useGazeEngine({ onSample, enabled = true } = {}) {
         points: mode === 'validate' ? VALIDATION_POINTS : gridPoints(gridCountRef.current),
         moveMs: MOVE_MS,
         collectMs: COLLECT_MS,
+        settleMs: SETTLE_MS,
         minSamples: MIN_SAMPLES,
       });
       session.samples = { A: [], B: [] };
