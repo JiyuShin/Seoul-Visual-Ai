@@ -10,6 +10,8 @@ import styles from './PageFour.module.css';
 const STAGE = { width: 3881, height: 2183 };
 const TRAVEL_MS = 7000;
 const SWIRL_AFTER_MS = 5600;
+/** 유리 소용돌이가 켜진 뒤(1.8초 페이드 + 잠깐 감상) 엔딩 /5 로 넘어가기까지. */
+const LEAVE_AFTER_SWIRL_MS = 4000;
 const PLACES = ['종로구', '마포구', '강남구'];
 
 /** 모바일 이미지는 블롭이 합쳐져 있어, 키오스크 원 안에는 식물만 있는 컷을 쓴다. */
@@ -124,6 +126,15 @@ export default function PageFour() {
     const timer = window.setTimeout(() => setSwirlOn(true), SWIRL_AFTER_MS);
     return () => window.clearTimeout(timer);
   }, [step]);
+
+  // 소용돌이까지 보여준 뒤 배정된 자치구의 엔딩(/5)으로 이동한다.
+  useEffect(() => {
+    if (!swirlOn || !placeName) return undefined;
+    const timer = window.setTimeout(() => {
+      router.push(`/5?district=${encodeURIComponent(placeName)}`);
+    }, LEAVE_AFTER_SWIRL_MS);
+    return () => window.clearTimeout(timer);
+  }, [swirlOn, placeName, router]);
 
   const slotPlantsView = useMemo(
     () =>
