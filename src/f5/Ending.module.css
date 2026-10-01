@@ -158,8 +158,8 @@
 
 .gazeTarget {
   position: absolute;
-  width: 608px;
-  height: 608px;
+  width: 648px;
+  height: 648px;
   transform: scale(0.86);
   transition: transform 1.1s cubic-bezier(0.22, 0, 0.36, 1);
 }
@@ -169,13 +169,13 @@
 }
 
 .gazeTargetA {
-  left: 561px;
-  top: 1465px;
+  left: 541px;
+  top: 1445px;
 }
 
 .gazeTargetB {
-  left: 2837px;
-  top: 1470px;
+  left: 2817px;
+  top: 1450px;
 }
 
 .gazeRingTrack {
@@ -309,8 +309,19 @@
   will-change: left, top, width, height;
 }
 
+/* backwards만 써야 등장이 끝난 뒤 .agentBubbleGone·.agentLayerLeaving의 opacity가 먹는다. */
 .agentBubbleIntro {
-  animation: agentBubbleIn 0.9s cubic-bezier(0.22, 0, 0.36, 1) both;
+  animation: agentBubbleIn 0.9s cubic-bezier(0.22, 0, 0.36, 1) backwards;
+}
+
+.agentBubbleGone .agentText {
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.42, 0, 0.58, 1);
+}
+
+.agentBubbleGone {
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.42, 0, 0.58, 1) 0.45s;
 }
 
 @keyframes agentBubbleIn {

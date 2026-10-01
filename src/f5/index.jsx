@@ -7,7 +7,7 @@ import { buildMobileJoinUrl, getMobilePublicOriginSync } from '../shared/mobileL
 import AgentOrb from '../f2/AgentOrb';
 import { sceneFor } from './districts';
 import BackgroundSequence from './BackgroundSequence';
-import { AGENT_BOX, cueForClip, cueLines, gazeRingState } from './jongnoCues';
+import { AGENT_BOX, cueForShot, cueLines, gazeRingState } from './endingCues';
 import { QR_LINES } from './sequence';
 import styles from './Ending.module.css';
 
@@ -163,9 +163,12 @@ function RingFill({ side, progress }) {
   );
 }
 
-function GazeRing({ side, name, progress, showLabel }) {
+function GazeRing({ side, name, progress, showLabel, place }) {
   return (
-    <div className={`${styles.gazeTarget} ${side === 'A' ? styles.gazeTargetA : styles.gazeTargetB}`}>
+    <div
+      className={`${styles.gazeTarget} ${side === 'A' ? styles.gazeTargetA : styles.gazeTargetB}`}
+      style={place}
+    >
       <div
         className={`${styles.plantName} ${side === 'A' ? styles.plantNameA : styles.plantNameB} ${
           showLabel ? '' : styles.plantNameOff
@@ -208,13 +211,22 @@ export default function EndingPage() {
   const [localUrl, setLocalUrl] = useState('');
   const [progress, setProgress] = useState({ index: 0, time: 0, duration: 0 });
   const scene = sceneFor(placeName || '종로구');
-  const cue = scene.name === '종로구'
-    ? cueForClip(progress.index, progress.time, progress)
-    : null;
+  const storied = scene.shots.some((shot) => shot.story);
+  const shot = scene.shots[progress.index];
+  const cue = cueForShot(shot, progress.time, progress);
   const lines = cueLines(cue, placeName, plantNames);
-  const ringState = scene.name === '종로구'
-    ? gazeRingState(progress.index, progress.time, progress)
-    : { visible: false, progress: 0, labels: false };
+  const ringState = gazeRingState(shot, progress.time, progress);
+  // 말풍선이 없는 멘트로 넘어가도 직전 말풍선을 남겨 두고 글자 → 박스 순서로 사라지게 한다.
+  const bubbleMemo = useRef({ cue: null, lines: [], run: 0, gone: true });
+  const memo = bubbleMemo.current;
+  if (cue?.bubble) {
+    if (memo.gone) memo.run += 1;
+    memo.cue = cue;
+    memo.lines = lines;
+    memo.gone = false;
+  } else if (memo.cue) {
+    memo.gone = true;
+  }
 
   useEffect(() => {
     const fit = () => {
@@ -274,26 +286,28 @@ export default function EndingPage() {
             onProgress={setProgress}
           />
         ) : null}
-        {scene.name === '종로구' ? (
+        {storied ? (
           <img
             className={`${styles.topGradient} ${qrOn ? styles.agentLayerOff : ''}`}
             src="/5/jongno/ui/top-gradient.png"
             alt=""
           />
         ) : null}
-        {scene.name === '종로구' ? (
+        {storied ? (
           <div className={`${styles.gazeLayer} ${ringState.visible && !qrOn ? styles.gazeLayerOn : ''}`}>
             <GazeRing
               side="A"
               name={plantNames?.A}
               progress={ringState.progress}
               showLabel={ringState.labels}
+              place={scene.rings?.A}
             />
             <GazeRing
               side="B"
               name={plantNames?.B}
               progress={ringState.progress}
               showLabel={ringState.labels}
+              place={scene.rings?.B}
             />
           </div>
         ) : null}
@@ -320,16 +334,19 @@ export default function EndingPage() {
                 userLevelRef={SPEAKING_LEVEL}
               />
             </div>
-            {cue?.bubble ? (
+            {memo.cue ? (
               <div
-                className={`${styles.agentBubble} ${cue.id <= 2 ? styles.agentBubbleIntro : ''}`}
-                style={bubbleBox(cue.bubble)}
+                key={memo.run}
+                className={`${styles.agentBubble} ${styles.agentBubbleIntro} ${
+                  memo.gone ? styles.agentBubbleGone : ''
+                }`}
+                style={bubbleBox(memo.cue.bubble)}
               >
-                {lines.length ? (
+                {memo.lines.length ? (
                   <CueText
-                    key={lineKey(lines)}
-                    lines={lines}
-                    className={cue.bubble.align === 'left' ? styles.agentTextLeft : ''}
+                    key={lineKey(memo.lines)}
+                    lines={memo.lines}
+                    className={memo.cue.bubble.align === 'left' ? styles.agentTextLeft : ''}
                   />
                 ) : null}
               </div>

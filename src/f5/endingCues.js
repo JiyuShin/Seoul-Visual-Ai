@@ -1,22 +1,15 @@
-// 피그마 종로구1–17. 말풍선 박스(2303×1295)를 3881×2183 스테이지로 옮긴 값이다.
-// 오브는 모든 장면에서 화면 가로 가운데에 고정한다.
-// 1~2는 오브만 떠 있다가(종로구1) 종로구2 말풍선이 나타난다.
-// 3~7은 1초 지점에서 멈춘 채 3→4, 그다음 슬로모션으로 5→7.
-// 8 영상 시작부터 9~10 영상이 끝날 때까지는 9.
-// 9~10은 끝 프레임에서 멈춘 채 10 → 11.
-// 14~17은 살짝 느리게 16, 끝 프레임에서 멈춘 채 17.
-// 6·8·12·13·15는 쓰지 않는다.
-export const JONGNO_CLIPS = [
-  [1, 2],
-  [3, 4, 5, 6, 7],
-  [8],
-  [9, 10],
-  [14, 15, 16, 17],
-];
-
+// 종로구·마포구 엔딩이 함께 쓰는 멘트. 번호는 피그마 종로구1–17 프레임 번호다.
+// 말풍선 박스(2303×1295)를 3881×2183 스테이지로 옮긴 값이고, 오브는 화면 가로 가운데에 고정한다.
+// 각 영상(shot)의 story가 어떤 멘트를 띄울지 정하고, hold가 그 구간의 타이밍을 정한다.
+//   intro   1~2: 오브만 떠 있다가(1) 2 말풍선이 나타난다.
+//   grow    3~7: 멈춘 채 3 → 4, 그다음 슬로모션으로 5 → 7. 이 구간에 시선 링이 뜬다.
+//   spread  8: 9.
+//   bloom   9~10: 9, 끝 프레임에서 멈춘 채 10 → 11.
+//   rise    11~13(마포구): 말풍선 없이 오브만(12).
+//   finale  14~17: 16, 끝 프레임에서 멈춘 채 17.
 export const AGENT_BOX = { left: (3881 - 440) / 2, top: 109, size: 440 };
 
-export const JONGNO_CUES = {
+export const CUES = {
   1: {},
   2: {
     lines: [[{ text: '여러분이 상상하는 용산구에 지금부터 직접 식물을 심고 함께 키워볼게요' }]],
@@ -48,20 +41,12 @@ export const JONGNO_CUES = {
     ],
     bubble: { left: 1223, top: 398, width: 1433, height: 238 },
   },
-  6: {
-    lines: [[{ text: '새싹들이 조금씩 자라나는 모습이 보여서 기뻐요!' }]],
-    bubble: { left: 1368, top: 398, width: 1146, height: 167 },
-  },
   7: {
     lines: [
       [{ text: '두 분의 시선을 받아 식물들이 한 단계 더 자랐어요' }],
       [{ text: '이제 새싹들이 도시 곳곳으로 뻗어나가기 시작해요!' }],
     ],
     bubble: { left: 1347, top: 398, width: 1189, height: 238 },
-  },
-  8: {
-    lines: [[{ text: '새싹들이 도시 곳곳에서 자라나고 있어요!' }]],
-    bubble: { left: 1437, top: 398, width: 1007, height: 167 },
   },
   9: {
     lines: [
@@ -81,20 +66,7 @@ export const JONGNO_CUES = {
     lines: [[{ text: '위쪽을 바라보면 변화된 공간으로 이동해요' }]],
     bubble: { left: 1421, top: 398, width: 1037, height: 167 },
   },
-  12: {
-    lines: [
-      [{ text: '두 분의 시선이 양분이 되어 ' }],
-      [{ text: '서울이 이만큼 더 푸르게 성장했어요' }],
-    ],
-    bubble: { left: 611, top: 508, width: 909, height: 238, align: 'left' },
-  },
-  13: {
-    lines: [
-      [{ text: '조금 더 위로 올라가볼까요?' }],
-      [{ text: '함께 위를 바라봐주세요' }],
-    ],
-    bubble: { left: 611, top: 508, width: 750, height: 238, align: 'left' },
-  },
+  12: {},
   16: {
     lines: [
       [{ text: '여러분들이 상상한 식물들로 완성된 서울의 전경이에요!' }],
@@ -111,66 +83,56 @@ export const JONGNO_CUES = {
   },
 };
 
-// 3~7 영상은 1초 지점까지 느리게 다가가 멈춘 채 3 → 4, 그 뒤 슬로모션 구간에서 5 → 7.
-// ringFill·ringEnd는 슬로모션 구간(1초~끝) 안의 비율: 링이 다 차는 지점, 링이 사라지고 7로 넘어가는 지점.
-export const SEVEN_HOLD = {
-  at: 1,
-  approachRate: 0.5,
-  cue3Ms: 5000,
-  cue4Ms: 5000,
-  slowRate: 0.25,
-  ringFill: 0.53,
-  ringEnd: 0.62,
-};
-
-// 9~10 영상은 끝 프레임에서 멈춘 채 10 → 11을 보여 준 뒤 14~17로 넘어간다.
-export const NINE_HOLD = { at: 4.8, cue10Ms: 6500, cue11Ms: 6500 };
-
-// 14~17 영상은 살짝 느리게 16, 끝 프레임에서 멈춘 채 16을 조금 더 보여 주고 17.
-export const FINALE_HOLD = { at: 4.9, rate: 0.85, cue16Ms: 2500, cue17Ms: 7500 };
-
-function cueIdForClip(clipIndex, time, detail) {
-  if (clipIndex === 0) return time < 1.6 ? 1 : 2;
-  if (clipIndex === 1) {
-    if (detail?.frozen) return detail.freezeElapsed < SEVEN_HOLD.cue3Ms ? 3 : 4;
-    if (time < SEVEN_HOLD.at) return null;
-    const span = (typeof detail === 'number' ? detail : detail?.duration) || 1;
-    const rest = Math.max(span - SEVEN_HOLD.at, 0.01);
-    return (time - SEVEN_HOLD.at) / rest < SEVEN_HOLD.ringEnd ? 5 : 7;
-  }
-  if (clipIndex === 2) return 9;
-  if (clipIndex === 3) {
-    if (detail?.frozen) return detail.freezeElapsed < NINE_HOLD.cue10Ms ? 10 : 11;
-    return time < NINE_HOLD.at ? 9 : 11;
-  }
-  if (clipIndex === 4) {
-    if (detail?.frozen) return detail.freezeElapsed < FINALE_HOLD.cue16Ms ? 16 : 17;
-    return time < FINALE_HOLD.at ? 16 : 17;
-  }
-  const beats = JONGNO_CLIPS[clipIndex];
-  if (!beats || !beats.length) return null;
-  return beats[0];
+// 슬로모션 구간(멈춘 지점~끝) 안에서 지금 몇 % 지났는지.
+function growProgress(hold, time, detail) {
+  const rest = Math.max((detail?.duration || 1) - hold.at, 0.01);
+  return Math.max(0, Math.min(1, (time - hold.at) / rest));
 }
 
-export function cueForClip(clipIndex, time, detail) {
-  const id = cueIdForClip(clipIndex, time, detail);
-  const cue = id ? JONGNO_CUES[id] || null : null;
+function cueIdFor(shot, time, detail) {
+  const hold = shot?.hold;
+  switch (shot?.story) {
+    case 'intro':
+      return time < hold.cue2At ? 1 : 2;
+    case 'grow':
+      if (detail?.frozen) return detail.freezeElapsed < hold.cue3Ms ? 3 : 4;
+      if (time < hold.at) return null;
+      return growProgress(hold, time, detail) < hold.ringEnd ? 5 : 7;
+    case 'spread':
+      return 9;
+    case 'bloom':
+      if (detail?.frozen) return detail.freezeElapsed < hold.cue10Ms ? 10 : 11;
+      return time < hold.at ? 9 : 11;
+    case 'rise':
+      return 12;
+    case 'finale':
+      if (detail?.frozen) return detail.freezeElapsed < hold.cue16Ms ? 16 : 17;
+      return time < hold.at ? 16 : 17;
+    default:
+      return null;
+  }
+}
+
+export function cueForShot(shot, time, detail) {
+  const id = cueIdFor(shot, time, detail);
+  const cue = id ? CUES[id] || null : null;
   return cue ? { ...cue, id } : null;
 }
 
-export function gazeRingState(clipIndex, time, detail) {
-  if (clipIndex !== 1) return { visible: false, progress: 0, labels: false };
+const RINGS_OFF = { visible: false, progress: 0, labels: false };
+
+export function gazeRingState(shot, time, detail) {
+  if (shot?.story !== 'grow') return RINGS_OFF;
+  const hold = shot.hold;
   if (detail?.frozen) {
-    const labels = detail.freezeElapsed >= SEVEN_HOLD.cue3Ms;
+    const labels = detail.freezeElapsed >= hold.cue3Ms;
     return { visible: labels, progress: 0, labels };
   }
-  if (time < SEVEN_HOLD.at) return { visible: false, progress: 0, labels: false };
-  const duration = (typeof detail === 'number' ? detail : detail?.duration) || 1;
-  const rest = Math.max(duration - SEVEN_HOLD.at, 0.01);
-  const sourceProgress = Math.max(0, Math.min(1, (time - SEVEN_HOLD.at) / rest));
+  if (time < hold.at) return RINGS_OFF;
+  const sourceProgress = growProgress(hold, time, detail);
   // 사라질 때 이름표를 켜 둔 채 레이어째 페이드해야 링과 이름표가 한 번에 사라진다.
-  if (sourceProgress >= SEVEN_HOLD.ringEnd) return { visible: false, progress: 1, labels: true };
-  const progress = Math.min(1, sourceProgress / SEVEN_HOLD.ringFill);
+  if (sourceProgress >= hold.ringHide) return { visible: false, progress: 1, labels: true };
+  const progress = Math.min(1, sourceProgress / hold.ringFill);
   return { visible: true, progress, labels: true };
 }
 
