@@ -146,7 +146,7 @@ export default function MobileScreen() {
     if (phase !== MOBILE_PHASE.PROMPT || !bothPeersConnected) return undefined;
     const timer = window.setTimeout(() => {
       goDrawingFromPrompt();
-    }, 700);
+    }, 100);
     return () => window.clearTimeout(timer);
   }, [phase, bothPeersConnected, goDrawingFromPrompt]);
 

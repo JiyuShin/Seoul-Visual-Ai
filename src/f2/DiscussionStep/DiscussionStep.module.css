@@ -478,6 +478,91 @@
   display: block;
 }
 
+.calibrationGuide {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.calibrationCard {
+  position: absolute;
+  left: 50%;
+  top: 752px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 36px 64px;
+  border: 1.733px solid transparent;
+  border-radius: 64px;
+  color: #363636;
+  background:
+    linear-gradient(
+        190deg,
+        rgba(193, 234, 150, 0.4) 0%,
+        rgba(255, 255, 255, 0.34) 65.725%,
+        rgba(189, 250, 255, 0.52) 100%
+      )
+      padding-box,
+    linear-gradient(190deg, #fff 0%, rgba(255, 255, 255, 0.5) 100%) border-box;
+  -webkit-backdrop-filter: blur(26px) saturate(130%);
+  backdrop-filter: blur(26px) saturate(130%);
+  box-shadow:
+    0 0 34.4938px rgba(255, 255, 255, 0.78),
+    inset 0 14.3062px 9.53748px #fff;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(-50%, 22px, 0) scale(0.985);
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+  transition:
+    opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1.05s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.85s;
+}
+
+.calibrationCard p {
+  margin: 0;
+  text-align: center;
+  font-size: 50px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+
+.calibrationCard strong {
+  font-weight: 700;
+}
+
+.calibrationCardNabi {
+  width: 1720px;
+  height: 352px;
+}
+
+.calibrationCardHandoff {
+  width: 1340px;
+  height: 282px;
+}
+
+.calibrationCardComplete {
+  width: 1320px;
+  height: 220px;
+}
+
+.calibrationCardOn {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(-50%, 0, 0) scale(1);
+  transition:
+    opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1.05s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+
 .promptBlock {
   position: absolute;
   left: 50%;

@@ -14,7 +14,6 @@ import { VIEWER_BY_CAM } from './gaze/participants';
 import GazeCameraFeeds from './gaze/GazeCameraFeeds';
 import GazeDebugHud from './gaze/GazeDebugHud';
 import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
-import { isDevAssistEnabled } from './dev/devEvents';
 
 const EntryFlowContext = createContext(null);
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -129,7 +128,8 @@ export function EntryFlowProvider({ children }) {
 
   useEffect(() => {
     if (!router.isReady || router.pathname !== '/2') return undefined;
-    if (!isDevAssistEnabled(router.query)) return undefined;
+    const dev = router.query?.dev;
+    if (dev !== '1' && dev !== 'true') return undefined;
     setMouseDev(true);
     setSetupComplete(true);
     return undefined;
@@ -203,7 +203,7 @@ export function EntryFlowProvider({ children }) {
       mouseDev,
       enableMouseDev,
       // 준비가 끝나기 전에는 참여 화면이 보정 화면으로 돌려보낸다.
-      isCalibrating: !setupComplete,
+      isCalibrating: !setupComplete || Boolean(engine.calibUi),
       setupComplete,
       completeSetup,
       finishCalibration,

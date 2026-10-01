@@ -7,6 +7,7 @@ import OpeningAgent from '../../op/OpeningAgent';
 import AgentOrb from '../AgentOrb';
 import { useSpeechInput } from '../useSpeechInput';
 import { useSpeechOutput } from '../useSpeechOutput';
+import CalibrationOverlay from '../../calibration/CalibrationOverlay';
 import StreetCanvas, { FOLD_MS } from './StreetCanvas';
 import { buildFollowUpQuestion } from '../buildFollowUpQuestion';
 import {
@@ -60,6 +61,16 @@ const ANALYZE_LINE = '토론 내용을 기반으로 지역구 추천을 위해 �
 const CLOSING_BEATS = new Set(['close', 'gather', 'wait', 'analyze']);
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
+const NABI_CALIBRATION_LINE =
+  '첫 번째 참가자 NABI님, 화면 앞에 자리를 잡고, 미리보기에서 얼굴이 잡히는지 확인한 후 시작해 주세요. 진행 중에는 고개를 크게 움직이지 말고 점만 눈으로 따라가 주세요.';
+const CALIBRATION_HANDOFF_LINE =
+  '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요.';
+const CALIBRATION_COMPLETE_LINE =
+  'NABI와 SORA님 모두 시선 보정이 완료되었어요!';
+
+// 구슬이 아래로 내려가 고정되는 데 걸리는 시간(아래 CSS 트랜지션과 동일) + 고정 후 안내 텍스트가 뜨기까지의 여유.
+const CALIB_ORB_SETTLE_MS = 1150;
+const CALIB_GUIDE_DELAY_MS = 3000;
 
 const PROMPT_CHARS_PER_LINE = 27;
 
@@ -234,7 +245,19 @@ export default function DiscussionStep({
   onGazeClipChange,
 }) {
   const router = useRouter();
-  const { selectedDistrict, setDiscussionCam } = useEntryFlow();
+  const {
+    selectedDistrict,
+    setDiscussionCam,
+    completeSetup,
+    running,
+    streams,
+    startCameras,
+    calibUi,
+    calibrated,
+    beginCalibration,
+    startStage,
+    mouseDev,
+  } = useEntryFlow();
   const scene = streetSceneForDistrict(selectedDistrict);
   const [speakerIndex, setSpeakerIndex] = useState(0);
   const [beat, setBeat] = useState('intro');
@@ -242,6 +265,10 @@ export default function DiscussionStep({
   const [marks, setMarks] = useState([]);
   const [gazeOpen, setGazeOpen] = useState(false);
   const [scale, setScale] = useState(readStageScale);
+  const [calibrationFlow, setCalibrationFlow] = useState('checking');
+  const [calibrationOrbSettled, setCalibrationOrbSettled] = useState(false);
+  const [calibrationGuideReady, setCalibrationGuideReady] = useState(false);
+  const calibGuideTimerRef = useRef(0);
   const historyRef = useRef([]);
   const recentPromptsRef = useRef([]);
   const activeMarkRef = useRef(null);
@@ -256,6 +283,9 @@ export default function DiscussionStep({
   const veilRef = useRef(null);
   const streetRef = useRef(null);
   const aliveRef = useRef(true);
+  const pageCalibrationRef = useRef(false);
+  const unveilStartedRef = useRef(false);
+  const dockTimerRef = useRef(0);
   const phraseRef = useRef('');
   const marksLiveRef = useRef([]);
   const zoneRef = useRef(0);
@@ -270,6 +300,16 @@ export default function DiscussionStep({
   marksLiveRef.current = marks;
   const cardPhrase = CARD_PHRASE[winnerCard?.id] || winnerCard?.label || CARD_PHRASE.food;
   phraseRef.current = cardPhrase;
+  const bothParticipantsCalibrated = calibrated.includes('A') && calibrated.includes('B');
+  const calibrationActive = calibrationFlow !== 'done';
+  const calibrationGuide =
+    (calibrationFlow === 'checking' || calibrationFlow === 'nabiIntro') && calibrationGuideReady
+      ? 'nabi'
+      : calibrationFlow === 'handoff'
+        ? 'handoff'
+        : calibrationFlow === 'complete'
+          ? 'complete'
+          : '';
 
   const showChrome = !['intro', 'shrink', 'dock', 'gather', 'wait', 'analyze'].includes(beat);
   const showPlace = showChrome && beat !== 'close';
@@ -299,6 +339,8 @@ export default function DiscussionStep({
     return () => {
       aliveRef.current = false;
       window.clearTimeout(hangRef.current);
+      window.clearTimeout(dockTimerRef.current);
+      window.clearTimeout(calibGuideTimerRef.current);
       queueRef.current = [];
       pumpingRef.current = false;
       speechOutputRef.current.stopSpeaking();
@@ -361,24 +403,155 @@ export default function DiscussionStep({
     pumpSpeech();
   }, [pumpSpeech]);
 
+  const beginUnveil = useCallback(() => {
+    if (unveilStartedRef.current || !aliveRef.current) return;
+    unveilStartedRef.current = true;
+    setBeat('shrink');
+    window.clearTimeout(dockTimerRef.current);
+    dockTimerRef.current = window.setTimeout(() => {
+      if (aliveRef.current) setBeat('dock');
+    }, 2600);
+  }, []);
+
   useEffect(() => {
-    let started = false;
-    let dockTimer = 0;
-    const beginUnveil = () => {
-      if (started || !aliveRef.current) return;
-      started = true;
-      setBeat('shrink');
-      dockTimer = window.setTimeout(() => {
-        if (aliveRef.current) setBeat('dock');
-      }, 2600);
-    };
     const speech = speechOutputRef.current;
     speech.warm(LINE_83);
     speech.warm(gazeLine('A'));
     speech.warm(MIC_LINE);
+    speech.warm(NABI_CALIBRATION_LINE);
+    speech.warm(CALIBRATION_HANDOFF_LINE);
+    speech.warm(CALIBRATION_COMPLETE_LINE);
+  }, []);
+
+  useEffect(() => {
+    completeSetup();
+  }, [completeSetup]);
+
+  // 페이지에 들어오면 카메라 연결과 무관하게 바로 구슬을 아래로 내려 고정한다.
+  useEffect(() => {
+    if (mouseDev || calibrationFlow === 'done') return undefined;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (aliveRef.current) setCalibrationOrbSettled(true);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [mouseDev, calibrationFlow]);
+
+  useEffect(() => {
+    if (calibrationFlow !== 'checking') return undefined;
+    if (mouseDev) {
+      setCalibrationFlow('done');
+      return undefined;
+    }
+    if (!running) {
+      startCameras();
+      return undefined;
+    }
+    if (!streams.A || !streams.B) return undefined;
+
+    pageCalibrationRef.current = true;
+    beginCalibration('calibrate');
+    setCalibrationFlow('nabiIntro');
+    return undefined;
+  }, [
+    beginCalibration,
+    calibrationFlow,
+    mouseDev,
+    running,
+    startCameras,
+    streams.A,
+    streams.B,
+  ]);
+
+  // 구슬이 아래로 내려가 고정된 뒤 약 3초 뒤에 안내 텍스트를 띄운다.
+  useEffect(() => {
+    if (!calibrationOrbSettled || calibrationGuideReady) return undefined;
+    if (calibrationFlow !== 'checking' && calibrationFlow !== 'nabiIntro') return undefined;
+    window.clearTimeout(calibGuideTimerRef.current);
+    calibGuideTimerRef.current = window.setTimeout(() => {
+      if (aliveRef.current) setCalibrationGuideReady(true);
+    }, CALIB_ORB_SETTLE_MS + CALIB_GUIDE_DELAY_MS);
+    return () => window.clearTimeout(calibGuideTimerRef.current);
+  }, [calibrationOrbSettled, calibrationGuideReady, calibrationFlow]);
+
+  useEffect(() => {
+    if (calibrationFlow !== 'nabiIntro' || !calibrationGuideReady) return;
+    if (calibUi?.cam !== 'A' || calibUi.ready) return;
+    let started = false;
+    const startNabi = () => {
+      if (started || !aliveRef.current) return;
+      started = true;
+      setCalibrationFlow('nabiRunning');
+      startStage();
+    };
+    say('calibration-nabi', NABI_CALIBRATION_LINE, startNabi, startNabi, true, false);
+  }, [calibUi, calibrationFlow, calibrationGuideReady, say, startStage]);
+
+  useEffect(() => {
+    if (
+      calibrationFlow === 'nabiRunning' &&
+      calibUi?.cam === 'B' &&
+      !calibUi.ready &&
+      calibUi.summary
+    ) {
+      setCalibrationFlow('handoff');
+    }
+  }, [calibUi, calibrationFlow]);
+
+  useEffect(() => {
+    if (calibrationFlow !== 'handoff' || calibUi?.cam !== 'B' || calibUi.ready) return;
+    let started = false;
+    const startSora = () => {
+      if (started || !aliveRef.current) return;
+      started = true;
+      setCalibrationFlow('soraRunning');
+      startStage();
+    };
+    say('calibration-handoff', CALIBRATION_HANDOFF_LINE, startSora, startSora, true, false);
+  }, [calibUi, calibrationFlow, say, startStage]);
+
+  useEffect(() => {
+    if (
+      calibrationFlow === 'soraRunning' &&
+      !calibUi &&
+      bothParticipantsCalibrated
+    ) {
+      setCalibrationFlow('complete');
+    }
+  }, [bothParticipantsCalibrated, calibUi, calibrationFlow]);
+
+  useEffect(() => {
+    if (calibrationFlow !== 'complete') return;
+    let finished = false;
+    const finishCalibration = () => {
+      if (finished || !aliveRef.current) return;
+      finished = true;
+      setCalibrationFlow('done');
+    };
+    say(
+      'calibration-complete',
+      CALIBRATION_COMPLETE_LINE,
+      finishCalibration,
+      finishCalibration,
+      true,
+      false,
+    );
+  }, [calibrationFlow, say]);
+
+  useEffect(() => {
+    if (calibrationFlow !== 'done') return;
+    if (pageCalibrationRef.current) {
+      beginUnveil();
+      say('intro', INTRO_LINE, undefined, undefined, false, false);
+      return;
+    }
     say('intro', INTRO_LINE, beginUnveil, beginUnveil, true, false);
-    return () => window.clearTimeout(dockTimer);
-  }, [say]);
+  }, [beginUnveil, calibrationFlow, say]);
 
   useEffect(() => {
     setDiscussionCam(speaker.cam);
@@ -887,6 +1060,8 @@ export default function DiscussionStep({
 
   const orbSize = 400;
   const introOrbSize = 997;
+  const calibOrbSize = 772;
+  const calibOrbTop = 1118;
   const finaleSize = 442;
   const morphing = beat === 'wait' || beat === 'analyze';
   const pillWidth = beat === 'analyze' ? 2082 : 1339;
@@ -898,8 +1073,18 @@ export default function DiscussionStep({
     height: size,
     radius: size / 2,
   });
-  const orbPose = beat === 'intro'
-    ? circlePose(introOrbSize, (STAGE_H - introOrbSize) / 2)
+  const holdsCalibrationPose =
+    calibrationActive || (pageCalibrationRef.current && beat === 'intro');
+  const calibrationOrbHidden =
+    calibrationFlow === 'nabiRunning' || calibrationFlow === 'soraRunning';
+  const orbPose = holdsCalibrationPose
+    ? calibrationOrbHidden
+      ? circlePose(calibOrbSize, STAGE_H + 120)
+      : calibrationOrbSettled
+      ? circlePose(calibOrbSize, calibOrbTop)
+      : circlePose(introOrbSize, (STAGE_H - introOrbSize) / 2)
+    : beat === 'intro'
+      ? circlePose(introOrbSize, (STAGE_H - introOrbSize) / 2)
     : morphing
       ? {
           left: (STAGE_W - pillWidth) / 2,
@@ -941,6 +1126,36 @@ export default function DiscussionStep({
       <div className={styles.hudViewport}>
         <div className={styles.hudFit} style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
           <div className={styles.hudStage} style={{ transform: `scale(${scale})` }}>
+            <div className={styles.calibrationGuide} aria-live="polite">
+              <div
+                className={`${styles.calibrationCard} ${styles.calibrationCardNabi} ${
+                  calibrationGuide === 'nabi' ? styles.calibrationCardOn : ''
+                }`}
+                aria-hidden={calibrationGuide !== 'nabi'}
+              >
+                <p>첫 번째 참가자 <strong>NABI</strong>님,</p>
+                <p>화면 앞에 자리를 잡고, 미리보기에서 얼굴이 잡히는지 확인한 후 시작해 주세요.</p>
+                <p><strong>진행 중에는 고개를 크게 움직이지 말고 점만 눈으로 따라가 주세요.</strong></p>
+              </div>
+              <div
+                className={`${styles.calibrationCard} ${styles.calibrationCardHandoff} ${
+                  calibrationGuide === 'handoff' ? styles.calibrationCardOn : ''
+                }`}
+                aria-hidden={calibrationGuide !== 'handoff'}
+              >
+                <p>첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요!</p>
+                <p>다음 두 번째 참가자 <strong>SORA</strong>님의 시선 보정을 시작할게요.</p>
+              </div>
+              <div
+                className={`${styles.calibrationCard} ${styles.calibrationCardComplete} ${
+                  calibrationGuide === 'complete' ? styles.calibrationCardOn : ''
+                }`}
+                aria-hidden={calibrationGuide !== 'complete'}
+              >
+                <p>NABI와 SORA님 모두 시선 보정이 완료되었어요!</p>
+              </div>
+            </div>
+
             <div className={`${styles.turn} ${showChrome ? styles.turnOn : ''} ${beat === 'close' ? styles.turnRest : ''}`}>
               <div className={styles.profileSlot}>
                 <img
@@ -1009,6 +1224,10 @@ export default function DiscussionStep({
           </div>
         </div>
       </div>
+
+      {calibrationActive && calibUi?.ready && (
+        <CalibrationOverlay {...calibUi} onStart={startStage} embedded />
+      )}
 
     </section>
   );

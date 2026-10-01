@@ -18,23 +18,5 @@
   transform: scale(1.2);
   transform-origin: 36% 32%;
   background: rgb(213, 255, 185);
-  opacity: 0;
-  animation: plantVideoFadeIn 1.75s ease-out 0.15s forwards;
-}
-
-@keyframes plantVideoFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .video {
-    animation: none;
-    opacity: 1;
-  }
+  opacity: 1;
 }

@@ -35,8 +35,9 @@ const ONE_EURO = { minCutoff: 0.9, beta: 0.008 };
 const CAMERA_HEIGHT = 720;
 
 const GRIDS = {
-  9: { xs: [0.08, 0.5, 0.92], ys: [0.1, 0.5, 0.9] },
-  16: { xs: [0.07, 0.36, 0.64, 0.93], ys: [0.08, 0.36, 0.64, 0.92] },
+  // 상단 안내 뱃지와 타깃이 겹치지 않도록 첫 행에 충분한 여백을 둔다.
+  9: { xs: [0.08, 0.5, 0.92], ys: [0.22, 0.5, 0.9] },
+  16: { xs: [0.07, 0.36, 0.64, 0.93], ys: [0.22, 0.36, 0.64, 0.92] },
 };
 
 const VALIDATION_POINTS = [
@@ -221,7 +222,19 @@ export function useGazeEngine({ onSample, enabled = true } = {}) {
       return;
     }
     const list = await navigator.mediaDevices.enumerateDevices();
-    setDevices(list.filter((device) => device.kind === 'videoinput'));
+    const cameras = list.filter((device) => device.kind === 'videoinput');
+    setDevices(cameras);
+    setDeviceIds((current) => {
+      const availableIds = new Set(cameras.map((device) => device.deviceId));
+      const first = availableIds.has(current.A) ? current.A : cameras[0]?.deviceId || '';
+      const second =
+        current.B && current.B !== first && availableIds.has(current.B)
+          ? current.B
+          : cameras.find((device) => device.deviceId !== first)?.deviceId || '';
+      if (first === current.A && second === current.B) return current;
+      return { A: first, B: second };
+    });
+    return cameras;
   }, [enabled]);
 
   useEffect(() => {
@@ -605,19 +618,21 @@ export function useGazeEngine({ onSample, enabled = true } = {}) {
       for (const key of CAM_KEYS) {
         stopCamera(key);
         const id = deviceIds[key];
-        if (key === 'B' && !id) continue;
 
         try {
           setStatus(`${PERSON_LABEL[key]} 카메라 요청 중…`);
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: id ? { exact: id } : undefined,
-              width: { ideal: Math.round((CAMERA_HEIGHT * 16) / 9) },
-              height: { ideal: CAMERA_HEIGHT },
-              frameRate: { ideal: 30 },
-            },
-            audio: false,
-          });
+          const stream =
+            key === 'B' && !id && camsRef.current.A.stream
+              ? camsRef.current.A.stream.clone()
+              : await navigator.mediaDevices.getUserMedia({
+                  video: {
+                    deviceId: id ? { exact: id } : undefined,
+                    width: { ideal: Math.round((CAMERA_HEIGHT * 16) / 9) },
+                    height: { ideal: CAMERA_HEIGHT },
+                    frameRate: { ideal: 30 },
+                  },
+                  audio: false,
+                });
 
           const cam = camsRef.current[key];
           cam.stream = stream;

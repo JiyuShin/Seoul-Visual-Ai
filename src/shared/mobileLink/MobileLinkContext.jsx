@@ -72,8 +72,11 @@ export function MobileLinkProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refreshMobilePublicOrigin();
-    const onFocus = () => refreshMobilePublicOrigin();
+    const refreshUnlessMobile = () => {
+      if (window.location.pathname !== '/mobile') refreshMobilePublicOrigin();
+    };
+    refreshUnlessMobile();
+    const onFocus = () => refreshUnlessMobile();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [refreshMobilePublicOrigin]);
@@ -347,18 +350,20 @@ export function MobileLinkProvider({ children }) {
   const mobileJoinRef = useRef(null);
 
   useEffect(() => {
-    if (!router.isReady || router.pathname !== '/mobile') return undefined;
+    const pathname = window.location.pathname || router.pathname;
+    if (pathname !== '/mobile') return undefined;
     if (disconnectedManually) return undefined;
-    const join = router.query.join;
+    const search = new URLSearchParams(window.location.search);
+    const join = router.query.join ?? search.get('join');
     const id = typeof join === 'string' ? join : join?.[0];
     if (!id || mobileJoinRef.current === id) return undefined;
     mobileJoinRef.current = id;
 
-    const districtQuery = router.query.district;
+    const districtQuery = router.query.district ?? search.get('district');
     const districtName =
       typeof districtQuery === 'string' ? districtQuery : districtQuery?.[0];
     if (districtName) {
-      applyDistrict(decodeURIComponent(districtName));
+      applyDistrict(districtName);
     }
 
     joinMobileSession(id);
@@ -367,10 +372,7 @@ export function MobileLinkProvider({ children }) {
       disconnect();
     };
   }, [
-    router.isReady,
     router.pathname,
-    router.query.join,
-    router.query.district,
     joinMobileSession,
     disconnect,
     disconnectedManually,

@@ -28,6 +28,8 @@ function GlobalGazeCursor() {
     router.pathname !== '/app' &&
     router.pathname !== '/mobile' &&
     router.pathname !== '/1' &&
+    router.pathname !== '/3' &&
+    router.pathname !== '/fail' &&
     router.pathname !== '/pre_opening';
 
   // 토론 중에는 지금 차례인 사람의 커서만 따라다닌다. 심어 둔 자리는 따로 남는다.
