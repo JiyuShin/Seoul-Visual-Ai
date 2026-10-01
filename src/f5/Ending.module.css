@@ -26,6 +26,18 @@
   background: #000;
 }
 
+/* 첫 영상이 그려지기 전까지 보이는 첫 프레임 사진. 영상(.shot)보다 아래에 깔린다. */
+.poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .shot {
   position: absolute;
   inset: 0;

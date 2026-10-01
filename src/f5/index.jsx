@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
@@ -206,6 +206,9 @@ function GazeRing({ side, name, progress, showLabel, place }) {
   );
 }
 
+// 서버에서는 layout effect 가 돌지 않으므로 경고 없이 넘어가게 한다.
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 const PLACES = ['종로구', '마포구', '강남구'];
 
 function readStoredPlace() {
@@ -272,6 +275,12 @@ export default function EndingPage() {
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  // router.query 는 첫 렌더에 비어 있다. 그때까지 기다리면 영상이 없는 검은 화면이 한 번 보이므로,
+  // /3 이 저장해 둔 자치구를 화면에 그려지기 전(layout effect)에 먼저 읽어 영상을 바로 띄운다.
+  useBeforePaint(() => {
+    setPlaceName((current) => current || readStoredPlace());
   }, []);
 
   useEffect(() => {
@@ -372,6 +381,8 @@ export default function EndingPage() {
       ))}
       <div className={styles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
       <div className={styles.stage} style={{ transform: `scale(${scale})` }}>
+        {/* 첫 영상이 디코딩되기 전까지 깔아 두는 첫 프레임 사진. 영상이 덮으면 보이지 않는다. */}
+        {scene.poster ? <img className={styles.poster} src={scene.poster} alt="" draggable={false} /> : null}
         {placeName ? (
           <BackgroundSequence
             key={scene.name}

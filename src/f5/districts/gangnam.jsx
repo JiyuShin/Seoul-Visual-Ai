@@ -13,6 +13,10 @@ const plants = [
 // 1~2 영상은 이 시점(초)부터 2 말풍선.
 const INTRO_HOLD = { cue2At: 1.6 };
 
+// 첫 영상의 첫 프레임 사진. 영상이 디코딩되기 전 검은 화면이 보이지 않게 깔아 둔다.
+export const poster = '/5/gangnam/poster.jpg';
+const POSTER = poster;
+
 // 3~7 영상은 1초 지점까지 느리게 다가가 멈춘 채 3 → 4, 그 뒤 슬로모션 구간에서 5 → 6 → 7.
 // ringFill·cue6From·ringEnd·ringHide는 슬로모션 구간(1초~끝) 안의 비율: 링이 다 차는 지점(= 6 "자라나는 모습이
 // 보여서 기뻐요"), 7로 넘어가는 지점, 다 찬 링이 사라지는 지점. 이 구간에서 0.06 ≈ 실제 1초.
@@ -47,7 +51,14 @@ export const rings = { A: { left: 316, top: 1246 }, B: { left: 2986, top: 1201 }
 // fade는 이 영상의 끝과 다음 영상의 시작이 겹치는 시간이다.
 export const shots = [
   // 1~2는 끝 프레임이 3~7의 첫 프레임과 같아 겹쳐도 어색하지 않다.
-  { kind: 'video', src: '/5/gangnam/1-2.mp4', fade: 1000, story: 'intro', hold: INTRO_HOLD },
+  {
+    kind: 'video',
+    src: '/5/gangnam/1-2.mp4',
+    poster: POSTER,
+    fade: 1000,
+    story: 'intro',
+    hold: INTRO_HOLD,
+  },
   {
     kind: 'video',
     src: '/5/gangnam/3-7.mp4',

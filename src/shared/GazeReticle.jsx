@@ -212,6 +212,9 @@ export default function GazeReticle({
 
   useEffect(() => {
     if (!mounted || typeof window === 'undefined') return undefined;
+    // visible=false 면 DOM 이 없다(elRef 가 null). 그때 등록하면 같은 viewerId 로 렌더 중인
+    // 다른 커서(예: /5 는 페이지가 직접 띄운다)의 등록을 null 로 덮어써 위치 갱신이 끊긴다.
+    if (!visible) return undefined;
 
     const runtime = window.__seoulGazeRuntime || (window.__seoulGazeRuntime = {});
     if (!runtime.cursors) runtime.cursors = {};
@@ -233,7 +236,7 @@ export default function GazeReticle({
         runtime.cursorEl = null;
       }
     };
-  }, [mounted, position, viewerId]);
+  }, [mounted, position, viewerId, visible]);
 
   // 그리기와 위치 갱신을 한 루프에서 한다.
   useEffect(() => {
