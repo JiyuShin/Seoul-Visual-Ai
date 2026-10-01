@@ -24,8 +24,8 @@ const GROW_HOLD = {
   ringHide: 0.74,
 };
 
-// 9~10 영상은 끝 프레임에서 멈춘 채 10 → 11을 보여 준 뒤 11~13으로 넘어간다.
-const BLOOM_HOLD = { at: 4.8, cue10Ms: 6500, cue11Ms: 6500 };
+// 9~10 영상은 끝 프레임에서 멈춘 채 10(cue10Ms) → 11(cue11Ms)을 보여 준 뒤 11~13으로 넘어간다.
+const BLOOM_HOLD = { at: 4.8, cue10Ms: 4500, cue11Ms: 3500 };
 
 // 14~17 영상은 살짝 느리게 16, 끝 프레임에서 멈춘 채 16을 조금 더 보여 주고 17.
 const FINALE_HOLD = { at: 4.9, rate: 0.85, cue16Ms: 2500, cue17Ms: 7500 };
