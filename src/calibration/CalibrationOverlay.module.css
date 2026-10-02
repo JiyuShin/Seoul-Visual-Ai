@@ -3,6 +3,8 @@
   inset: 0;
   z-index: 10000;
   background: rgba(247, 246, 242, 0.97);
+  /* 관람객 화면은 마우스 포인터를 감추지만, 운영자가 눌러야 하는 보정 화면에서는 보인다. */
+  cursor: default;
 }
 
 .overlayEmbedded {
