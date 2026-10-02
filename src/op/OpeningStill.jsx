@@ -124,7 +124,7 @@ export default function OpeningStill() {
           </div>
           <div className={styles.titleBoard}>
             <p className={stageStyles.wordmark} aria-hidden="true">ONSI</p>
-            <p className={stageStyles.tagline} aria-hidden="true">A City Cultivated by Sight</p>
+            <p className={stageStyles.tagline} aria-hidden="true">A Green City Cultivated by a Warm Gaze</p>
           </div>
         </div>
       </div>

@@ -241,7 +241,7 @@ export default function Opening() {
           </div>
           <div className={styles.titleCopy}>
             <p className={styles.wordmark} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">ONSI</p>
-            <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">A City Cultivated by Sight</p>
+            <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">A Green City Cultivated by a Warm Gaze</p>
           </div>
           <div className={`${styles.agentMove} ${poseReady ? styles.agentMoveOn : ''}`} style={agentStyle(frame)}>
             <div className={`${styles.agentFloat} ${agentSpeaking(frame) ? styles.agentSpeaking : ''}`}>

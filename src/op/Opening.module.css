@@ -183,9 +183,9 @@
 
 .tagline {
   position: absolute;
-  left: 1669px;
+  left: 0;
   top: 1158px;
-  width: 736px;
+  width: 100%;
   height: 78px;
   margin: 0;
   text-align: center;
