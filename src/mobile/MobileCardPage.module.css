@@ -57,20 +57,44 @@
   gap: 10px;
 }
 
+/* 폭은 위 카드에 맞춘다(--card-width). 아직 재기 전이면 꽉 채운다. */
 .saveBtn {
-  width: 100%;
-  max-width: 420px;
+  position: relative;
+  width: var(--card-width, 100%);
+  max-width: 100%;
   padding: 17px 20px;
   border: 0;
   border-radius: 999px;
-  background: #27351f;
-  color: #f4fff0;
+  background: none;
+  color: #485943;
   font-family: inherit;
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* 알약 배경만 따로 깐다. 원본 SVG도 opacity 0.95 는 도형에만 걸려 있고 글자는 또렷하다. */
+.saveBtn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.95;
+  background: radial-gradient(
+    68.2% 355% at 50% 50%,
+    #91e464 0%,
+    rgba(216, 255, 201, 0.9) 74.55%
+  );
+  box-shadow:
+    0 7px 4px rgba(172, 172, 172, 0.1),
+    inset 2px 2px 2px rgba(255, 255, 255, 0.7);
+}
+
+/* 배경이 position 을 가져서 글자도 띄워 줘야 위에 남는다. */
+.saveLabel {
+  position: relative;
 }
 
 .saveBtn:disabled {

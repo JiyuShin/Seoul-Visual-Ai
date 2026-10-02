@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CARD_SIZE, cardArtUrl, cardFor, formatCardDate, plantNameFor } from '../f5/cardArt';
 import {
   CARD_FONT,
@@ -132,10 +132,27 @@ export default function MobileCardPage({ district, slot, name, ready }) {
   const [status, setStatus] = useState('idle');
   // 키오스크와 같은 날짜가 찍히도록 열어 본 날을 쓴다.
   const [date, setDate] = useState('');
+  // 저장 버튼 폭을 카드와 맞춘다. 카드는 남는 높이에 눌려 폭이 정해지므로 재어 봐야 안다.
+  const cardRef = useRef(null);
+  const cardBoxRef = useRef(null);
+  const [cardWidth, setCardWidth] = useState(0);
 
   useEffect(() => {
     setDate(formatCardDate());
   }, []);
+
+  useEffect(() => {
+    const box = cardBoxRef.current;
+    if (!box) return undefined;
+    const measure = () => {
+      const node = cardRef.current;
+      if (node) setCardWidth(node.getBoundingClientRect().width);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [card]);
 
   const handleSave = useCallback(async () => {
     if (!card) return;
@@ -161,13 +178,17 @@ export default function MobileCardPage({ district, slot, name, ready }) {
   }
 
   return (
-    <div className={styles.page}>
+    <div
+      className={styles.page}
+      style={cardWidth ? { '--card-width': `${cardWidth}px` } : undefined}
+    >
       <header className={styles.head}>
         <p className={styles.district}>{district}</p>
         <h1 className={styles.title}>식물 도감 카드</h1>
       </header>
-      <div className={styles.cardBox}>
+      <div className={styles.cardBox} ref={cardBoxRef}>
         <MobileCardArt
+          ref={cardRef}
           className={styles.card}
           art={card.art}
           district={district}
@@ -182,7 +203,9 @@ export default function MobileCardPage({ district, slot, name, ready }) {
           onClick={handleSave}
           disabled={status === 'working'}
         >
-          {status === 'working' ? '저장하는 중…' : '이미지 저장하기'}
+          <span className={styles.saveLabel}>
+            {status === 'working' ? '저장하는 중…' : '카드 저장하기'}
+          </span>
         </button>
         <p className={styles.hint} role="status">
           {status === 'saved' ? '다운로드 폴더에 저장했어요.' : null}

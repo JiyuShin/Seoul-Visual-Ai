@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { forwardRef, useLayoutEffect, useRef } from 'react';
 import { CARD_SIZE, cardArtUrl } from '../f5/cardArt';
 import DistrictLabel from '../f5/DistrictLabel';
 import {
@@ -15,7 +15,10 @@ import {
  * 폰에서 보는 카드 한 장. 배경 그림과 하단 박스·글자를 한 SVG 안에 담아
  * 크기만 바꿔도 글자 위치가 어긋나지 않는다. 저장용 PNG도 같은 값으로 그린다.
  */
-export default function MobileCardArt({ art, district, plantName, date, className }) {
+const MobileCardArt = forwardRef(function MobileCardArt(
+  { art, district, plantName, date, className },
+  ref
+) {
   const nameRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -38,6 +41,7 @@ export default function MobileCardArt({ art, district, plantName, date, classNam
 
   return (
     <svg
+      ref={ref}
       className={className}
       width={CARD_SIZE.width}
       height={CARD_SIZE.height}
@@ -96,4 +100,6 @@ export default function MobileCardArt({ art, district, plantName, date, classNam
       </text>
     </svg>
   );
-}
+});
+
+export default MobileCardArt;
