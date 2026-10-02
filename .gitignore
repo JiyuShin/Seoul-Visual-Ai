@@ -7,3 +7,4 @@ out
 .env.local
 .env*.local
 public/mediapipe
+.tmp-svg
