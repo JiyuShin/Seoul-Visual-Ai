@@ -23,10 +23,15 @@ yarn dev
 ./scripts/launch-kiosk.sh
 ```
 
-- `/pre_opening` 전체화면 창과 `/presence_test` 인원 인식 창(작은 앱 창)이 함께 뜹니다.
+- `/pre_opening` 은 `--kiosk` 전체화면(탭·주소창 없음, 페이지 이동·오류 복구 중에도 전체화면 유지),
+  `/presence_test` 인원 인식 창은 바탕화면 데스크톱의 작은 앱 창으로 뜹니다. 두 창은 별도 Chrome 인스턴스입니다.
 - `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`
-  플래그로 실행되므로, 인원 인식 창이 전체화면 뒤에 가려져도 얼굴 인식이 느려지지 않습니다.
-- 카메라 권한은 자동 허용(`--use-fake-ui-for-media-stream`)됩니다. 끄려면 전시용 Chrome 에서 `Cmd+Q`.
+  플래그로 실행되므로, 인원 인식 창이 다른 데스크톱에 있어도 얼굴 인식이 느려지지 않습니다.
+- 카메라·마이크 권한은 자동 허용(`--use-fake-ui-for-media-stream`)됩니다.
+- 인식 창을 보려면 `Ctrl+←/→`(또는 세 손가락 스와이프)로 데스크톱을 넘깁니다.
+- 끄기: `./scripts/launch-kiosk.sh stop` (전시 창에서 `Cmd+Q` 를 누르면 전시 창만 꺼집니다).
+- `KIOSK_DEBUG=1 ./scripts/launch-kiosk.sh` 로 띄우면 전시 창 왼쪽 아래에 `얼굴 N명 · 통과 N명 · N%` 가 떠서,
+  안 넘어갈 때 센서가 살아 있는지 / 통과 조건(2명·정면·4초) 문제인지 바로 구분할 수 있습니다.
 - 다른 주소/크기는 `KIOSK_URL`, `PRESENCE_SIZE`, `PRESENCE_POS` 환경 변수로 바꿉니다. (스크립트 머리말 참고)
 
 ## 두 사람이 함께 고르기 (웹캠 2대)
