@@ -443,7 +443,7 @@ function QrCopy({ phase, qrUrl, joinedCount = 0 }) {
         <div className={phase === 'q' ? styles.qrImageLive : styles.qrImage}>
           {phase === 'q' ? (
             qrUrl ? (
-              <DynamicQrCode url={qrUrl} alt="모바일 연결 QR 코드" />
+              <DynamicQrCode url={qrUrl} alt="모바일 연결 QR 코드" tone="light" />
             ) : (
               <div className={styles.qrImageLiveLoading} aria-hidden="true" />
             )

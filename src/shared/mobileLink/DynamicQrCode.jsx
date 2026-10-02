@@ -2,16 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from './DynamicQrCode.module.css';
 
 /**
- * @param {{ url: string, alt?: string }} props
+ * tone="light" 면 바탕 사각형 없이 흰 QR 만 나온다(배경 위에 바로 얹는 화면용).
+ *
+ * @param {{ url: string, alt?: string, tone?: 'dark' | 'light' }} props
  */
-export default function DynamicQrCode({ url, alt = 'QR 코드' }) {
+export default function DynamicQrCode({ url, alt = 'QR 코드', tone = 'dark' }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const src = useMemo(() => {
     if (!url) return '';
-    return `/api/mobile-qr?url=${encodeURIComponent(url)}`;
-  }, [url]);
+    const query = tone === 'light' ? '&tone=light' : '';
+    return `/api/mobile-qr?url=${encodeURIComponent(url)}${query}`;
+  }, [url, tone]);
 
   useEffect(() => {
     setFailed(false);

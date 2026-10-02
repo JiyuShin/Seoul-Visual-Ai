@@ -180,16 +180,17 @@
     );
 }
 
+/*
+ * 유리 패널 한가운데에 QR 을 놓는다. 패널 폭의 약 65%가 QR 모듈 영역이 되도록 여백을 잡았다
+ * (QR PNG 는 가장자리 여백을 포함해 모듈이 폭의 87.7%). /3 화면과 같은 값으로 맞춘다.
+ */
 .qrImageLive {
   position: absolute;
-  left: 178.781px;
-  top: 175.781px;
-  width: 686px;
-  height: 691px;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3%;
+  padding: 12.7%;
   box-sizing: border-box;
 }
 

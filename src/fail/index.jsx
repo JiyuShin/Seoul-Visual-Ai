@@ -186,7 +186,7 @@ function FailQrImage({ url }) {
   const [loaded, setLoaded] = useState(false);
 
   const src = url
-    ? `/api/mobile-qr?url=${encodeURIComponent(url)}&a=${attempt}`
+    ? `/api/mobile-qr?url=${encodeURIComponent(url)}&tone=light&a=${attempt}`
     : '';
 
   useEffect(() => {
