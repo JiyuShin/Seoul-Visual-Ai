@@ -1,5 +1,8 @@
 /** @typedef {{ id: string, image: string, scale?: number, rotate?: number, offsetY?: number, objectPosition?: string }} EndPlantVariant */
 
+// 자치구마다 식물 두 개만 쓴다. 슬롯 A(첫 번째 참가자)가 앞의 것, 슬롯 B(두 번째 참가자)가 뒤의 것.
+// 쓰지 않는 에셋: jongno-c, mapo-a, gangnam-c (public/mobile/plants, public/4/plants 에 파일은 남아 있다).
+
 /** @type {Record<string, EndPlantVariant>} */
 export const END_PLANT_VARIANTS = {
   'jongno-a': {
@@ -11,18 +14,6 @@ export const END_PLANT_VARIANTS = {
   'jongno-b': {
     id: 'jongno-b',
     image: '/mobile/plants/jongno-b.png',
-    scale: 1,
-    objectPosition: 'center center',
-  },
-  'jongno-c': {
-    id: 'jongno-c',
-    image: '/mobile/plants/jongno-c.png',
-    scale: 1,
-    objectPosition: 'center center',
-  },
-  'mapo-a': {
-    id: 'mapo-a',
-    image: '/mobile/plants/mapo-a.png',
     scale: 1,
     objectPosition: 'center center',
   },
@@ -50,46 +41,25 @@ export const END_PLANT_VARIANTS = {
     scale: 1,
     objectPosition: 'center center',
   },
-  'gangnam-c': {
-    id: 'gangnam-c',
-    image: '/mobile/plants/gangnam-c.png',
-    scale: 1,
-    objectPosition: 'center center',
-  },
 };
 
-const POOL_BY_DISTRICT = {
-  종로구: ['jongno-a', 'jongno-b', 'jongno-c'],
-  마포구: ['mapo-a', 'mapo-b', 'mapo-c'],
-  강남구: ['gangnam-a', 'gangnam-b', 'gangnam-c'],
+/** 자치구별 [슬롯 A 식물, 슬롯 B 식물]. */
+const PAIR_BY_DISTRICT = {
+  종로구: ['jongno-a', 'jongno-b'],
+  마포구: ['mapo-b', 'mapo-c'],
+  강남구: ['gangnam-a', 'gangnam-b'],
 };
 
-const DEFAULT_POOL = ['jongno-a', 'jongno-b', 'jongno-c'];
-
-function hashString(value) {
-  let h = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    h = (h * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return h;
-}
+const DEFAULT_PAIR = PAIR_BY_DISTRICT.종로구;
 
 /**
- * 같은 세션의 A·B 휴대폰은 sessionId 로 같은 시작 번호를 얻고,
- * B 는 그다음 식물을 받으므로 둘은 절대 겹치지 않는다 (풀 크기 ≥ 2 전제).
+ * 슬롯 A 는 항상 첫 번째 식물, 슬롯 B 는 항상 두 번째 식물을 받는다. 그래서 둘은 겹치지 않는다.
+ * 슬롯을 모르면(짝이 안 맺어진 상태) A 쪽 식물을 쓴다.
  * @param {string} districtName
  * @param {{ sessionId?: string | null, slot?: 'A' | 'B' | null }} [link]
  * @returns {EndPlantVariant}
  */
 export function pickEndPlantVariant(districtName, link = {}) {
-  const pool = POOL_BY_DISTRICT[districtName] ?? DEFAULT_POOL;
-  const { sessionId, slot } = link;
-  let index;
-  if (sessionId && (slot === 'A' || slot === 'B')) {
-    const base = hashString(sessionId) % pool.length;
-    index = (base + (slot === 'B' ? 1 : 0)) % pool.length;
-  } else {
-    index = Math.floor(Math.random() * pool.length);
-  }
-  return END_PLANT_VARIANTS[pool[index]];
+  const pair = PAIR_BY_DISTRICT[districtName] ?? DEFAULT_PAIR;
+  return END_PLANT_VARIANTS[pair[link?.slot === 'B' ? 1 : 0]];
 }

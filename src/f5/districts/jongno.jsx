@@ -10,6 +10,10 @@ const plants = [
 // 1~2 영상은 이 시점(초)부터 2 말풍선.
 const INTRO_HOLD = { cue2At: 1.6 };
 
+// 첫 영상의 첫 프레임 사진. 영상이 디코딩되기 전 검은 화면이 보이지 않게 깔아 둔다.
+export const poster = '/5/jongno/poster.jpg';
+const POSTER = poster;
+
 // 3~7 영상은 1초 지점까지 느리게 다가가 멈춘 채 3 → 4, 그 뒤 슬로모션 구간에서 5 → 7.
 // ringFill·ringEnd·ringHide는 슬로모션 구간(1초~끝) 안의 비율: 링이 다 차는 지점, 7로 넘어가는 지점,
 // 다 찬 링이 사라지는 지점. 이 구간에서 0.06 ≈ 실제 1초.
@@ -36,7 +40,14 @@ export const assets = plants;
 // 업스케일 영상을 번호 순서대로 잇는다. fade는 이 영상의 끝과 다음 영상의 시작이 겹치는 시간이다.
 export const shots = [
   // fade 가 길면 그만큼 끝부분이 다음 영상에 덮인다. 1~2는 끝 프레임까지 보여 주려고 짧게 둔다.
-  { kind: 'video', src: '/5/jongno/1-2.mp4', fade: 400, story: 'intro', hold: INTRO_HOLD },
+  {
+    kind: 'video',
+    src: '/5/jongno/1-2.mp4',
+    poster: POSTER,
+    fade: 400,
+    story: 'intro',
+    hold: INTRO_HOLD,
+  },
   {
     kind: 'video',
     src: '/5/jongno/3-7.mp4',

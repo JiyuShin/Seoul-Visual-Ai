@@ -54,19 +54,19 @@ function spokenHoldMs(text) {
 }
 const AFTER_USER_MS = 0;
 const MIC_LIMIT_MS = 10000;
-const INTRO_LINE = '함께 선택해주신 이 서울을 실현하기 위해, 삭막한 지금의 거리에서 식물이 필요한 곳을 차례대로 바라보며 토론을 통해 의견을 나눠볼게요.';
+const INTRO_LINE = '함께 선택해주신 이 서울을 실현하기 위해, 삭막한 지금의 거리에서 식물이 필요한 곳을 차례대로 바라보며 토론을 통해 의견을 나눠볼게요';
 const CLOSE_LINE = '토론이 종료 되었어요. 이제 의견을 모아볼게요!';
 const WAIT_LINE = '잠시만 기다려 주세요...';
 const ANALYZE_LINE = '토론 내용을 기반으로 지역구 추천을 위해 분석 중이에요...';
 const CLOSING_BEATS = new Set(['close', 'gather', 'wait', 'analyze']);
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
-const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요.';
+const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요';
 const NABI_CALIBRATION_LINE =
-  '첫 번째 참가자 NABI님 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요.';
+  '첫 번째 참가자 NABI님, 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요';
 const CALIBRATION_HANDOFF_LINE =
-  '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요.';
+  '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요';
 const CALIBRATION_COMPLETE_LINE =
-  'NABI와 SORA님 모두 시선 보정이 완료되었어요! 여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요.';
+  'NABI와 SORA님 모두 시선 보정이 완료되었어요! 여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요';
 
 // 구슬이 아래로 내려가 고정되는 데 걸리는 시간(아래 CSS 트랜지션과 동일) + 고정 후 안내 텍스트가 뜨기까지의 여유.
 const CALIB_ORB_SETTLE_MS = 1150;
@@ -1138,8 +1138,8 @@ export default function DiscussionStep({
                 }`}
                 aria-hidden={calibrationGuide !== 'nabi'}
               >
-                <p>첫 번째 참가자 <strong>NABI</strong>님 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이</p>
-                <p><strong>시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요.</strong></p>
+                <p>첫 번째 참가자 <strong>NABI</strong>님, 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이</p>
+                <p><strong>시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요</strong></p>
               </div>
               <div
                 className={`${styles.calibrationCard} ${styles.calibrationCardHandoff} ${
@@ -1148,7 +1148,7 @@ export default function DiscussionStep({
                 aria-hidden={calibrationGuide !== 'handoff'}
               >
                 <p>첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요!</p>
-                <p>다음 두 번째 참가자 <strong>SORA</strong>님의 시선 보정을 시작할게요.</p>
+                <p>다음 두 번째 참가자 <strong>SORA</strong>님의 시선 보정을 시작할게요</p>
               </div>
               <div
                 className={`${styles.calibrationCard} ${styles.calibrationCardComplete} ${
@@ -1157,7 +1157,7 @@ export default function DiscussionStep({
                 aria-hidden={calibrationGuide !== 'complete'}
               >
                 <p>NABI와 SORA님 모두 시선 보정이 완료되었어요!</p>
-                <p><strong>여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요.</strong></p>
+                <p><strong>여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요</strong></p>
               </div>
             </div>
 

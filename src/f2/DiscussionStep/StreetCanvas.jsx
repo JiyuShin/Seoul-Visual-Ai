@@ -801,17 +801,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
           )}
           </div>
         </div>
-        {pendingCircle && phase === 'gaze' && pendingCircle.progress > 0.02 && (
-          <div
-            className={styles.pendingRing}
-            style={{
-              left: `${pendingCircle.x * 100}%`,
-              top: `${pendingCircle.y * 100}%`,
-              background: `conic-gradient(rgba(255,255,255,0.95) ${pendingCircle.progress * 360}deg, rgba(255,255,255,0.18) 0deg)`,
-              opacity: 0.35 + pendingCircle.progress * 0.55,
-            }}
-          />
-        )}
+        {/* 응시 진행 게이지는 시선 커서(GazeReticle)가 dwellProgress 로 직접 그린다. */}
         {gather && FINALE_ORBS.map((slot, index) => {
           if (slot.late && !finaleFull) return null;
           const arrived = slot.late ? lateReady : gatherReady;

@@ -265,6 +265,8 @@ function Shot({ shot, shotIndex, clock, slotIndex, remember, onAdvance, onProgre
           ref={setNode}
           className={styles.media}
           src={shot.src}
+          /* 첫 영상은 포스터(첫 프레임 사진)를 깔아 둔다. 영상이 디코딩되기 전까지 검은 화면이 보이지 않게. */
+          poster={shot.poster}
           muted
           playsInline
           preload="auto"

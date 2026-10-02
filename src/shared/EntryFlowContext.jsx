@@ -128,8 +128,9 @@ export function EntryFlowProvider({ children }) {
   const gazeEnabled = router.pathname !== '/mobile';
   const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
 
+  // ?dev=1 이면 카메라 없이 마우스를 시선으로 쓴다(/2 뿐 아니라 /5 등 커서가 뜨는 화면 확인용).
   useEffect(() => {
-    if (!router.isReady || router.pathname !== '/2') return undefined;
+    if (!router.isReady || router.pathname === '/mobile') return undefined;
     const dev = router.query?.dev;
     if (dev !== '1' && dev !== 'true') return undefined;
     setMouseDev(true);
