@@ -282,7 +282,7 @@ export default function PresenceTest() {
     const id = window.setTimeout(() => setNow(Date.now()), SENT_BANNER_MS);
     return () => window.clearTimeout(id);
   }, [sentAt]);
-  const showSent = sentAt + SENT_BANNER_MS > now;
+  const showSent = sentAt > 0 && sentAt + SENT_BANNER_MS > now;
 
   const linkText = link.connected
     ? `서버 연결됨 · 디스플레이(/pre_opening) ${link.peers.displays}대`

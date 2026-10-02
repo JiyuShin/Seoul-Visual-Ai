@@ -17,6 +17,8 @@
 #   PRESENCE_SIZE  인식 창 크기 "W,H"   (기본 960,640)
 #   PRESENCE_POS   인식 창 위치 "X,Y"   (기본 40,40)
 #   CHROME_APP     Chrome 앱 번들 경로  (기본 /Applications/Google Chrome.app)
+#   KIOSK_DEBUG=1  전시 창 왼쪽 아래에 센서 상태(얼굴 수·통과 인원·진행률)를 띄운다.
+#                  인식 창이 전체화면 뒤에 가려져 있어도 왜 안 넘어가는지 볼 수 있다.
 #
 # 끄기: 전시용 Chrome 에서 Cmd+Q (또는 pkill -f "user-data-dir=$HOME/.seoul-kiosk-chrome")
 
@@ -27,6 +29,10 @@ BASE_URL="${KIOSK_URL:-http://localhost:3000}"
 PROFILE="${KIOSK_PROFILE:-$HOME/.seoul-kiosk-chrome}"
 PRESENCE_SIZE="${PRESENCE_SIZE:-960,640}"
 PRESENCE_POS="${PRESENCE_POS:-40,40}"
+DISPLAY_URL="$BASE_URL/pre_opening"
+if [ "${KIOSK_DEBUG:-0}" = "1" ]; then
+  DISPLAY_URL="$DISPLAY_URL?presenceDebug=1"
+fi
 
 if [ ! -d "$CHROME_APP" ]; then
   echo "Chrome 을 찾지 못했습니다: $CHROME_APP" >&2
@@ -62,8 +68,8 @@ FLAGS=(
 )
 
 # `open` 으로 띄우면 launchd 가 Chrome 을 띄워 주므로, 이 스크립트(터미널)가 닫혀도 Chrome 은 남는다.
-echo "전시 창 실행: $BASE_URL/pre_opening (전체화면)"
-open -na "$CHROME_APP" --args "${FLAGS[@]}" --start-fullscreen "$BASE_URL/pre_opening"
+echo "전시 창 실행: $DISPLAY_URL (전체화면)"
+open -na "$CHROME_APP" --args "${FLAGS[@]}" --start-fullscreen "$DISPLAY_URL"
 
 # 첫 인스턴스가 뜬 뒤에 붙여야 같은 인스턴스의 새 창으로 열린다.
 for _ in $(seq 1 20); do
