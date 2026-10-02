@@ -70,6 +70,7 @@ export default function PlantCards({ visible, district, qrUrl, plantNames }) {
                   <img className={styles.cardArt} src={art} alt="" />
                   <CardPanel
                     id={`${card.art}-front`}
+                    district={district}
                     plantName={name}
                     grown={grown}
                     qrUrl={cardUrlFor(qrUrl, district, card.slot, name)}
@@ -78,7 +79,13 @@ export default function PlantCards({ visible, district, qrUrl, plantNames }) {
                 {/* 도는 동안 보이는 뒷면. 같은 그림을 쓰므로 글자가 뒤집혀 보이지 않는다. */}
                 <div className={`${styles.face} ${styles.faceBack}`}>
                   <img className={styles.cardArt} src={art} alt="" />
-                  <CardPanel id={`${card.art}-back`} plantName={name} grown={false} qrUrl="" />
+                  <CardPanel
+                    id={`${card.art}-back`}
+                    district={district}
+                    plantName={name}
+                    grown={false}
+                    qrUrl=""
+                  />
                 </div>
               </div>
             </div>

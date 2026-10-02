@@ -3,6 +3,7 @@ import { CARD_SIZE, cardArtUrl, cardFor, formatCardDate, plantNameFor } from '..
 import {
   CARD_FONT,
   DATE_TEXT,
+  DISTRICT_TEXT,
   NAME_TEXT,
   PANEL_FILL_SMALL,
   PANEL_GRADIENT_SMALL,
@@ -41,7 +42,7 @@ async function loadCardArt(url, width, height) {
  * 저장용 PNG는 화면과 같은 값으로 캔버스에 다시 그린다.
  * SVG 안의 <text>는 이미지로 띄우는 순간 웹폰트를 못 써서, 글자만 캔버스로 올린다.
  */
-async function renderCardPng(art, plantName, date, scale) {
+async function renderCardPng(art, district, plantName, date, scale) {
   const width = Math.round(CARD_SIZE.width * scale);
   const height = Math.round(CARD_SIZE.height * scale);
   const image = await loadCardArt(cardArtUrl(art, { base: true }), width, height);
@@ -55,6 +56,14 @@ async function renderCardPng(art, plantName, date, scale) {
 
   // 이제부터는 카드 원본 좌표(505×769)로 그린다.
   ctx.scale(scale, scale);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'white';
+  ctx.font = `${DISTRICT_TEXT.fontWeight} ${DISTRICT_TEXT.fontSize}px ${CARD_FONT}`;
+  // letterSpacing 은 아직 못 받는 브라우저가 있다. 없으면 0.9px 정도 넓어질 뿐이라 그냥 둔다.
+  ctx.letterSpacing = `${DISTRICT_TEXT.letterSpacing}px`;
+  ctx.fillText(district, DISTRICT_TEXT.x, DISTRICT_TEXT.baseline);
+  ctx.letterSpacing = '0px';
 
   const panel = new Path2D(PANEL_SMALL);
   ctx.fillStyle = `rgba(255, 255, 255, ${PANEL_FILL_SMALL})`;
@@ -132,12 +141,12 @@ export default function MobileCardPage({ district, slot, name, ready }) {
     if (!card) return;
     setStatus('working');
     try {
-      const blob = await renderCardPng(card.art, plantName, date, EXPORT_SCALE);
+      const blob = await renderCardPng(card.art, district, plantName, date, EXPORT_SCALE);
       setStatus(await saveBlob(blob, `plant-your-seoul-${card.art}.png`));
     } catch {
       setStatus('error');
     }
-  }, [card, plantName, date]);
+  }, [card, district, plantName, date]);
 
   if (!ready) {
     return <div className={styles.page} />;
@@ -161,6 +170,7 @@ export default function MobileCardPage({ district, slot, name, ready }) {
         <MobileCardArt
           className={styles.card}
           art={card.art}
+          district={district}
           plantName={plantName}
           date={date}
         />

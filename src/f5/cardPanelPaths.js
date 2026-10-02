@@ -39,6 +39,19 @@ export const DATE_TEXT = {
   fontWeight: 500,
 };
 
+/*
+ * 카드 오른쪽 위 자치구 이름. 자치구마다 글자가 달라야 해서 카드 그림에서 들어내고
+ * 여기 값으로 다시 쓴다. 구워져 있던 잉크 박스(413.77, 44.64, 54.01×19.44)에 맞춘 값이라
+ * 핀 아이콘과의 간격이 원래대로 남는다.
+ */
+export const DISTRICT_TEXT = {
+  x: 412.59,
+  baseline: 62.11,
+  fontSize: 21.84,
+  fontWeight: 700,
+  letterSpacing: -0.429,
+};
+
 export const CARD_FONT = 'Pretendard, system-ui, sans-serif';
 
 // 패널이 다 자란 뒤 들어오는 QR 안내 문구와 QR이 놓일 칸.

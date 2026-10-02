@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
 import { formatCardDate } from './cardArt';
+import DistrictLabel from './DistrictLabel';
 import {
   CARD_FONT,
   CARD_VIEWBOX,
@@ -93,10 +94,11 @@ function useFittedText(ref, text) {
 }
 
 /**
- * 카드 하단의 흰 박스. grown 이 켜지면 박스가 위로 자라면서 식물 이름이 빠지고,
- * 그 자리에 QR과 안내 문구가 들어온다. 배경 그림은 /5/cards/*-base.svg 가 따로 그린다.
+ * 카드 위에 겹쳐 그리는 글자 층. 아래쪽 흰 박스는 grown 이 켜지면 위로 자라면서
+ * 식물 이름이 빠지고 그 자리에 QR과 안내 문구가 들어온다. 오른쪽 위 자치구 이름은
+ * 그대로 머문다. 배경 그림은 /5/cards/*-base.svg 가 따로 그린다.
  */
-export default function CardPanel({ id, plantName, grown, qrUrl }) {
+export default function CardPanel({ id, district, plantName, grown, qrUrl }) {
   const [elapsed, setElapsed] = useState(0);
   // 날짜는 켜질 때마다 오늘로. 서버와 시간대가 어긋나도 화면이 흔들리지 않게 붙은 뒤에 넣는다.
   const [today, setToday] = useState('');
@@ -151,6 +153,7 @@ export default function CardPanel({ id, plantName, grown, qrUrl }) {
             <stop offset="1" stopColor="white" />
           </linearGradient>
         </defs>
+        <DistrictLabel district={district} />
         <path d={shape} fill="white" fillOpacity={mix(PANEL_FILL_SMALL, PANEL_FILL_TALL, panelT)} />
         <path d={shape} fill={`url(#${gradientId})`} />
         <text
