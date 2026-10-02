@@ -221,8 +221,16 @@ export default function MobileScreen() {
     if (isCompletedRef.current) return;
     isCompletedRef.current = true;
 
-    // 1. 키오스크로 완성된 식물 정보 전달 (슬롯 정보와 함께 전송)
+    // 1. 중간에 소켓이 재연결됐어도 키오스크가 최종 그림을 갖도록 다시 전달
     try {
+      if (plantDrawingUrl) {
+        sendState({
+          type: 'plant_drawing',
+          drawingUrl: plantDrawingUrl,
+          plantName: plantName.trim(),
+          slot: mobileSlot,
+        });
+      }
       sendState({
         type: 'plant_sent',
         plantName: plantName.trim(),
@@ -249,7 +257,16 @@ export default function MobileScreen() {
     window.setTimeout(() => {
       disconnect();
     }, 150);
-  }, [disconnect, districtName, endPlantVariant?.id, endPlantVariant?.image, mobileSlot, plantName, sendState]);
+  }, [
+    disconnect,
+    districtName,
+    endPlantVariant?.id,
+    endPlantVariant?.image,
+    mobileSlot,
+    plantDrawingUrl,
+    plantName,
+    sendState,
+  ]);
 
   useEffect(() => {
     if (phase !== MOBILE_PHASE.CONVERT || !convertMounted) return undefined;

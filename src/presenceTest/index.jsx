@@ -31,12 +31,19 @@ const TUNABLE = SLIDERS.map((slider) => slider.key);
 // 이 페이지가 실제 센서라서, 여기서 맞춘 값이 그대로 /pre_opening 통과 조건이 된다.
 // 유지 시간은 저장하지 않고 늘 이 값에서 시작한다(브라우저에 남은 옛 값이 통과 시간을 바꾸지 않게).
 const DEFAULT_HOLD_MS = 4000;
-const CONFIG_KEY = 'seoul-presence-config';
+const DEFAULT_MIN_FACE_WIDTH = 0.05;
+const CONFIG_KEY = 'seoul-presence-config-v3';
 const STATE_SEND_MS = 250;
 const SENT_BANNER_MS = 2000;
+const RECOVERY_RETRY_MS = 2000;
+const MAX_DETECT_ERRORS = 10;
 
 function defaultConfig() {
-  return { ...Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]])), holdMs: DEFAULT_HOLD_MS };
+  return {
+    ...Object.fromEntries(TUNABLE.map((key) => [key, PRESENCE[key]])),
+    minFaceWidth: DEFAULT_MIN_FACE_WIDTH,
+    holdMs: DEFAULT_HOLD_MS,
+  };
 }
 
 // 슬라이더 값은 이 브라우저에 저장해 두고 새로고침해도 유지한다.
@@ -83,16 +90,24 @@ function drawFaces(canvas, video, faces) {
 export default function PresenceTest() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [config, setConfig] = useState(loadConfig);
+  // 서버 렌더와 첫 클라이언트 렌더가 같아야 하므로(hydration) 기본값으로 그린 뒤,
+  // 마운트 후에 브라우저에 저장된 슬라이더 값을 읽어 적용한다.
+  const [config, setConfig] = useState(defaultConfig);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const configRef = useRef(config);
   configRef.current = config;
   useEffect(() => {
+    setConfig(loadConfig());
+    setConfigLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!configLoaded) return;
     try {
       window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
     } catch {
       // 저장 못 해도 동작에는 지장 없다.
     }
-  }, [config]);
+  }, [config, configLoaded]);
 
   const link = usePresenceLink('sensor');
   const sendRef = useRef(link.send);
@@ -105,6 +120,7 @@ export default function PresenceTest() {
   const [activeId, setActiveId] = useState('');
   const [status, setStatus] = useState('준비 중…');
   const [view, setView] = useState({ faces: [], kept: 0, progress: 0, fps: 0 });
+  const [restartToken, setRestartToken] = useState(0);
   const holdRef = useRef({ heldMs: 0, lastOkAt: 0 });
   const trackerRef = useRef(null);
   if (!trackerRef.current) trackerRef.current = createPresenceTracker();
@@ -124,7 +140,9 @@ export default function PresenceTest() {
   useEffect(() => {
     let alive = true;
     let timer = 0;
+    let retryTimer = 0;
     let stream = null;
+    let cameraTrack = null;
     let landmarker = null;
     let lastTick = 0;
     let lastStamp = 0;
@@ -132,11 +150,26 @@ export default function PresenceTest() {
     let fpsSince = performance.now();
     let fps = 0;
     let lastSentAt = 0;
+    let detectErrors = 0;
     const video = videoRef.current;
+
+    const scheduleRecovery = (reason) => {
+      if (!alive || retryTimer) return;
+      setStatus(`${reason} · ${RECOVERY_RETRY_MS / 1000}초 후 자동 재연결…`);
+      retryTimer = window.setTimeout(() => {
+        if (alive) setRestartToken((token) => token + 1);
+      }, RECOVERY_RETRY_MS);
+    };
+
+    const onCameraEnded = () => {
+      scheduleRecovery('카메라 연결이 끊겼어요');
+    };
 
     const release = () => {
       alive = false;
       window.clearTimeout(timer);
+      window.clearTimeout(retryTimer);
+      cameraTrack?.removeEventListener('ended', onCameraEnded);
       stream?.getTracks().forEach((track) => track.stop());
       stream = null;
       video.srcObject = null;
@@ -147,6 +180,10 @@ export default function PresenceTest() {
 
     const step = () => {
       if (!alive) return;
+      if (!cameraTrack || cameraTrack.readyState === 'ended') {
+        scheduleRecovery('카메라 연결이 끊겼어요');
+        return;
+      }
       const now = performance.now();
       const dt = lastTick ? Math.min(now - lastTick, 250) : 0;
       lastTick = now;
@@ -158,8 +195,14 @@ export default function PresenceTest() {
         let result = null;
         try {
           result = landmarker.detectForVideo(video, stamp);
+          detectErrors = 0;
         } catch {
           // 슬라이더로 옵션을 바꾸는 동안 그래프가 다시 만들어지면 한두 프레임 실패할 수 있다.
+          detectErrors += 1;
+          if (detectErrors >= MAX_DETECT_ERRORS) {
+            scheduleRecovery('인식 모델이 응답하지 않아요');
+            return;
+          }
         }
         const { faces, kept } = trackerRef.current.update(result, now, cfg);
         const progress = advanceHold(holdRef.current, kept.length >= cfg.people, now, dt, cfg);
@@ -200,7 +243,9 @@ export default function PresenceTest() {
         stream = opened;
         video.srcObject = stream;
         await video.play();
-        setActiveId(stream.getVideoTracks()[0]?.getSettings().deviceId || '');
+        cameraTrack = stream.getVideoTracks()[0] || null;
+        cameraTrack?.addEventListener('ended', onCameraEnded, { once: true });
+        setActiveId(cameraTrack?.getSettings().deviceId || '');
         setDevices(await videoInputs());
 
         setStatus('모델 불러오는 중…');
@@ -218,12 +263,12 @@ export default function PresenceTest() {
         setStatus(`인식 중 · ${track?.label || '카메라'} · ${video.videoWidth}×${video.videoHeight}`);
         step();
       } catch (err) {
-        if (alive) setStatus(`오류: ${err?.message || err}`);
+        if (alive) scheduleRecovery(`오류: ${err?.message || err}`);
       }
     })();
 
     return release;
-  }, [want]);
+  }, [want, restartToken]);
 
   const seconds = (view.progress * config.holdMs) / 1000;
   const snippet = TUNABLE.filter((key) => key !== 'holdMs')
