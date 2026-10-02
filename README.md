@@ -15,6 +15,20 @@ yarn dev
 준비됩니다. 이 폴더는 저장소에 넣지 않으므로 필요하면 `yarn setup:assets` 로 다시 만듭니다.
 준비에 실패해도 실행은 되며, 런타임이 CDN 으로 폴백합니다.
 
+### 전시 실행 (모니터 1대, 창 2개)
+
+`yarn dev` 가 떠 있는 상태에서 아래를 실행하면 전시용 Chrome 이 전용 프로필로 열립니다.
+
+```bash
+./scripts/launch-kiosk.sh
+```
+
+- `/pre_opening` 전체화면 창과 `/presence_test` 인원 인식 창(작은 앱 창)이 함께 뜹니다.
+- `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`
+  플래그로 실행되므로, 인원 인식 창이 전체화면 뒤에 가려져도 얼굴 인식이 느려지지 않습니다.
+- 카메라 권한은 자동 허용(`--use-fake-ui-for-media-stream`)됩니다. 끄려면 전시용 Chrome 에서 `Cmd+Q`.
+- 다른 주소/크기는 `KIOSK_URL`, `PRESENCE_SIZE`, `PRESENCE_POS` 환경 변수로 바꿉니다. (스크립트 머리말 참고)
+
 ## 두 사람이 함께 고르기 (웹캠 2대)
 
 1단계 투표는 두 사람이 같은 카드를 바라봐야 선택됩니다. 웹캠 두 대를 한 창에서 동시에 다루므로
