@@ -45,6 +45,18 @@ export function EntryFlowProvider({ children }) {
   // /2 거리뷰 블러(veil) 레이어가 다 걷혔는지. 걷히기 전엔 시선 커서를 숨긴다.
   const [streetUnveiled, setStreetUnveiled] = useState(false);
 
+  // /4 거리 파노라마는 서버가 외부에서 받아 오느라 수 초~십수 초 걸린다(강남 약 24MB).
+  // 구가 정해지는 /3 에서 미리 받아 브라우저 캐시에 두면 /4 의 QuietStreet 가 바로 그린다.
+  // 주소는 QuietStreet 가 요청하는 것과 글자 하나까지 같아야 캐시가 맞는다.
+  const streetPreloadRef = useRef(null);
+  const districtName = selectedDistrict?.name || '';
+  useEffect(() => {
+    if (!districtName) return;
+    const image = new Image();
+    image.src = `/api/district-street?name=${encodeURIComponent(districtName)}&v=2`;
+    streetPreloadRef.current = image;
+  }, [districtName]);
+
   // 운영자가 카메라를 잡고 보정을 마친 뒤 시작을 누르면 참여 화면으로 넘어간다.
   const [setupComplete, setSetupComplete] = useState(false);
 
