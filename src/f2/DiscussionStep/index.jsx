@@ -62,7 +62,7 @@ const CLOSING_BEATS = new Set(['close', 'gather', 'wait', 'analyze']);
 const LINE_83 = '여러분이 상상한 서울의 모습, 어떻게 완성할 수 있을까요?';
 const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요';
 const NABI_CALIBRATION_LINE =
-  '첫 번째 참가자 NABI님, 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요';
+  '첫 번째 참가자 NABI님, 모니터를 바라봐주세요. 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요';
 const CALIBRATION_HANDOFF_LINE =
   '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요';
 const CALIBRATION_COMPLETE_LINE =
@@ -1138,7 +1138,7 @@ export default function DiscussionStep({
                 }`}
                 aria-hidden={calibrationGuide !== 'nabi'}
               >
-                <p>첫 번째 참가자 <strong>NABI</strong>님, 바닥에 보이는 선 앞에 자리를 잡으신 뒤 시선 보정이</p>
+                <p>첫 번째 참가자 <strong>NABI</strong>님, 모니터를 바라봐주세요. 시선 보정이</p>
                 <p><strong>시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요</strong></p>
               </div>
               <div
