@@ -40,6 +40,10 @@ const CARD_HOLD_MS = 3000;
 const CARD_MIN_TEXT_MS = 11000;
 // 그래도 끝났다는 신호가 없으면 여기서 끊고 카드로 넘어간다.
 const CARD_WAIT_MAX_MS = 20000;
+// 도감 카드가 뜬 뒤 이만큼 지나면 조건 없이 처음 화면으로 돌아간다.
+// FlowIdleGuard 의 무활동 복귀와 별개인 안전장치다. 엔딩에서는 휴대폰 연동 메시지가 계속 오가서
+// '활동 중'으로 잡히면 무활동 판정이 영영 안 설 수 있다.
+const CARD_HOME_MS = 40000;
 
 function bubbleBox(bubble) {
   return {
@@ -229,8 +233,9 @@ function readStoredPlace() {
 
 export default function EndingPage() {
   const router = useRouter();
-  const { selectedDistrict, gazeRef } = useEntryFlow();
-  const { qrTargetUrl, startKioskSession, mobilePublicOrigin, slotPlants } = useMobileLink();
+  const { selectedDistrict, gazeRef, resetFlow } = useEntryFlow();
+  const { qrTargetUrl, startKioskSession, mobilePublicOrigin, slotPlants, disconnect } =
+    useMobileLink();
   // 휴대폰에서 적은 식물 이름. 슬롯 A·B 모두 있어야 5 멘트에 이름이 들어간다.
   const plantNames = useMemo(
     () => ({ A: slotPlants?.A?.plantName || '', B: slotPlants?.B?.plantName || '' }),
@@ -245,6 +250,13 @@ export default function EndingPage() {
   const [leaving, setLeaving] = useState(false);
   const leaveTimer = useRef(0);
   const cardTimer = useRef(0);
+  // 타이머가 중간에 다시 걸리지 않도록 최신 함수만 ref 에 담아 둔다(FlowIdleGuard 와 같은 방식).
+  const goHomeRef = useRef(null);
+  goHomeRef.current = () => {
+    resetFlow();
+    disconnect();
+    router.replace('/pre_opening');
+  };
   const [localUrl, setLocalUrl] = useState('');
   const [progress, setProgress] = useState({ index: 0, time: 0, duration: 0 });
   const speech = useSpeechOutput();
@@ -381,6 +393,13 @@ export default function EndingPage() {
       window.clearTimeout(cardTimer.current);
     };
   }, [qrOn]);
+
+  // 카드가 뜬 뒤 CARD_HOME_MS 가 지나면 무조건 처음으로. 다음 사람을 위해 흐름과 휴대폰 연결을 비운다.
+  useEffect(() => {
+    if (!cardsOn) return undefined;
+    const timer = window.setTimeout(() => goHomeRef.current(), CARD_HOME_MS);
+    return () => window.clearTimeout(timer);
+  }, [cardsOn]);
 
   useEffect(() => {
     if (!qrOn || qrTargetUrl || localUrl) return undefined;
