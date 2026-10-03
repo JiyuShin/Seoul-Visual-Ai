@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import DynamicQrCode from '../shared/mobileLink/DynamicQrCode';
 import { formatCardDate } from './cardArt';
 import DistrictLabel from './DistrictLabel';
@@ -15,7 +15,7 @@ import {
   PANEL_SMALL,
   PANEL_TALL,
   QR_SLOT,
-  QR_TEXT_PATH,
+  QR_TEXT_LINES,
   TEXT_COLOR_SMALL,
   TEXT_COLOR_TALL,
 } from './cardPanelPaths';
@@ -99,37 +99,85 @@ function useFittedText(ref, text) {
  * 그대로 머문다. 배경 그림은 /5/cards/*-base.svg 가 따로 그린다.
  */
 export default function CardPanel({ id, district, plantName, grown, qrUrl }) {
-  const [elapsed, setElapsed] = useState(0);
   // 날짜는 켜질 때마다 오늘로. 서버와 시간대가 어긋나도 화면이 흔들리지 않게 붙은 뒤에 넣는다.
   const [today, setToday] = useState('');
   const nameRef = useRef(null);
+  const fillRef = useRef(null);
+  const sheenRef = useRef(null);
+  const fadeRef = useRef(null);
+  const dateRef = useRef(null);
+  const qrTextRef = useRef(null);
+  const qrSlotRef = useRef(null);
   useFittedText(nameRef, plantName);
 
   useEffect(() => {
     setToday(formatCardDate());
   }, []);
 
-  useEffect(() => {
+  /*
+   * 박스가 자라는 동안은 리액트를 거치지 않고 바뀌는 속성만 DOM 에 직접 적는다.
+   * 프레임마다 다시 그리면 긴 path 문자열까지 매번 비교돼 커지는 동작이 끊긴다.
+   */
+  const paint = useCallback((elapsed) => {
+    const panelT = easeInOut(clamp01(elapsed / PANEL_MS));
+    const nameT = clamp01(elapsed / NAME_MS);
+    const qrT = clamp01((elapsed - QR_DELAY_MS) / QR_MS);
+    const shape = panelPath(panelT);
+
+    const fill = fillRef.current;
+    if (fill) {
+      fill.setAttribute('d', shape);
+      fill.setAttribute('fill-opacity', mix(PANEL_FILL_SMALL, PANEL_FILL_TALL, panelT));
+    }
+    sheenRef.current?.setAttribute('d', shape);
+
+    const fade = fadeRef.current;
+    if (fade) {
+      fade.setAttribute('x1', mix(PANEL_GRADIENT_SMALL.x1, PANEL_GRADIENT_TALL.x1, panelT));
+      fade.setAttribute('y1', mix(PANEL_GRADIENT_SMALL.y1, PANEL_GRADIENT_TALL.y1, panelT));
+      fade.setAttribute('x2', mix(PANEL_GRADIENT_SMALL.x2, PANEL_GRADIENT_TALL.x2, panelT));
+      fade.setAttribute('y2', mix(PANEL_GRADIENT_SMALL.y2, PANEL_GRADIENT_TALL.y2, panelT));
+    }
+
+    nameRef.current?.setAttribute('fill-opacity', 0.9 * (1 - nameT));
+
+    const date = dateRef.current;
+    if (date) {
+      date.setAttribute('transform', `translate(${DATE_SHIFT.x * panelT} ${DATE_SHIFT.y * panelT})`);
+      date.setAttribute('fill', mixColor(TEXT_COLOR_SMALL, TEXT_COLOR_TALL, panelT));
+    }
+
+    // QR 과 안내 문구는 박스가 다 자란 뒤에 들어온다. 투명도만 0 으로 두면 큰 글자 path 와
+    // 섞기 모드(multiply) 칸이 자라는 내내 같이 합성되므로, 보일 때까지 아예 빼 둔다.
+    const shown = qrT > 0 ? '' : 'none';
+    const qrText = qrTextRef.current;
+    if (qrText) {
+      qrText.setAttribute('fill-opacity', 0.9 * qrT);
+      qrText.style.display = shown;
+    }
+    const slot = qrSlotRef.current;
+    if (slot) {
+      slot.style.opacity = qrT;
+      slot.style.display = shown;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
     if (!grown) {
-      setElapsed(0);
+      paint(0);
       return undefined;
     }
     let raf = 0;
     const start = performance.now();
     const step = (now) => {
       const next = now - start;
-      setElapsed(Math.min(TOTAL_MS, next));
+      paint(Math.min(TOTAL_MS, next));
       if (next < TOTAL_MS) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [grown]);
+  }, [grown, paint]);
 
-  const panelT = easeInOut(clamp01(elapsed / PANEL_MS));
-  const nameT = clamp01(elapsed / NAME_MS);
-  const qrT = clamp01((elapsed - QR_DELAY_MS) / QR_MS);
-
-  const shape = panelPath(panelT);
   const gradientId = `cardPanelFade-${id}`;
 
   return (
@@ -142,11 +190,12 @@ export default function CardPanel({ id, district, plantName, grown, qrUrl }) {
       >
         <defs>
           <linearGradient
+            ref={fadeRef}
             id={gradientId}
-            x1={mix(PANEL_GRADIENT_SMALL.x1, PANEL_GRADIENT_TALL.x1, panelT)}
-            y1={mix(PANEL_GRADIENT_SMALL.y1, PANEL_GRADIENT_TALL.y1, panelT)}
-            x2={mix(PANEL_GRADIENT_SMALL.x2, PANEL_GRADIENT_TALL.x2, panelT)}
-            y2={mix(PANEL_GRADIENT_SMALL.y2, PANEL_GRADIENT_TALL.y2, panelT)}
+            x1={PANEL_GRADIENT_SMALL.x1}
+            y1={PANEL_GRADIENT_SMALL.y1}
+            x2={PANEL_GRADIENT_SMALL.x2}
+            y2={PANEL_GRADIENT_SMALL.y2}
             gradientUnits="userSpaceOnUse"
           >
             <stop offset="0.334801" stopColor="white" stopOpacity="0" />
@@ -154,8 +203,8 @@ export default function CardPanel({ id, district, plantName, grown, qrUrl }) {
           </linearGradient>
         </defs>
         <DistrictLabel district={district} />
-        <path d={shape} fill="white" fillOpacity={mix(PANEL_FILL_SMALL, PANEL_FILL_TALL, panelT)} />
-        <path d={shape} fill={`url(#${gradientId})`} />
+        <path ref={fillRef} d={PANEL_SMALL} fill="white" fillOpacity={PANEL_FILL_SMALL} />
+        <path ref={sheenRef} d={PANEL_SMALL} fill={`url(#${gradientId})`} />
         <text
           ref={nameRef}
           x={NAME_TEXT.x}
@@ -165,33 +214,39 @@ export default function CardPanel({ id, district, plantName, grown, qrUrl }) {
           fontSize={NAME_TEXT.fontSize}
           fontWeight={NAME_TEXT.fontWeight}
           fill={TEXT_COLOR_SMALL}
-          fillOpacity={0.9 * (1 - nameT)}
+          fillOpacity={0.9}
         >
           {plantName}
         </text>
         <text
+          ref={dateRef}
           x={DATE_TEXT.x}
           y={DATE_TEXT.baseline}
-          transform={`translate(${DATE_SHIFT.x * panelT} ${DATE_SHIFT.y * panelT})`}
           textAnchor="middle"
           fontFamily={CARD_FONT}
           fontSize={DATE_TEXT.fontSize}
           fontWeight={DATE_TEXT.fontWeight}
-          fill={mixColor(TEXT_COLOR_SMALL, TEXT_COLOR_TALL, panelT)}
+          fill={TEXT_COLOR_SMALL}
           fillOpacity="0.9"
         >
           {today}
         </text>
-        <path d={QR_TEXT_PATH} fill={TEXT_COLOR_TALL} fillOpacity={0.9 * qrT} />
+        <g ref={qrTextRef} fill={TEXT_COLOR_TALL} fillOpacity={0} style={{ display: 'none' }}>
+          {QR_TEXT_LINES.map((line) => (
+            <path key={line.y} d={line.d} transform={`translate(${line.x} ${line.y})`} />
+          ))}
+        </g>
       </svg>
       <div
+        ref={qrSlotRef}
         className={styles.qrSlot}
         style={{
           left: percent(QR_SLOT.x, CARD_VIEWBOX.width),
           top: percent(QR_SLOT.y, CARD_VIEWBOX.height),
           width: percent(QR_SLOT.width, CARD_VIEWBOX.width),
           height: percent(QR_SLOT.height, CARD_VIEWBOX.height),
-          opacity: qrT,
+          opacity: 0,
+          display: 'none',
         }}
       >
         <DynamicQrCode url={qrUrl} alt="식물 도감 카드 받기" />

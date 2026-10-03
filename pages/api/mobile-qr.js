@@ -1,11 +1,11 @@
 import QRCode from 'qrcode';
 
 /*
- * 기본은 흰 바탕에 검은 QR. ?tone=light 면 흰 QR 에 바탕이 투명해서,
+ * 기본은 흰 바탕에 청회색 QR(/5 도감 카드). ?tone=light 면 흰 QR 에 바탕이 투명해서,
  * 배경 영상·유리 패널 위에 바탕 사각형 없이 얹을 수 있다(/3·/fail 에서 쓴다).
  */
 const TONES = {
-  dark: { dark: '#000000', light: '#ffffff' },
+  dark: { dark: '#6887ab', light: '#ffffff' },
   light: { dark: '#ffffff', light: '#00000000' },
 };
 
