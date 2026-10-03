@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../EntryFlowContext';
 import { useMobileLink } from '../mobileLink/MobileLinkContext';
-import { evaluateFaces } from './presence';
+import { PRESENCE, evaluateFaces } from './presence';
 import { subscribePresence } from './presenceCamera';
 
 /**
@@ -25,7 +25,13 @@ export const IDLE_RESET = {
   faceGraceMs: 800,
 };
 
-const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'];
+// 입장 센서는 넉넉하게 받지만, 여기서 그 기준을 쓰면 뒤에 서 있는 사람 때문에 복귀가 영영 안 선다.
+const FACE_CONFIG = { ...PRESENCE, minFaceWidth: 0.07, minRelativeWidth: 0.5 };
+
+const INPUT_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
+// 마우스가 가만히 있어도 화면 아래 내용이 바뀌면 Chrome 이 pointermove 를 보낸다.
+// 숨긴 커서가 화면 가운데 머무는 키오스크에서는 그게 계속 '활동'이 되므로 실제로 움직였을 때만 친다.
+const POINTER_MOVE_PX = 8;
 const DEBUG_KEY = 'seoul-idle-debug';
 
 const DEBUG_STYLE = {
@@ -64,6 +70,7 @@ export default function FlowIdleGuard() {
     near: 0,
     ok: 0,
     lastFire: '',
+    lastReason: '',
   });
 
   const [debug, setDebug] = useState(false);
@@ -79,22 +86,27 @@ export default function FlowIdleGuard() {
 
   // 공백(gapBefore)은 얼굴이 나타난 순간 한 번 재고 여기서는 건드리지 않는다.
   // 돌아온 사람이 화면을 보며 만드는 시선 응시·입력이 "같은 세션" 증거가 되어 버리면 안 되기 때문이다.
-  const markActive = useCallback(() => {
+  const markActive = useCallback((reason) => {
     stateRef.current.lastActiveAt = performance.now();
+    stateRef.current.lastReason = typeof reason === 'string' ? reason : reason?.type || '입력';
   }, []);
 
   useEffect(() => {
-    markActive();
+    markActive('페이지 이동');
   }, [router.asPath, markActive]);
 
   useEffect(() => {
-    if (dwellProgress > 0) markActive();
+    if (dwellProgress > 0) markActive('시선 응시');
   }, [dwellProgress, markActive]);
 
   // /4 에서 휴대폰으로 이름을 쓰는 동안은 고개를 숙여 얼굴이 안 잡힐 수 있다.
+  // 연결이 끊겨 1초마다 재접속하면 상태와 slots 객체가 계속 새로 바뀌므로, 휴대폰 쪽 내용이 달라졌을 때만 친다.
+  const paired = linkStatus === 'paired';
+  const slotA = Boolean(slots?.A);
+  const slotB = Boolean(slots?.B);
   useEffect(() => {
-    markActive();
-  }, [linkStatus, slots, slotPlants, markActive]);
+    markActive('휴대폰');
+  }, [paired, slotA, slotB, slotPlants, markActive]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -120,7 +132,7 @@ export default function FlowIdleGuard() {
       setDebugText([
         `감시 ${active ? router.pathname : '꺼짐 (' + router.pathname + ')'} · 카메라 ${camera}`,
         `얼굴 가까이 ${state.near} · 정면 ${state.ok} · 머문 지 ${seconds(faceAge)} (기준 ${seconds(IDLE_RESET.arriveMs)})`,
-        `마지막 활동 ${seconds(sinceActive)} 전 (복귀 ${seconds(IDLE_RESET.idleMs)})`,
+        `마지막 활동 ${seconds(sinceActive)} 전 · ${state.lastReason || '-'} (복귀 ${seconds(IDLE_RESET.idleMs)})`,
         `얼굴 등장 전 공백 ${seconds(state.gapBefore)} (새 세션 기준 ${seconds(IDLE_RESET.newUserGapMs)})`,
         state.lastFire ? `마지막 복귀: ${state.lastFire}` : '마지막 복귀: 없음',
       ].join('\n'));
@@ -148,6 +160,19 @@ export default function FlowIdleGuard() {
 
     INPUT_EVENTS.forEach((type) => window.addEventListener(type, markActive, { passive: true }));
 
+    let pointerX = null;
+    let pointerY = null;
+    const onPointerMove = (event) => {
+      if (pointerX !== null && Math.hypot(event.clientX - pointerX, event.clientY - pointerY) < POINTER_MOVE_PX) {
+        return;
+      }
+      const first = pointerX === null;
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (!first) markActive('마우스 이동');
+    };
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+
     const idleTimer = window.setInterval(() => {
       if (performance.now() - state.lastActiveAt >= IDLE_RESET.idleMs) fire('무활동');
     }, 1000);
@@ -156,7 +181,7 @@ export default function FlowIdleGuard() {
       if (status) state.camera = status;
       if (!result) return;
       state.lastFrameAt = now;
-      const { faces } = evaluateFaces(result);
+      const { faces } = evaluateFaces(result, FACE_CONFIG);
       const near = faces.some((face) => face.near);
       state.near = faces.filter((face) => face.near).length;
       state.ok = faces.filter((face) => face.ok).length;
@@ -178,6 +203,7 @@ export default function FlowIdleGuard() {
 
       if (state.gapBefore < IDLE_RESET.newUserGapMs) {
         state.lastActiveAt = now;
+        state.lastReason = '얼굴';
       } else if (faces.some((face) => face.ok)) {
         fire(`새 사용자 (공백 ${seconds(state.gapBefore)})`);
       }
@@ -185,6 +211,7 @@ export default function FlowIdleGuard() {
 
     return () => {
       INPUT_EVENTS.forEach((type) => window.removeEventListener(type, markActive));
+      window.removeEventListener('pointermove', onPointerMove);
       window.clearInterval(idleTimer);
       unsubscribe();
     };

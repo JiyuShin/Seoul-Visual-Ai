@@ -11,19 +11,19 @@ export const PRESENCE = {
   people: 2,
   holdMs: 15000,
   // 검출이 잠깐 끊겨도 이 시간 안에 돌아오면 누적 시간을 지우지 않는다.
-  graceMs: 1000,
+  graceMs: 1500,
   intervalMs: 100,
   maxFaces: 6,
-  // 얼굴 폭 / 화면 폭. 약 1.5m 안쪽에 선 사람만 남기고 뒤로 지나가는 사람을 거른다.
-  minFaceWidth: 0.07,
-  // 가장 큰 얼굴의 이 비율보다 작으면 뒤쪽 사람으로 본다.
-  minRelativeWidth: 0.5,
+  // 얼굴 폭 / 화면 폭. 앞에 선 사람을 넉넉히 받고, 멀리 지나가는 사람만 거른다.
+  minFaceWidth: 0.04,
+  // 가장 큰 얼굴의 이 비율보다 작으면 뒤쪽 사람으로 본다. 한 발 뒤에 선 동행은 포함한다.
+  minRelativeWidth: 0.4,
   // 얼굴이 화면 좌우 끝에 걸쳐 있으면 들어오거나 나가는 중으로 본다.
-  edgeMargin: 0.03,
-  maxYawDeg: 28,
+  edgeMargin: 0.02,
+  maxYawDeg: 38,
   // 올려다보는 각도 때문에 정면을 봐도 pitch 가 0에서 벗어난다. 현장에서 ?presenceDebug=1 로 보고 맞춘다.
   pitchCenterDeg: 0,
-  maxPitchDeg: 35,
+  maxPitchDeg: 45,
   // 모자 챙이 이마를 가리고 눈가에 그림자를 드리우면 검출 점수가 기본값 0.5 아래로 떨어진다.
   // 뒤쪽 오검출은 얼굴 크기 조건이 거르므로 점수 기준은 낮게 둔다.
   detectionConfidence: 0.3,
@@ -31,7 +31,7 @@ export const PRESENCE = {
   trackingConfidence: 0.3,
   // 모자를 쓰면 검출이 한두 프레임씩 끊기고 고개 각도도 튄다.
   // stickyMs 동안은 마지막 위치로 사람을 붙잡아 두고, poseSmooth 로 각도를 눌러 떨림을 없앤다.
-  stickyMs: 900,
+  stickyMs: 1200,
   poseSmooth: 0.3,
   // 같은 사람으로 이을 때 허용하는 얼굴 중심 이동량(화면 비율).
   matchDist: 0.15,

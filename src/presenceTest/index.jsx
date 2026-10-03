@@ -24,15 +24,15 @@ const SLIDERS = [
   { key: 'stickyMs', label: '얼굴 붙잡기 (ms · 모자면 올림)', min: 0, max: 3000, step: 100, digits: 0 },
   { key: 'poseSmooth', label: '고개 각도 흔들림 누르기 (낮을수록 강함)', min: 0.05, max: 1, step: 0.05, digits: 2 },
   { key: 'graceMs', label: '끊김 허용 (ms)', min: 0, max: 3000, step: 100, digits: 0 },
-  { key: 'holdMs', label: '유지 시간 (ms)', min: 1000, max: 30000, step: 500, digits: 0 },
+  { key: 'holdMs', label: '유지 시간 (ms)', min: 1000, max: 30000, step: 100, digits: 0 },
 ];
 
 const TUNABLE = SLIDERS.map((slider) => slider.key);
 // 이 페이지가 실제 센서라서, 여기서 맞춘 값이 그대로 /pre_opening 통과 조건이 된다.
 // 유지 시간은 저장하지 않고 늘 이 값에서 시작한다(브라우저에 남은 옛 값이 통과 시간을 바꾸지 않게).
-const DEFAULT_HOLD_MS = 4000;
-const DEFAULT_MIN_FACE_WIDTH = 0.05;
-const CONFIG_KEY = 'seoul-presence-config-v3';
+const DEFAULT_HOLD_MS = 3200;
+const DEFAULT_MIN_FACE_WIDTH = 0.04;
+const CONFIG_KEY = 'seoul-presence-config-v4';
 const STATE_SEND_MS = 250;
 const SENT_BANNER_MS = 2000;
 const RECOVERY_RETRY_MS = 2000;
