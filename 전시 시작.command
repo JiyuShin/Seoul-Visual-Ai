@@ -3,7 +3,7 @@
 # 서버는 뒤에서 돌기 때문에 이 터미널 창을 닫아도 전시는 계속된다. 끌 때는 '전시 종료.command'.
 
 cd "$(dirname "$0")" || exit 1
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 
 URL="http://localhost:3000"
 STATE_DIR="$HOME/.seoul-kiosk-chrome"
