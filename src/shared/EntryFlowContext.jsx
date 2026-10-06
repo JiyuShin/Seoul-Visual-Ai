@@ -73,6 +73,7 @@ export function EntryFlowProvider({ children }) {
   const dwellProgressRef = useRef(0);
   const gazeStateAtRef = useRef(0);
   const discussionCamRef = useRef('A');
+  const gazeRefHolder = useRef(null);
   const [discussionCam, setDiscussionCam] = useState('A');
   discussionCamRef.current = discussionCam;
 
@@ -94,15 +95,11 @@ export function EntryFlowProvider({ children }) {
     const clip = gazeClipRef.current;
     const sample = clip ? clampGazeToRect(x, y, clip) : { x, y };
 
-    // 사람별 커서 DOM 을 바로 옮긴다 (리렌더 없이 60fps).
+    // 위치는 GazeReticle 이 따라가게 두고, 여기서는 보이기만 켠다.
     if (typeof window !== 'undefined') {
       const runtime = window.__seoulGazeRuntime;
       const cursorEl = runtime?.cursors?.[viewerId] || (viewerId === PRIMARY_VIEWER_ID ? runtime?.cursorEl : null);
-      if (cursorEl) {
-        cursorEl.style.left = `${sample.x}px`;
-        cursorEl.style.top = `${sample.y}px`;
-        cursorEl.style.opacity = '1';
-      }
+      if (cursorEl) cursorEl.style.opacity = '1';
     }
 
     const discussionViewerId = VIEWER_BY_CAM[discussionCamRef.current] || PRIMARY_VIEWER_ID;
@@ -127,6 +124,13 @@ export function EntryFlowProvider({ children }) {
     if (!handler) return;
 
     const result = handler(viewerId, sample.x, sample.y);
+    if (result?.cursorX != null && result?.cursorY != null) {
+      const held = gazeRefHolder.current?.current?.[viewerId];
+      if (held) {
+        held.x = result.cursorX;
+        held.y = result.cursorY;
+      }
+    }
     if (result?.dwellProgress == null) return;
 
     // 매 프레임 setState 하면 화면 전체가 다시 그려지므로 눈에 보일 만큼 바뀔 때만 올린다.
@@ -139,6 +143,7 @@ export function EntryFlowProvider({ children }) {
 
   const gazeEnabled = router.pathname !== '/mobile';
   const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
+  gazeRefHolder.current = engine.gazeRef;
 
   // ?dev=1 이면 카메라 없이 마우스를 시선으로 쓴다(/2 뿐 아니라 /5 등 커서가 뜨는 화면 확인용).
   useEffect(() => {

@@ -24,6 +24,10 @@ const nextConfig = {
         source: '/street/red/:path*',
         destination: 'https://quiet-street-red-road.hello-ccid.chatgpt.site/:path*',
       },
+      {
+        source: '/street/outline/:path*',
+        destination: 'https://quiet-street-outline-review.hello-ccid.chatgpt.site/:path*',
+      },
     ];
   },
 };

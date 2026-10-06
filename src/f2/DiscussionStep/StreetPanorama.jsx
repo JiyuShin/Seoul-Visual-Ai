@@ -14,10 +14,44 @@ const FRAGMENT = `
 precision highp float;
 varying vec2 screenUV;
 uniform sampler2D panorama;
+uniform sampler2D outlines;
+uniform vec4 outlineRect;
+uniform float outlineActive;
 uniform vec2 viewport;
 uniform vec3 view;
 uniform float yawSpan;
+uniform float time;
 const float PI = 3.141592653589793;
+float outlineA(vec2 luv) {
+  if (luv.x < 0.0 || luv.x > 1.0 || luv.y < 0.0 || luv.y > 1.0) return 0.0;
+  return texture2D(outlines, luv).a;
+}
+float gaussGlow(vec2 luv, vec2 unit) {
+  float acc = 0.0;
+  float wacc = 0.0;
+  for (int j = -4; j <= 4; j++) {
+    for (int i = -4; i <= 4; i++) {
+      float x = float(i);
+      float y = float(j);
+      float w = exp(-(x * x + y * y) / 10.0);
+      acc += outlineA(luv + vec2(x, y) * unit) * w;
+      wacc += w;
+    }
+  }
+  return acc / max(wacc, 0.001);
+}
+vec3 strokeTint(vec2 luv) {
+  vec2 c = luv - 0.5;
+  float along = atan(c.y, c.x) / (2.0 * PI);
+  float t = fract(along + time * 0.08);
+  vec3 ice = vec3(0.78, 0.97, 1.0);
+  vec3 mint = vec3(0.62, 1.0, 0.88);
+  vec3 pink = vec3(1.0, 0.82, 0.93);
+  float k = t * 3.0;
+  if (k < 1.0) return mix(ice, mint, k);
+  if (k < 2.0) return mix(mint, pink, k - 1.0);
+  return mix(pink, ice, k - 2.0);
+}
 void main() {
   float a = viewport.x / viewport.y;
   float t = tan(view.z * 0.5);
@@ -32,8 +66,64 @@ void main() {
   float span = max(yawSpan, 0.001);
   vec2 uv = vec2(clamp(0.5 + atan(ray.x, ray.z) / span, 0.0, 1.0),
                  0.5 - asin(clamp(ray.y, -1.0, 1.0)) / PI);
-  gl_FragColor = vec4(texture2D(panorama, uv).rgb, 1.0);
+  vec3 scene = texture2D(panorama, uv).rgb;
+  vec3 color = scene;
+  if (outlineActive > 0.5) {
+    vec2 localUV = (uv - outlineRect.xy) / outlineRect.zw;
+    float core = outlineA(localUV);
+    vec2 unit = vec2(1.35 / 3840.0, 1.35 / 1648.0) / max(outlineRect.zw, vec2(0.0002));
+    float blur = gaussGlow(localUV, unit);
+    float halo = max(0.0, blur - core * 0.72);
+    halo = pow(halo, 0.72) * 1.35;
+    vec3 tint = strokeTint(localUV);
+    color = scene + tint * halo * 0.9;
+    color = mix(color, tint, min(1.0, core * 1.65));
+  }
+  gl_FragColor = vec4(color, 1.0);
 }`;
+
+const PANO_W = 3840;
+const PANO_H = 1648;
+const outlineCache = new Map();
+
+function outlineAssetUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('/street/')) return url;
+  const path = (url.startsWith('/') ? url : `/${url}`).replace(/@/g, '%40');
+  return `/street/outline${path}`;
+}
+
+function loadOutlineImage(url) {
+  const src = outlineAssetUrl(url);
+  if (!outlineCache.has(src)) {
+    outlineCache.set(src, new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => {
+        outlineCache.delete(src);
+        reject(new Error('outline'));
+      };
+      image.src = src;
+    }));
+  }
+  return outlineCache.get(src);
+}
+
+export function preloadOutlineAssets() {
+  if (typeof window === 'undefined' || window.__streetOutlinesWarm) return;
+  window.__streetOutlinesWarm = true;
+  fetch('/street/outline/outlines/manifest.json')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      (data?.objects || []).forEach((obj) => {
+        if (!obj?.selectable || !obj.id) return;
+        loadOutlineImage(`/outlines/objects/${obj.id}@2x.png`);
+      });
+    })
+    .catch(() => {
+      window.__streetOutlinesWarm = false;
+    });
+}
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -72,6 +162,7 @@ export default forwardRef(function StreetPanorama({
   const viewRef = useRef({ yaw: 0, pitch: 0, fov: viewFov(16 / 9), aspect: 16 / 9 });
   const marksRef = useRef(marks);
   const homeRef = useRef(null);
+  const outlineApiRef = useRef({});
   marksRef.current = marks;
 
   useImperativeHandle(ref, () => ({
@@ -79,8 +170,17 @@ export default forwardRef(function StreetPanorama({
       const view = viewRef.current;
       return screenToWorld(nx, ny, view.yaw, view.pitch, view.fov, view.aspect);
     },
+    viewNow() {
+      return viewRef.current;
+    },
     recenter(onDone) {
       homeRef.current = typeof onDone === 'function' ? onDone : () => {};
+    },
+    showOutline(id, raster) {
+      return outlineApiRef.current.showOutline?.(id, raster);
+    },
+    clearOutline() {
+      outlineApiRef.current.clearOutline?.();
     },
   }), []);
 
@@ -127,15 +227,75 @@ export default forwardRef(function StreetPanorama({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.uniform1i(gl.getUniformLocation(program, 'panorama'), 0);
+
+    const outlineTexture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.uniform1i(gl.getUniformLocation(program, 'outlines'), 1);
+    gl.activeTexture(gl.TEXTURE0);
+
     const sizeUniform = gl.getUniformLocation(program, 'viewport');
     const viewUniform = gl.getUniformLocation(program, 'view');
     const spanUniform = gl.getUniformLocation(program, 'yawSpan');
+    const outlineRectUniform = gl.getUniformLocation(program, 'outlineRect');
+    const outlineActiveUniform = gl.getUniformLocation(program, 'outlineActive');
+    const timeUniform = gl.getUniformLocation(program, 'time');
+    gl.uniform1f(outlineActiveUniform, 0);
+    gl.uniform4f(outlineRectUniform, 0, 0, 1, 1);
+    gl.uniform1f(timeUniform, 0);
 
+    let selectedId = null;
+    let highlightRequest = 0;
     let ready = false;
     let presented = false;
     let dead = false;
     let frame = 0;
     let last = 0;
+
+    const clearOutline = () => {
+      highlightRequest += 1;
+      selectedId = null;
+      if (dead || gl.isContextLost()) return;
+      gl.uniform1f(outlineActiveUniform, 0);
+    };
+
+    const showOutline = async (id, raster) => {
+      if (dead || !id || !raster?.url || !raster.viewBox) {
+        clearOutline();
+        return false;
+      }
+      if (selectedId === id) return true;
+      const request = highlightRequest + 1;
+      highlightRequest = request;
+      try {
+        const image = await loadOutlineImage(raster.url);
+        if (dead || request !== highlightRequest || gl.isContextLost()) return false;
+        gl.useProgram(program);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        const [x, y, w, h] = raster.viewBox;
+        gl.uniform4f(outlineRectUniform, x / PANO_W, y / PANO_H, w / PANO_W, h / PANO_H);
+        gl.uniform1f(outlineActiveUniform, 1);
+        selectedId = id;
+        return true;
+      } catch {
+        if (request === highlightRequest) clearOutline();
+        return false;
+      }
+    };
+
+    outlineApiRef.current = { showOutline, clearOutline };
+
     const current = { yaw: 0, pitch: 0 };
     const target = { yaw: 0, pitch: 0 };
     const stable = { nx: 0.5, ny: 0.5 };
@@ -149,9 +309,9 @@ export default forwardRef(function StreetPanorama({
       const dx = look.nx - stable.nx;
       const dy = look.ny - stable.ny;
       const dist = Math.hypot(dx, dy);
-      if (dist >= 0.08) {
-        const pull = (dist - 0.08) / dist;
-        const tau = dist > 0.22 ? 420 : 1100;
+      if (dist >= 0.05) {
+        const pull = (dist - 0.05) / dist;
+        const tau = dist > 0.18 ? 180 : 420;
         const gain = 1 - Math.exp(-dt / tau);
         stable.nx += dx * pull * gain;
         stable.ny += dy * pull * gain;
@@ -194,7 +354,7 @@ export default forwardRef(function StreetPanorama({
         target.yaw = next.yaw;
         target.pitch = next.pitch;
       }
-      const follow = 1 - Math.exp(-dt / (homing ? 980 : gazeDriven ? 560 : 160));
+      const follow = 1 - Math.exp(-dt / (homing ? 980 : gazeDriven ? 240 : 140));
       current.yaw += (target.yaw - current.yaw) * follow;
       current.pitch += (target.pitch - current.pitch) * follow;
 
@@ -221,9 +381,14 @@ export default forwardRef(function StreetPanorama({
       }
       viewRef.current = { yaw: current.yaw, pitch: current.pitch, fov, aspect };
       gl.viewport(0, 0, w, h);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform2f(sizeUniform, w, h);
       gl.uniform1f(spanUniform, (yawSpan * Math.PI) / 180);
       gl.uniform3f(viewUniform, current.yaw, current.pitch, fov);
+      gl.uniform1f(timeUniform, time * 0.001);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (!presented) {
         presented = true;
@@ -239,6 +404,7 @@ export default forwardRef(function StreetPanorama({
     };
     const present = () => {
       if (dead || !image?.naturalWidth) return;
+      preloadOutlineAssets();
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
       ready = true;
@@ -252,9 +418,11 @@ export default forwardRef(function StreetPanorama({
 
     return () => {
       dead = true;
+      outlineApiRef.current = {};
       cancelAnimationFrame(frame);
       image?.removeEventListener('load', present);
       image?.removeEventListener('error', onError);
+      gl.deleteTexture(outlineTexture);
       gl.deleteTexture(texture);
       gl.deleteBuffer(buffer);
       gl.deleteShader(vertex);

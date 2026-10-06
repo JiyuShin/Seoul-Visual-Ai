@@ -64,7 +64,7 @@ const MIC_LINE = '마이크가 켜졌어요. 음성으로 입력해주세요';
 const NABI_CALIBRATION_LINE =
   '첫 번째 참가자 NABI님, 모니터를 바라봐주세요. 시선 보정이 시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요';
 const CALIBRATION_HANDOFF_LINE =
-  '첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요';
+  '첫 번째 참가자 NABI님의 시선 보정이 완료되었어요! 다음 두 번째 참가자 SORA님의 시선 보정을 시작할게요';
 const CALIBRATION_COMPLETE_LINE =
   'NABI와 SORA님 모두 시선 보정이 완료되었어요! 여기에 이제 초록의 서울을 만들기 위한 거리뷰 토론으로 넘어갈게요';
 
@@ -384,6 +384,7 @@ export default function DiscussionStep({
       playbackStarted = true;
       reveal();
       armWatchdog();
+      job.onStart?.();
     });
     hangRef.current = window.setTimeout(() => {
       if (playbackStarted || settled) return;
@@ -391,13 +392,14 @@ export default function DiscussionStep({
     }, 45000);
   }, []);
 
-  const say = useCallback((key, line, onEnd, onAudioEnd, releaseOnAudio, display = true) => {
+  const say = useCallback((key, line, onEnd, onAudioEnd, releaseOnAudio, display = true, onStart) => {
     if (!line || saidRef.current.has(key)) return;
     saidRef.current.add(key);
     queueRef.current.push({
       line,
       onEnd,
       onAudioEnd,
+      onStart,
       releaseOnAudio: Boolean(releaseOnAudio),
       display,
     });
@@ -664,16 +666,19 @@ export default function DiscussionStep({
     }
     if (beat === 'gaze') {
       const cam = speakerRef.current.cam;
+      const line = gazeLine(cam);
       let armed = false;
       let timer = 0;
       const openGaze = () => {
         if (armed || beatRef.current !== 'gaze') return;
         armed = true;
-        timer = window.setTimeout(() => {
-          if (beatRef.current === 'gaze') setGazeOpen(true);
-        }, 7000);
+        window.clearTimeout(timer);
+        setGazeOpen(true);
       };
-      say(`gaze-${cam}`, gazeLine(cam), openGaze, openGaze);
+      say(`gaze-${cam}`, line, openGaze, openGaze, false, true, () => {
+        if (armed || beatRef.current !== 'gaze') return;
+        timer = window.setTimeout(openGaze, Math.round(spokenHoldMs(line) * 0.28));
+      });
       return () => window.clearTimeout(timer);
     }
     if (beat === 'speak') {
@@ -778,12 +783,14 @@ export default function DiscussionStep({
       const openGaze = () => {
         if (armed || beatRef.current !== 'f1Gaze') return;
         armed = true;
+        window.clearTimeout(timer);
         streetRef.current?.releaseLook?.();
-        timer = window.setTimeout(() => {
-          if (beatRef.current === 'f1Gaze') setGazeOpen(true);
-        }, 7000);
+        setGazeOpen(true);
       };
-      say(`f1-gaze-${zone.id}`, zone.look, openGaze, openGaze);
+      say(`f1-gaze-${zone.id}`, zone.look, openGaze, openGaze, false, true, () => {
+        if (armed || beatRef.current !== 'f1Gaze') return;
+        timer = window.setTimeout(openGaze, Math.round(spokenHoldMs(zone.look) * 0.28));
+      });
       return () => window.clearTimeout(timer);
     }
     if (beat === 'f1Speak') {
@@ -1138,8 +1145,8 @@ export default function DiscussionStep({
                 }`}
                 aria-hidden={calibrationGuide !== 'nabi'}
               >
-                <p>첫 번째 참가자 <strong>NABI</strong>님, 모니터를 바라봐주세요. 시선 보정이</p>
-                <p><strong>시작되면 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요</strong></p>
+                <p>첫 번째 참가자 <strong>NABI</strong>님, 모니터를 바라봐주세요. 시선 보정이 시작되면</p>
+                <p><strong> 진행 중에는 고개를 크게 움직이지 말고 점을 눈으로만 따라가 주세요</strong></p>
               </div>
               <div
                 className={`${styles.calibrationCard} ${styles.calibrationCardHandoff} ${
@@ -1147,7 +1154,7 @@ export default function DiscussionStep({
                 }`}
                 aria-hidden={calibrationGuide !== 'handoff'}
               >
-                <p>첫 번째 참가자 NABI님의 시선 보정이 완료 되었어요!</p>
+                <p>첫 번째 참가자 NABI님의 시선 보정이 완료되었어요!</p>
                 <p>다음 두 번째 참가자 <strong>SORA</strong>님의 시선 보정을 시작할게요</p>
               </div>
               <div
