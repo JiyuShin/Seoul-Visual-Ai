@@ -671,7 +671,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
         const obj = data?.selected?.outline?.selectable ? data.selected : null;
         selectedRef.current = obj;
         if (!obj) panoramaRef.current?.clearOutline();
-        else await panoramaRef.current?.showOutline(obj.id, obj.outline.raster);
+        else await panoramaRef.current?.showOutline(obj.id, obj.outline);
       } catch {
         if (alive && gen === generation) {
           selectedRef.current = null;

@@ -26,7 +26,7 @@ const nextConfig = {
       },
       {
         source: '/street/outline/:path*',
-        destination: 'https://quiet-street-outline-review.hello-ccid.chatgpt.site/:path*',
+        destination: 'https://quiet-street-clarity.hello-ccid.chatgpt.site/:path*',
       },
     ];
   },

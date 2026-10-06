@@ -15,8 +15,10 @@ precision highp float;
 varying vec2 screenUV;
 uniform sampler2D panorama;
 uniform sampler2D outlines;
+uniform sampler2D glareMask;
 uniform vec4 outlineRect;
 uniform float outlineActive;
+uniform vec2 glareStage;
 uniform vec2 viewport;
 uniform vec3 view;
 uniform float yawSpan;
@@ -76,11 +78,33 @@ void main() {
     float halo = max(0.0, blur - core * 0.72);
     halo = pow(halo, 0.72) * 1.35;
     vec3 tint = strokeTint(localUV);
-    color = scene + tint * halo * 0.9;
+    if (localUV.x >= 0.0 && localUV.x <= 1.0 && localUV.y >= 0.0 && localUV.y <= 1.0) {
+      vec4 mask = texture2D(glareMask, localUV);
+      float coverage = mask.a;
+      float coord = (localUV.x + 0.24 * (1.0 - localUV.y)) / 1.24;
+      float progress = fract(glareStage.y / 3.6) * 1.7 - 0.35;
+      float band = exp(-pow((coord - progress) / 0.105, 2.0));
+      float beam = exp(-pow((coord - progress) / 0.035, 2.0));
+      vec3 glareTint = mix(vec3(0.95, 0.92, 1.0), vec3(0.75, 1.0, 0.89), clamp(coord, 0.0, 1.0));
+      float strength = glareStage.x * coverage * (0.055 + 0.34 * band + 0.10 * beam);
+      color += (vec3(1.0) - color) * glareTint * strength;
+    }
+    color = color + tint * halo * 0.9;
     color = mix(color, tint, min(1.0, core * 1.65));
   }
   gl_FragColor = vec4(color, 1.0);
 }`;
+
+const GLARE_DELAY_SECONDS = 0.12;
+
+function glareTimeline(elapsed) {
+  const t = Math.max(0, elapsed);
+  const u = Math.max(0, Math.min(1, (t - GLARE_DELAY_SECONDS) / 0.28));
+  return {
+    glare: u * u * (3 - 2 * u),
+    sweep: Math.max(0, t - GLARE_DELAY_SECONDS),
+  };
+}
 
 const PANO_W = 3840;
 const PANO_H = 1648;
@@ -90,7 +114,8 @@ function outlineAssetUrl(url) {
   if (!url) return '';
   if (url.startsWith('http') || url.startsWith('/street/')) return url;
   const path = (url.startsWith('/') ? url : `/${url}`).replace(/@/g, '%40');
-  return `/street/outline${path}`;
+  const href = `/street/outline${path}`;
+  return href.includes('?') ? href : `${href}?v=clarity-54-1`;
 }
 
 function loadOutlineImage(url) {
@@ -112,12 +137,13 @@ function loadOutlineImage(url) {
 export function preloadOutlineAssets() {
   if (typeof window === 'undefined' || window.__streetOutlinesWarm) return;
   window.__streetOutlinesWarm = true;
-  fetch('/street/outline/outlines/manifest.json')
+  fetch('/street/outline/outlines/manifest.json?v=clarity-54-1')
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       (data?.objects || []).forEach((obj) => {
-        if (!obj?.selectable || !obj.id) return;
-        loadOutlineImage(`/outlines/objects/${obj.id}@2x.png`);
+        if (!obj?.selectable || !obj.raster?.url) return;
+        loadOutlineImage(obj.raster.url);
+        if (obj.glare?.url) loadOutlineImage(obj.glare.url);
       });
     })
     .catch(() => {
@@ -176,8 +202,8 @@ export default forwardRef(function StreetPanorama({
     recenter(onDone) {
       homeRef.current = typeof onDone === 'function' ? onDone : () => {};
     },
-    showOutline(id, raster) {
-      return outlineApiRef.current.showOutline?.(id, raster);
+    showOutline(id, outline) {
+      return outlineApiRef.current.showOutline?.(id, outline);
     },
     clearOutline() {
       outlineApiRef.current.clearOutline?.();
@@ -228,34 +254,53 @@ export default forwardRef(function StreetPanorama({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.uniform1i(gl.getUniformLocation(program, 'panorama'), 0);
 
-    const outlineTexture = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.uniform1i(gl.getUniformLocation(program, 'outlines'), 1);
+    const bindLayer = (unit, name, empty) => {
+      const handle = gl.createTexture();
+      gl.activeTexture(unit);
+      gl.bindTexture(gl.TEXTURE_2D, handle);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, empty);
+      gl.uniform1i(gl.getUniformLocation(program, name), unit - gl.TEXTURE0);
+      return handle;
+    };
+    const outlineTexture = bindLayer(gl.TEXTURE1, 'outlines', new Uint8Array([0, 0, 0, 0]));
+    const glareTexture = bindLayer(gl.TEXTURE2, 'glareMask', new Uint8Array([0, 0, 0, 0]));
     gl.activeTexture(gl.TEXTURE0);
 
     const sizeUniform = gl.getUniformLocation(program, 'viewport');
     const viewUniform = gl.getUniformLocation(program, 'view');
     const spanUniform = gl.getUniformLocation(program, 'yawSpan');
+    const timeUniform = gl.getUniformLocation(program, 'time');
     const outlineRectUniform = gl.getUniformLocation(program, 'outlineRect');
     const outlineActiveUniform = gl.getUniformLocation(program, 'outlineActive');
-    const timeUniform = gl.getUniformLocation(program, 'time');
+    const glareStageUniform = gl.getUniformLocation(program, 'glareStage');
     gl.uniform1f(outlineActiveUniform, 0);
     gl.uniform4f(outlineRectUniform, 0, 0, 1, 1);
+    gl.uniform2f(glareStageUniform, 0, 0);
     gl.uniform1f(timeUniform, 0);
 
     let selectedId = null;
     let highlightRequest = 0;
+    let effectStartedAt = 0;
     let ready = false;
     let presented = false;
     let dead = false;
     let frame = 0;
     let last = 0;
+
+    const uploadLayer = (handle, unit, image, dataTexture) => {
+      gl.activeTexture(unit);
+      gl.bindTexture(gl.TEXTURE_2D, handle);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, !dataTexture);
+      if (gl.UNPACK_COLORSPACE_CONVERSION_WEBGL != null) {
+        gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, dataTexture ? gl.NONE : gl.BROWSER_DEFAULT_WEBGL);
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    };
 
     const clearOutline = () => {
       highlightRequest += 1;
@@ -264,7 +309,8 @@ export default forwardRef(function StreetPanorama({
       gl.uniform1f(outlineActiveUniform, 0);
     };
 
-    const showOutline = async (id, raster) => {
+    const showOutline = async (id, outline) => {
+      const raster = outline?.raster || outline;
       if (dead || !id || !raster?.url || !raster.viewBox) {
         clearOutline();
         return false;
@@ -273,20 +319,24 @@ export default forwardRef(function StreetPanorama({
       const request = highlightRequest + 1;
       highlightRequest = request;
       try {
-        const image = await loadOutlineImage(raster.url);
+        const [image, glare] = await Promise.all([
+          loadOutlineImage(raster.url),
+          outline?.glare?.url ? loadOutlineImage(outline.glare.url) : Promise.resolve(null),
+        ]);
         if (dead || request !== highlightRequest || gl.isContextLost()) return false;
         gl.useProgram(program);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        uploadLayer(outlineTexture, gl.TEXTURE1, image, false);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, glareTexture);
+        if (glare) uploadLayer(glareTexture, gl.TEXTURE2, glare, true);
+        else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
         const [x, y, w, h] = raster.viewBox;
         gl.uniform4f(outlineRectUniform, x / PANO_W, y / PANO_H, w / PANO_W, h / PANO_H);
         gl.uniform1f(outlineActiveUniform, 1);
         selectedId = id;
+        effectStartedAt = performance.now();
         return true;
       } catch {
         if (request === highlightRequest) clearOutline();
@@ -381,6 +431,8 @@ export default forwardRef(function StreetPanorama({
       }
       viewRef.current = { yaw: current.yaw, pitch: current.pitch, fov, aspect };
       gl.viewport(0, 0, w, h);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, glareTexture);
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, outlineTexture);
       gl.activeTexture(gl.TEXTURE0);
@@ -389,6 +441,12 @@ export default forwardRef(function StreetPanorama({
       gl.uniform1f(spanUniform, (yawSpan * Math.PI) / 180);
       gl.uniform3f(viewUniform, current.yaw, current.pitch, fov);
       gl.uniform1f(timeUniform, time * 0.001);
+      if (selectedId) {
+        const stage = glareTimeline((time - effectStartedAt) / 1000);
+        gl.uniform2f(glareStageUniform, stage.glare, stage.sweep);
+      } else {
+        gl.uniform2f(glareStageUniform, 0, 0);
+      }
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (!presented) {
         presented = true;
@@ -422,6 +480,7 @@ export default forwardRef(function StreetPanorama({
       cancelAnimationFrame(frame);
       image?.removeEventListener('load', present);
       image?.removeEventListener('error', onError);
+      gl.deleteTexture(glareTexture);
       gl.deleteTexture(outlineTexture);
       gl.deleteTexture(texture);
       gl.deleteBuffer(buffer);
