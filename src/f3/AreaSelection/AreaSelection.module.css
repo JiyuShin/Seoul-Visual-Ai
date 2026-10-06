@@ -507,19 +507,64 @@
   mix-blend-mode: screen;
 }
 
-.qrFrame {
+.qrPair {
   position: absolute;
-  left: 1421px;
-  top: 672.486px;
-  width: 1039px;
-  height: 1038.029px;
+  left: 1940px;
+  top: 970px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 80px;
+  opacity: 0;
+  transform: translateX(calc(-50% + 40px));
+}
+
+.qrPair.qrPairOn {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+
+.qrSlot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qrNameTag {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  height: auto;
+  overflow: visible;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.qrNameTagNabi {
+  width: 423px;
+  transform: translateX(calc(-50% - 19px));
+}
+
+.qrNameTagSora {
+  width: 427px;
+  transform: translateX(calc(-50% - 21px));
+}
+
+.qrFrame {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 700px;
+  height: 700px;
   box-sizing: border-box;
   overflow: hidden;
   opacity: 0;
-  transform: translateX(80px) scale(0.85);
+  transform: scale(0.92);
   transform-origin: center;
   border: 1.781px solid #fff;
-  border-radius: 194.206px;
+  border-radius: 132px;
   box-shadow: 0 0 19.323px rgba(255, 255, 255, 0.78);
   background:
     radial-gradient(
@@ -543,25 +588,26 @@
 
 .qrFrame.qrOn {
   opacity: 1;
-  transform: translateX(0) scale(0.85);
+  transform: scale(1);
 }
 
 .qrImage {
   position: absolute;
-  left: 178.781px;
-  top: 175.781px;
-  width: 686px;
-  height: 691px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12.7%;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
 .qrImage img {
-  position: absolute;
-  left: -38.04%;
-  top: -37.06%;
-  width: 175.89%;
-  height: 174.65%;
-  max-width: none;
+  position: static;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-width: 100%;
 }
 
 /*
@@ -605,6 +651,18 @@
     inset -19.421px -19.421px 97.103px rgba(250, 151, 255, 0.58),
     inset 0 8.014px 5.343px #fff,
     inset -35.619px 0 36.687px rgba(254, 206, 255, 0.62),
+    inset 16.507px -23.305px 37.87px rgba(255, 255, 255, 0.6),
+    inset 0 8.905px 21.371px rgba(255, 203, 129, 0.88),
+    inset -3.562px -3.562px 15.405px rgba(255, 255, 255, 0.38),
+    inset -8.905px -8.905px 16.83px rgba(0, 0, 0, 0.25);
+}
+
+.qrGlowNabi {
+  box-shadow:
+    inset 0 22.262px 21.816px rgba(255, 255, 255, 0.74),
+    inset -19.421px -19.421px 97.103px rgba(142, 242, 105, 0.56),
+    inset 0 8.014px 5.343px #fff,
+    inset -35.619px 0 36.687px rgba(142, 242, 105, 0.56),
     inset 16.507px -23.305px 37.87px rgba(255, 255, 255, 0.6),
     inset 0 8.905px 21.371px rgba(255, 203, 129, 0.88),
     inset -3.562px -3.562px 15.405px rgba(255, 255, 255, 0.38),

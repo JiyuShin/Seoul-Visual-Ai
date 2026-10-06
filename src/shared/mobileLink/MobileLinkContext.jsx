@@ -20,7 +20,7 @@ import {
   readPersistedKioskSession,
 } from './kioskSessionPersist';
 import { normalizeLinkDistrict } from './normalizeDistrict';
-import { mergeSlotPlantFromState } from './slotPlants';
+import { mergeSlotPlantFromState, resolvePlantSlot } from './slotPlants';
 
 const MobileLinkContext = createContext(null);
 
@@ -137,14 +137,20 @@ export function MobileLinkProvider({ children }) {
   }, []);
 
   const connect = useCallback(
-    ({ sessionId: id, linkRole, district }) => {
+    ({ sessionId: id, linkRole, district, slot }) => {
       if (typeof window === 'undefined' || !id) return;
       manualCloseRef.current = false;
       setDisconnectedManually(false);
       disconnectInternal();
 
       const normalizedDistrict = normalizeLinkDistrict(district);
-      lastConnectRef.current = { sessionId: id, linkRole, district: normalizedDistrict };
+      const requestedSlot = slot === 'A' || slot === 'B' ? slot : null;
+      lastConnectRef.current = {
+        sessionId: id,
+        linkRole,
+        district: normalizedDistrict,
+        slot: requestedSlot,
+      };
       if (linkRole === 'kiosk' && normalizedDistrict) {
         setLinkDistrict(normalizedDistrict);
         setDistrictFromKiosk(normalizedDistrict);
@@ -179,11 +185,17 @@ export function MobileLinkProvider({ children }) {
             sessionId: id,
             role: linkRole,
             district: normalizedDistrict,
+            slot: requestedSlot,
           })
         );
         if (linkRole === 'mobile') {
           ws.send(
-            JSON.stringify({ type: 'claim', sessionId: id, clientId: readMobileClientId(id) })
+            JSON.stringify({
+              type: 'claim',
+              sessionId: id,
+              clientId: readMobileClientId(id),
+              slot: requestedSlot,
+            })
           );
         }
         if (linkRole === 'kiosk') {
@@ -234,7 +246,7 @@ export function MobileLinkProvider({ children }) {
           if (msg.payload?.district) {
             applyDistrict(msg.payload.district);
           }
-          const slot = msg.slot === 'A' || msg.slot === 'B' ? msg.slot : null;
+          const slot = resolvePlantSlot(msg.slot, msg.payload);
           if (linkRole === 'kiosk' && slot && msg.payload) {
             setSlotPlants((prev) => mergeSlotPlantFromState(prev, slot, msg.payload));
           }
@@ -329,9 +341,9 @@ export function MobileLinkProvider({ children }) {
   );
 
   const joinMobileSession = useCallback(
-    (id) => {
+    (id, slot) => {
       if (!id) return;
-      connect({ sessionId: id, linkRole: 'mobile' });
+      connect({ sessionId: id, linkRole: 'mobile', slot });
     },
     [connect]
   );
@@ -356,8 +368,12 @@ export function MobileLinkProvider({ children }) {
     const search = new URLSearchParams(window.location.search);
     const join = router.query.join ?? search.get('join');
     const id = typeof join === 'string' ? join : join?.[0];
-    if (!id || mobileJoinRef.current === id) return undefined;
-    mobileJoinRef.current = id;
+    const slotQuery = router.query.slot ?? search.get('slot');
+    const rawSlot = typeof slotQuery === 'string' ? slotQuery : slotQuery?.[0];
+    const requestedSlot = rawSlot === 'A' || rawSlot === 'B' ? rawSlot : null;
+    const joinKey = requestedSlot ? `${id}:${requestedSlot}` : id;
+    if (!id || mobileJoinRef.current === joinKey) return undefined;
+    mobileJoinRef.current = joinKey;
 
     const districtQuery = router.query.district ?? search.get('district');
     const districtName =
@@ -366,7 +382,7 @@ export function MobileLinkProvider({ children }) {
       applyDistrict(districtName);
     }
 
-    joinMobileSession(id);
+    joinMobileSession(id, requestedSlot);
     return () => {
       mobileJoinRef.current = null;
       disconnect();
@@ -384,6 +400,12 @@ export function MobileLinkProvider({ children }) {
   const qrTargetUrl = sessionId
     ? buildMobileJoinUrl(sessionId, qrOrigin, qrDistrictName)
     : '';
+  const qrTargetUrlA = sessionId
+    ? buildMobileJoinUrl(sessionId, qrOrigin, qrDistrictName, 'A')
+    : '';
+  const qrTargetUrlB = sessionId
+    ? buildMobileJoinUrl(sessionId, qrOrigin, qrDistrictName, 'B')
+    : '';
 
   const value = useMemo(
     () => ({
@@ -397,6 +419,8 @@ export function MobileLinkProvider({ children }) {
       lastError,
       mobilePublicOrigin,
       qrTargetUrl,
+      qrTargetUrlA,
+      qrTargetUrlB,
       startKioskSession,
       joinMobileSession,
       sendState,
@@ -414,6 +438,8 @@ export function MobileLinkProvider({ children }) {
       lastError,
       mobilePublicOrigin,
       qrTargetUrl,
+      qrTargetUrlA,
+      qrTargetUrlB,
       startKioskSession,
       joinMobileSession,
       sendState,

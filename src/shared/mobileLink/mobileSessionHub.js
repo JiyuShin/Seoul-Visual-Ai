@@ -52,7 +52,8 @@ function tellMobilePaired(sessionId, slot) {
   }
 }
 
-function pickSlot(room, clientId) {
+function pickSlot(room, clientId, requestedSlot) {
+  if (requestedSlot === 'A' || requestedSlot === 'B') return requestedSlot;
   const own = SLOTS.find((slot) => room[slot]?.clientId === clientId);
   if (own) return own;
   return SLOTS.find((slot) => !room[slot]) || null;
@@ -97,7 +98,7 @@ function attachMobileLinkClient(ws, meta) {
   let joinedSlot = null;
   let claimTimer = null;
 
-  const assignMobileSlot = (requestedClientId) => {
+  const assignMobileSlot = (requestedClientId, requestedSlot) => {
     if (joinedSlot || ws.readyState !== WebSocket.OPEN) return;
     const current = rooms.get(sessionId);
     if (!current) return;
@@ -105,12 +106,17 @@ function attachMobileLinkClient(ws, meta) {
       typeof requestedClientId === 'string' && requestedClientId
         ? requestedClientId
         : crypto.randomUUID();
-    const slot = pickSlot(current, clientId);
+    const slot = pickSlot(current, clientId, requestedSlot || meta.slot);
     if (!slot) {
       send(ws, { type: 'error', message: 'room full' });
       ws.close();
       return;
     }
+    SLOTS.forEach((other) => {
+      if (other !== slot && current[other]?.clientId === clientId) {
+        delete current[other];
+      }
+    });
     const previous = current[slot];
     if (previous?.ws && previous.ws !== ws) {
       send(previous.ws, { type: 'error', message: 'replaced' });
@@ -174,7 +180,7 @@ function attachMobileLinkClient(ws, meta) {
         clearTimeout(claimTimer);
         claimTimer = null;
       }
-      assignMobileSlot(msg.clientId);
+      assignMobileSlot(msg.clientId, msg.slot);
       return;
     }
 

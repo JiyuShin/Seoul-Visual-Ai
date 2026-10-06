@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: #c5d7ef url('/3/bg.png') center / cover no-repeat;
 }
 
 .fit {
@@ -24,7 +24,7 @@
   height: 2183px;
   transform-origin: top left;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   color: #363636;
   font-family: Pretendard, system-ui, sans-serif;
 }

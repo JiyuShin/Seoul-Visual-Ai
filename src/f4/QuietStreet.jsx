@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import styles from './PageFour.module.css';
 
 const DEG = Math.PI / 180;
@@ -59,7 +59,7 @@ export default function QuietStreet({ name, still = false, hold = false, onReady
   stillRef.current = still;
   holdRef.current = hold;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !name) return undefined;
     const gl = canvas.getContext('webgl', {
@@ -139,8 +139,9 @@ export default function QuietStreet({ name, still = false, hold = false, onReady
       frame = requestAnimationFrame(draw);
     };
 
-    const image = new Image();
-    image.onload = () => {
+    const cached = typeof window !== 'undefined' ? window.__districtStreet : null;
+    const image = cached?.name === name && cached.image ? cached.image : new Image();
+    const reveal = () => {
       if (dead) return;
       let source = image;
       const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
@@ -165,13 +166,20 @@ export default function QuietStreet({ name, still = false, hold = false, onReady
       }, 1600);
       onReadyRef.current?.();
     };
-    image.src = `/api/district-street?name=${encodeURIComponent(name)}&v=2`;
+    if (image.complete && image.naturalWidth) {
+      reveal();
+    } else {
+      image.addEventListener('load', reveal, { once: true });
+      if (!image.getAttribute('src')) {
+        image.src = `/api/district-street?name=${encodeURIComponent(name)}&v=2`;
+      }
+    }
 
     return () => {
       dead = true;
       if (sharpenTimer) window.clearTimeout(sharpenTimer);
       if (frame) cancelAnimationFrame(frame);
-      image.onload = null;
+      image.removeEventListener('load', reveal);
     };
   }, [name]);
 

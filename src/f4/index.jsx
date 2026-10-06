@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useEntryFlow } from '../shared/EntryFlowContext';
 import { useMobileLink } from '../shared/mobileLink/MobileLinkContext';
@@ -33,6 +33,23 @@ const PLACEHOLDER_PLANTS = [
   { name: '금목서향새싹', image: '/4/plant-right.png', tone: 'lilac' },
 ];
 
+/** 모바일과 같은 짝. 슬롯이 뒤바뀌어 들어와도 이 그림이 그 자리에 가게 한다. */
+const PLANT_PAIR_BY_DISTRICT = {
+  종로구: ['jongno-a', 'jongno-b'],
+  마포구: ['mapo-b', 'mapo-c'],
+  강남구: ['gangnam-a', 'gangnam-b'],
+};
+
+function liveForSide(slotPlants, districtName, side) {
+  const pair = PLANT_PAIR_BY_DISTRICT[districtName] || PLANT_PAIR_BY_DISTRICT.종로구;
+  const want = pair[side === 'B' ? 1 : 0];
+  const fromA = slotPlants?.A;
+  const fromB = slotPlants?.B;
+  if (fromA?.plantVariant === want) return fromA;
+  if (fromB?.plantVariant === want) return fromB;
+  return slotPlants?.[side] ?? {};
+}
+
 function readStoredPlace() {
   try {
     const stored = sessionStorage.getItem('seoul-district') || '';
@@ -55,11 +72,13 @@ export default function PageFour() {
   const travelStarted = useRef(false);
   const kioskEnsured = useRef(false);
 
-  useEffect(() => {
-    if (!router.isReady) return;
+  useLayoutEffect(() => {
     const queryName = typeof router.query.district === 'string' ? router.query.district : '';
+    const fromUrl = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('district') || ''
+      : '';
     const contextName = selectedDistrict?.name || '';
-    const next = [queryName, contextName, readStoredPlace()].find((item) => PLACES.includes(item)) || '종로구';
+    const next = [queryName, fromUrl, contextName, readStoredPlace()].find((item) => PLACES.includes(item)) || '종로구';
     setPlaceName((current) => (current === next ? current : next));
   }, [router.isReady, router.query.district, selectedDistrict]);
 
@@ -141,7 +160,7 @@ export default function PageFour() {
     () =>
       ['A', 'B'].map((slotKey, index) => {
         const fallback = PLACEHOLDER_PLANTS[index];
-        const live = slotPlants[slotKey];
+        const live = liveForSide(slotPlants, placeName, slotKey);
         const plantImage = KIOSK_PLANT_IMAGES[live?.plantVariant] || live?.plantImage;
         const drawingUrl = plantImage ? null : live?.drawingUrl;
         return {
@@ -153,7 +172,7 @@ export default function PageFour() {
           isPicked: Boolean(plantImage),
         };
       }),
-    [slotPlants]
+    [slotPlants, placeName]
   );
 
   return (

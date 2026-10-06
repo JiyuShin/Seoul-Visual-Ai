@@ -24,6 +24,40 @@ function districtByName(name) {
   return DISTRICTS.find((item) => item.name === name) || null;
 }
 
+function preloadDistrictStreet(name) {
+  if (typeof window === 'undefined' || !name) return Promise.resolve();
+  const cached = window.__districtStreet;
+  if (cached?.name === name && cached.image?.complete && cached.image.naturalWidth) {
+    return Promise.resolve(cached.image);
+  }
+  const image = cached?.name === name && cached.image ? cached.image : new Image();
+  if (cached?.name !== name) {
+    image.decoding = 'async';
+    image.src = `/api/district-street?name=${encodeURIComponent(name)}&v=2`;
+    window.__districtStreet = { name, image };
+  }
+  if (image.complete) return Promise.resolve(image);
+  return new Promise((resolve) => {
+    const done = () => resolve(image);
+    image.addEventListener('load', done, { once: true });
+    image.addEventListener('error', done, { once: true });
+  });
+}
+
+function leaveToFour(router, name) {
+  const href = `/4?district=${encodeURIComponent(name)}`;
+  const go = () => router.push(href);
+  if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') {
+    go();
+    return;
+  }
+  document.documentElement.classList.add('fail-four-transition');
+  const transition = document.startViewTransition(() => go());
+  transition.finished.finally(() => {
+    document.documentElement.classList.remove('fail-four-transition');
+  });
+}
+
 function tokenStyle(placement, colored) {
   return {
     left: `${placement.x}px`,
@@ -147,14 +181,20 @@ const QR_BORDER_SHADOWS = [
   { x: -3.562, y: -3.562, blur: 15.405, color: 'rgba(255, 255, 255, 0.38)' },
   { x: -8.905, y: -8.905, blur: 16.83, color: 'rgba(0, 0, 0, 0.25)' },
 ];
+const QR_BORDER_SHADOWS_NABI = QR_BORDER_SHADOWS.map((shadow) =>
+  shadow.color.startsWith('rgba(250, 151, 255') || shadow.color.startsWith('rgba(254, 206, 255')
+    ? { ...shadow, color: 'rgba(142, 242, 105, 0.56)' }
+    : shadow
+);
 const QR_BORDER_TURN_MS = 5000;
 
-function QrBorder() {
+function QrBorder({ tone = 'sora' }) {
   const borderRef = useRef(null);
 
   useEffect(() => {
     const border = borderRef.current;
     if (!border) return undefined;
+    const shadows = tone === 'nabi' ? QR_BORDER_SHADOWS_NABI : QR_BORDER_SHADOWS;
     const started = performance.now();
     let frame;
 
@@ -162,7 +202,7 @@ function QrBorder() {
       const angle = (((now - started) % QR_BORDER_TURN_MS) / QR_BORDER_TURN_MS) * Math.PI * 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      border.style.boxShadow = QR_BORDER_SHADOWS.map((shadow) => {
+      border.style.boxShadow = shadows.map((shadow) => {
         const x = shadow.x * cos - shadow.y * sin;
         const y = shadow.x * sin + shadow.y * cos;
         return `inset ${x.toFixed(2)}px ${y.toFixed(2)}px ${shadow.blur}px ${shadow.color}`;
@@ -172,9 +212,14 @@ function QrBorder() {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [tone]);
 
-  return <div ref={borderRef} className={styles.qrGlow} />;
+  return (
+    <div
+      ref={borderRef}
+      className={`${styles.qrGlow} ${tone === 'nabi' ? styles.qrGlowNabi : ''}`}
+    />
+  );
 }
 
 /**
@@ -224,7 +269,7 @@ function FailQrImage({ url }) {
 export default function FailScreen() {
   const router = useRouter();
   const { selectedDistrict } = useEntryFlow();
-  const { slots, qrTargetUrl, sessionId, startKioskSession, slotPlants, role, sendState } =
+  const { slots, qrTargetUrlA, qrTargetUrlB, sessionId, startKioskSession, slotPlants, role, sendState } =
     useMobileLink();
   const [scale, setScale] = useState(1);
   const [district, setDistrict] = useState(DISTRICTS[0]);
@@ -254,8 +299,10 @@ export default function FailScreen() {
   useEffect(() => {
     if (!district?.name) return undefined;
     startKioskSession(district);
+    router.prefetch(`/4?district=${encodeURIComponent(district.name)}`).catch(() => {});
+    preloadDistrictStreet(district.name);
     return undefined;
-  }, [district?.name, startKioskSession]);
+  }, [district?.name, startKioskSession, router]);
 
   useEffect(() => {
     if (!district?.name || !sessionId || role !== 'kiosk') return undefined;
@@ -277,7 +324,7 @@ export default function FailScreen() {
     const timer = window.setTimeout(() => {
       if (advancedToFourRef.current) return;
       advancedToFourRef.current = true;
-      router.push(`/4?district=${encodeURIComponent(district.name)}`);
+      preloadDistrictStreet(district.name).finally(() => leaveToFour(router, district.name));
     }, 1400);
     return () => window.clearTimeout(timer);
   }, [router.isReady, bothJoined, district?.name, role, router]);
@@ -287,7 +334,7 @@ export default function FailScreen() {
     const timer = window.setTimeout(() => {
       if (advancedForSentRef.current) return;
       advancedForSentRef.current = true;
-      router.push(`/4?district=${encodeURIComponent(district.name)}`);
+      preloadDistrictStreet(district.name).finally(() => leaveToFour(router, district.name));
     }, 800);
     return () => window.clearTimeout(timer);
   }, [router.isReady, bothSent, district?.name, router]);
@@ -311,12 +358,24 @@ export default function FailScreen() {
           <div className={arc.rouletteLayer}>
             <StillRoulette logoIndex={district.logoIndex} />
           </div>
-          {qrTargetUrl ? (
-            <div className={styles.qrFrame}>
-              <div className={styles.qrImageLive}>
-                <FailQrImage url={qrTargetUrl} />
+          {qrTargetUrlA || qrTargetUrlB ? (
+            <div className={styles.qrPair}>
+              <div className={styles.qrSlot}>
+                <div className={styles.qrFrame}>
+                  <div className={styles.qrImageLive}>
+                    <FailQrImage url={qrTargetUrlA} />
+                  </div>
+                  <QrBorder tone="nabi" />
+                </div>
               </div>
-              <QrBorder />
+              <div className={styles.qrSlot}>
+                <div className={styles.qrFrame}>
+                  <div className={styles.qrImageLive}>
+                    <FailQrImage url={qrTargetUrlB} />
+                  </div>
+                  <QrBorder />
+                </div>
+              </div>
             </div>
           ) : null}
           <p className={styles.title}>{title}</p>

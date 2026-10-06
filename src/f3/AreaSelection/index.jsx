@@ -377,11 +377,17 @@ const QR_BORDER_SHADOWS = [
   { x: -3.562, y: -3.562, blur: 15.405, color: 'rgba(255, 255, 255, 0.38)' },
   { x: -8.905, y: -8.905, blur: 16.83, color: 'rgba(0, 0, 0, 0.25)' },
 ];
+const QR_BORDER_SHADOWS_NABI = QR_BORDER_SHADOWS.map((shadow) =>
+  shadow.color.startsWith('rgba(250, 151, 255') || shadow.color.startsWith('rgba(254, 206, 255')
+    ? { ...shadow, color: 'rgba(142, 242, 105, 0.56)' }
+    : shadow
+);
 const QR_BORDER_TURN_MS = 5000;
 const MAP_FADE_OUT_MS = 1800;
 
-function QrBorder() {
+function QrBorder({ tone = 'sora' }) {
   const borderRef = useRef(null);
+  const shadows = tone === 'nabi' ? QR_BORDER_SHADOWS_NABI : QR_BORDER_SHADOWS;
 
   useEffect(() => {
     const border = borderRef.current;
@@ -392,7 +398,7 @@ function QrBorder() {
       const angle = (((now - started) % QR_BORDER_TURN_MS) / QR_BORDER_TURN_MS) * Math.PI * 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      border.style.boxShadow = QR_BORDER_SHADOWS.map((shadow) => {
+      border.style.boxShadow = shadows.map((shadow) => {
         const x = shadow.x * cos - shadow.y * sin;
         const y = shadow.x * sin + shadow.y * cos;
         return `inset ${x.toFixed(2)}px ${y.toFixed(2)}px ${shadow.blur}px ${shadow.color}`;
@@ -402,12 +408,52 @@ function QrBorder() {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [shadows]);
 
-  return <div ref={borderRef} className={styles.qrGlow} />;
+  return (
+    <div
+      ref={borderRef}
+      className={`${styles.qrGlow} ${tone === 'nabi' ? styles.qrGlowNabi : ''}`}
+    />
+  );
 }
 
-function QrCopy({ phase, qrUrl, joinedCount = 0 }) {
+function QrNameTag({ tone }) {
+  const src = tone === 'nabi' ? '/3/qr-tag-nabi.svg' : '/3/qr-tag-sora.svg';
+
+  return (
+    <img
+      className={`${styles.qrNameTag} ${tone === 'nabi' ? styles.qrNameTagNabi : styles.qrNameTagSora}`}
+      src={src}
+      alt=""
+      aria-hidden="true"
+    />
+  );
+}
+
+function QrCard({ url, label, live, revealed, tone = 'sora' }) {
+  return (
+    <div className={styles.qrSlot}>
+      <QrNameTag tone={tone} />
+      <div className={`${styles.qrFrame} ${revealed ? styles.qrOn : ''}`}>
+        <div className={live ? styles.qrImageLive : styles.qrImage}>
+          {live ? (
+            url ? (
+              <DynamicQrCode url={url} alt={`${label} 연결 QR 코드`} tone="light" />
+            ) : (
+              <div className={styles.qrImageLiveLoading} aria-hidden="true" />
+            )
+          ) : (
+            <img src="/3/qr.png" alt="" aria-hidden="true" />
+          )}
+        </div>
+        <QrBorder tone={tone} />
+      </div>
+    </div>
+  );
+}
+
+function QrCopy({ phase, qrUrlA, qrUrlB, joinedCount = 0 }) {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -437,26 +483,16 @@ function QrCopy({ phase, qrUrl, joinedCount = 0 }) {
       <p className={`${styles.qrBody} ${motion}`}>
         이제 모든 준비는 끝났어요! 화면 속 QR를 인식해 휴대폰으로 직접 식물을 그려볼 차례예요.
         <br />
-        여러분이 원하는 서울 속 나만의 식물을 심으러 가볼까요?
+        각자의 이름이 적힌 Qr로 접속해주세요!
       </p>
-      <div className={`${styles.qrFrame} ${revealed ? styles.qrOn : ''}`}>
-        <div className={phase === 'q' ? styles.qrImageLive : styles.qrImage}>
-          {phase === 'q' ? (
-            qrUrl ? (
-              <DynamicQrCode url={qrUrl} alt="모바일 연결 QR 코드" tone="light" />
-            ) : (
-              <div className={styles.qrImageLiveLoading} aria-hidden="true" />
-            )
-          ) : (
-            <img src="/3/qr.png" alt="" aria-hidden="true" />
-          )}
-        </div>
-        <QrBorder />
+      <div className={`${styles.qrPair} ${revealed ? styles.qrPairOn : ''}`}>
+        <QrCard url={qrUrlA} label="NABI" tone="nabi" live={phase === 'q'} revealed={revealed} />
+        <QrCard url={qrUrlB} label="SORA" live={phase === 'q'} revealed={revealed} />
       </div>
       {phase === 'q' && joinedCount > 0 ? (
         <p className={`${styles.resultBody} ${motion} ${styles.qrJoinStatus}`} role="status">
           모바일 접속 {joinedCount}/2
-          {joinedCount < 2 ? ' · 두 번째 기기도 같은 QR로 접속해 주세요' : ' · 잠시 후 다음 화면으로 이동합니다'}
+          {joinedCount < 2 ? ' · 아직 안 찍은 쪽 QR을 찍어 주세요' : ' · 잠시 후 다음 화면으로 이동합니다'}
         </p>
       ) : null}
     </>
@@ -466,13 +502,12 @@ function QrCopy({ phase, qrUrl, joinedCount = 0 }) {
 export default function AreaSelection() {
   const router = useRouter();
   const { setSelectedDistrict } = useEntryFlow();
-  const { startKioskSession, qrTargetUrl, slots } = useMobileLink();
+  const { startKioskSession, qrTargetUrlA, qrTargetUrlB, slots } = useMobileLink();
   const kioskSessionRef = useRef(false);
   const [phase, setPhase] = useState('f');
   const [districtIndex, setDistrictIndex] = useState(0);
   const [districtReady, setDistrictReady] = useState(false);
   const district = DISTRICTS[districtIndex];
-  const displayQrUrl = qrTargetUrl;
   const joinedCount = Number(slots.A) + Number(slots.B);
 
   const finishFinding = useCallback((landedOffset) => {
@@ -559,7 +594,7 @@ export default function AreaSelection() {
       <MovingMap phase={phase} />
       <SelectedCopy district={district} phase={phase} />
       {phase !== 'f' && <DistrictGlow district={district} hidden={phase !== 's'} />}
-      <QrCopy phase={phase} qrUrl={displayQrUrl} joinedCount={joinedCount} />
+      <QrCopy phase={phase} qrUrlA={qrTargetUrlA} qrUrlB={qrTargetUrlB} joinedCount={joinedCount} />
     </Stage>
   );
 }

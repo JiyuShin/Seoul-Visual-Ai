@@ -48,13 +48,14 @@ export async function resolveMobilePublicOrigin() {
   return `${protocol}//${hostname}${portSuffix}`;
 }
 
-export function buildMobileJoinUrl(sessionId, originBase, districtName) {
+export function buildMobileJoinUrl(sessionId, originBase, districtName, slot) {
   if (!sessionId) return '';
   const base = (originBase || getMobilePublicOriginSync()).replace(/\/$/, '');
-  const join = `${base}/mobile?join=${encodeURIComponent(sessionId)}`;
+  let join = `${base}/mobile?join=${encodeURIComponent(sessionId)}`;
   const name = typeof districtName === 'string' ? districtName.trim() : '';
-  if (!name) return join;
-  return `${join}&district=${encodeURIComponent(name)}`;
+  if (name) join += `&district=${encodeURIComponent(name)}`;
+  if (slot === 'A' || slot === 'B') join += `&slot=${slot}`;
+  return join;
 }
 
 export function isLikelyLocalhostQr(originBase) {

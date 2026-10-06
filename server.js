@@ -77,6 +77,7 @@ app.prepare().then(() => {
         sessionId: msg.sessionId,
         role: msg.role,
         district: msg.district ?? null,
+        slot: msg.slot === 'A' || msg.slot === 'B' ? msg.slot : null,
       });
     });
 
