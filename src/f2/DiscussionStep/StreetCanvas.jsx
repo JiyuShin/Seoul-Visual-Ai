@@ -1,7 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { useEntryFlow } from '../../shared/EntryFlowContext';
 import { VIEWER_BY_CAM } from '../../shared/gaze/participants';
-import StreetPanorama from './StreetPanorama';
+import StreetPanorama, { preloadOutlineAssets } from './StreetPanorama';
+import { screenToWorld } from './streetLook';
 import styles from './StreetCanvas.module.css';
 
 const STAGE_W = 3881;
@@ -112,11 +113,95 @@ function originFor(slot, index, marks) {
   return { ...slotPoint(slot, 1.65), fromMark: false };
 }
 const PLANT_DWELL_MS = 3000;
-const PLANT_STILL = 0.06;
-const PLANT_GRACE_MS = 260;
+const SELECT_URL = '/street/outline/api/segmentation/select';
+const SELECT_MS = 100;
+const PANO_W = 3840;
+const PANO_H = 1648;
 
-function distance(x1, y1, x2, y2) {
-  return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+function screenToUv(nx, ny, view) {
+  const t = Math.tan(view.fov * 0.5);
+  let rx = (2 * nx - 1) * view.aspect * t;
+  let ry = (1 - 2 * ny) * t;
+  let rz = 1;
+  const n = Math.hypot(rx, ry, rz) || 1;
+  rx /= n;
+  ry /= n;
+  rz /= n;
+  const cp = Math.cos(view.pitch);
+  const sp = Math.sin(view.pitch);
+  [ry, rz] = [cp * ry + sp * rz, -sp * ry + cp * rz];
+  const cy = Math.cos(view.yaw);
+  const sy = Math.sin(view.yaw);
+  [rx, rz] = [cy * rx + sy * rz, -sy * rx + cy * rz];
+  const u = 0.5 + Math.atan2(rx, rz) / (Math.PI * 2);
+  return {
+    u: ((u % 1) + 1) % 1,
+    v: 0.5 - Math.asin(Math.max(-1, Math.min(1, ry))) / Math.PI,
+  };
+}
+
+function uvToScreen(u, v, view) {
+  const lon = (u - 0.5) * Math.PI * 2;
+  const lat = (0.5 - v) * Math.PI;
+  let x = Math.cos(lat) * Math.sin(lon);
+  let y = Math.sin(lat);
+  let z = Math.cos(lat) * Math.cos(lon);
+  const cy = Math.cos(view.yaw);
+  const sy = Math.sin(view.yaw);
+  [x, z] = [cy * x - sy * z, sy * x + cy * z];
+  const cp = Math.cos(view.pitch);
+  const sp = Math.sin(view.pitch);
+  [y, z] = [cp * y - sp * z, sp * y + cp * z];
+  if (z <= 0) return null;
+  const t = Math.tan(view.fov * 0.5);
+  const ndcX = x / (z * view.aspect * t);
+  const ndcY = y / (z * t);
+  if (ndcX < -1.08 || ndcX > 1.08 || ndcY < -1.08 || ndcY > 1.08) return null;
+  return { x: (ndcX + 1) / 2, y: (1 - ndcY) / 2 };
+}
+
+function pixelToScreen(x, y, view) {
+  return uvToScreen(x / PANO_W, y / PANO_H, view);
+}
+
+function uvInBbox(uv, obj) {
+  const [x, y, w, h] = obj.bbox || [];
+  if (!w || !h) return false;
+  const px = uv.u * PANO_W;
+  const py = uv.v * PANO_H;
+  return px >= x && px < x + w && py >= y && py < y + h;
+}
+
+function snapFromObject(obj, view) {
+  const [x, y, w, h] = obj.bbox || [];
+  if (!w || !h) return null;
+  const center = pixelToScreen(x + w / 2, y + h / 2, view);
+  if (!center) return null;
+  return {
+    ...obj,
+    dir: screenToWorld(center.x, center.y, view.yaw, view.pitch, view.fov, view.aspect),
+    sx: center.x,
+    sy: center.y,
+    dist: 0,
+  };
+}
+
+function attractToSnap(nx, ny, snap) {
+  if (!snap) return null;
+  const pull = 0.58;
+  return {
+    x: nx + (snap.sx - nx) * pull,
+    y: ny + (snap.sy - ny) * pull,
+    pull,
+  };
+}
+
+function normToPixels(nx, ny, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: rect.left + nx * rect.width,
+    y: rect.top + ny * rect.height,
+  };
 }
 
 const INTRO_SWEEP_MS = 12000;
@@ -537,6 +622,8 @@ const StreetCanvas = forwardRef(function StreetCanvas({
     return () => cancelAnimationFrame(frame);
   }, [finaleFull]);
   const lookRef = useRef(null);
+  const hoverRef = useRef({ u: null, v: null });
+  const selectedRef = useRef(null);
   const introLockRef = useRef(true);
   if (revealed) introLockRef.current = false;
   const holdLookRef = useRef(false);
@@ -552,6 +639,65 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   const [pendingCircle, setPendingCircle] = useState(null);
 
   viewerRef.current = activeViewerId;
+  const selectKickRef = useRef(() => {});
+
+  useEffect(() => {
+    preloadOutlineAssets();
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'gaze') {
+      selectedRef.current = null;
+      selectKickRef.current = () => {};
+      panoramaRef.current?.clearOutline();
+      return undefined;
+    }
+    let alive = true;
+    let inflight = false;
+    let generation = 0;
+    let lastKey = '';
+    const poll = async () => {
+      if (!alive || inflight) return;
+      const { u, v } = hoverRef.current;
+      if (u == null || v == null) return;
+      const key = `${u.toFixed(3)},${v.toFixed(3)}`;
+      inflight = true;
+      const gen = ++generation;
+      lastKey = key;
+      try {
+        const res = await fetch(`${SELECT_URL}?u=${u.toFixed(4)}&v=${v.toFixed(4)}`);
+        const data = res.ok ? await res.json() : null;
+        if (!alive || gen !== generation) return;
+        const obj = data?.selected?.outline?.selectable ? data.selected : null;
+        selectedRef.current = obj;
+        if (!obj) panoramaRef.current?.clearOutline();
+        else await panoramaRef.current?.showOutline(obj.id, obj.outline);
+      } catch {
+        if (alive && gen === generation) {
+          selectedRef.current = null;
+          panoramaRef.current?.clearOutline();
+        }
+      } finally {
+        inflight = false;
+        const latest = hoverRef.current;
+        if (alive && latest.u != null && `${latest.u.toFixed(3)},${latest.v.toFixed(3)}` !== lastKey) {
+          void poll();
+        }
+      }
+    };
+    selectKickRef.current = () => {
+      void poll();
+    };
+    const timer = window.setInterval(poll, SELECT_MS);
+    poll();
+    return () => {
+      alive = false;
+      selectKickRef.current = () => {};
+      window.clearInterval(timer);
+      selectedRef.current = null;
+      panoramaRef.current?.clearOutline();
+    };
+  }, [phase]);
 
   useImperativeHandle(ref, () => ({
     recenter(onDone, { release = true } = {}) {
@@ -594,6 +740,7 @@ const StreetCanvas = forwardRef(function StreetCanvas({
   const clearPending = useCallback(() => {
     pendingRef.current = null;
     setPendingCircle(null);
+    panoramaRef.current?.clearOutline();
   }, []);
 
   const hitMark = useCallback((x, y) => {
@@ -627,7 +774,9 @@ const StreetCanvas = forwardRef(function StreetCanvas({
     const markId = lockedId || (rect
       ? hitMark(rect.left + anchorX * rect.width, rect.top + anchorY * rect.height)
       : null);
-    const direction = panoramaRef.current?.directionAt(anchorX, anchorY) || [0, 0, 1];
+    const direction = pendingRef.current?.direction
+      || panoramaRef.current?.directionAt(anchorX, anchorY)
+      || [0, 0, 1];
     clearPending();
     onPlantRef.current?.({ direction, nx: anchorX, ny: anchorY, markId });
   }, [clearPending, hitMark]);
@@ -639,6 +788,10 @@ const StreetCanvas = forwardRef(function StreetCanvas({
       }
       const norm = screenToNormalized(x, y);
       if (norm && !holdLookRef.current) lookRef.current = { nx: norm.x, ny: norm.y, source };
+      const view = panoramaRef.current?.viewNow?.();
+      const uv = norm && view ? screenToUv(norm.x, norm.y, view) : null;
+      if (uv) hoverRef.current = uv;
+
       if (!norm || phaseRef.current !== 'gaze' || (!repeatRef.current && plantedRef.current)) {
         if (phaseRef.current !== 'gaze') clearPending();
         return { dwellProgress: 0, target: null };
@@ -646,35 +799,45 @@ const StreetCanvas = forwardRef(function StreetCanvas({
 
       const now = Date.now();
       const pending = pendingRef.current;
-      const inZone = (anchor) =>
-        distance(anchor.anchorX, anchor.anchorY, norm.x, norm.y) < PLANT_STILL;
+      if (uv) selectKickRef.current();
+      const hit = uv && selectedRef.current && uvInBbox(uv, selectedRef.current)
+        ? selectedRef.current
+        : null;
+      const snap = hit && view ? snapFromObject(hit, view) : null;
+      const pulled = snap ? attractToSnap(norm.x, norm.y, snap) : null;
+      const canvas = canvasRef.current;
+      const cursor = pulled && canvas ? normToPixels(pulled.x, pulled.y, canvas) : null;
+      const cursorPos = cursor ? { cursorX: cursor.x, cursorY: cursor.y } : {};
 
-      if (pending && inZone(pending)) pending.lastInZoneAt = now;
-      const still =
-        pending && (inZone(pending) || now - pending.lastInZoneAt <= PLANT_GRACE_MS);
+      if (!pulled || !snap) {
+        pendingRef.current = null;
+        setPendingCircle(null);
+        return { dwellProgress: 0, target: 'canvas', ...cursorPos };
+      }
 
-      if (!still) {
+      const same = pending && pending.objectId === snap.id;
+      if (!same) {
         pendingRef.current = {
-          anchorX: norm.x,
-          anchorY: norm.y,
+          objectId: snap.id,
+          direction: snap.dir,
+          anchorX: snap.sx,
+          anchorY: snap.sy,
           since: now,
           lastInZoneAt: now,
           markId: hitMark(x, y),
         };
-        setPendingCircle({ x: norm.x, y: norm.y, progress: 0 });
-        return { dwellProgress: 0, target: 'canvas' };
+        setPendingCircle({ x: snap.sx, y: snap.sy, progress: 0, zone: snap.id });
+        return { dwellProgress: 0, target: 'canvas', ...cursorPos };
       }
 
-      pendingRef.current = {
-        ...pending,
-        anchorX: norm.x,
-        anchorY: norm.y,
-        lastInZoneAt: now,
-      };
+      pending.direction = snap.dir;
+      pending.anchorX = snap.sx;
+      pending.anchorY = snap.sy;
+      pending.lastInZoneAt = now;
       const elapsed = now - pending.since;
       const dwellProgress = Math.min(1, elapsed / PLANT_DWELL_MS);
-      setPendingCircle({ x: norm.x, y: norm.y, progress: dwellProgress });
-      return { dwellProgress, target: 'canvas' };
+      setPendingCircle({ x: snap.sx, y: snap.sy, progress: dwellProgress, zone: snap.id });
+      return { dwellProgress, target: 'canvas', ...cursorPos };
   }, [clearPending, hitMark, screenToNormalized]);
 
   const handleGaze = useCallback(
@@ -695,10 +858,12 @@ const StreetCanvas = forwardRef(function StreetCanvas({
       if (phaseRef.current === 'gaze' && viewerRef.current === VIEWER_BY_CAM.A) return;
       window.__seoulPointerOwnsGaze = performance.now() + 4500;
       const viewerId = viewerRef.current;
+      const result = applyPoint(event.clientX, event.clientY);
+      const px = result?.cursorX ?? event.clientX;
+      const py = result?.cursorY ?? event.clientY;
       if (gazeRef.current && viewerId) {
-        gazeRef.current[viewerId] = { x: event.clientX, y: event.clientY, at: Date.now() };
+        gazeRef.current[viewerId] = { x: px, y: py, at: Date.now() };
       }
-      applyPoint(event.clientX, event.clientY);
     };
     window.addEventListener('pointermove', onMove, true);
     return () => window.removeEventListener('pointermove', onMove, true);
@@ -742,10 +907,11 @@ const StreetCanvas = forwardRef(function StreetCanvas({
       const now = Date.now();
       if (now - lastPaint > 70) {
         lastPaint = now;
-        setPendingCircle((prev) => {
-          if (!prev) return prev;
-          if (Math.abs((prev.progress || 0) - progress) < 0.025 && progress < 1) return prev;
-          return { x: pending.anchorX, y: pending.anchorY, progress };
+        setPendingCircle({
+          x: pending.anchorX,
+          y: pending.anchorY,
+          progress,
+          zone: pending.objectId,
         });
       }
       if (elapsed >= PLANT_DWELL_MS) finishPlant(pending.anchorX, pending.anchorY);

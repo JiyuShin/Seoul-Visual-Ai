@@ -36,6 +36,8 @@ const DWELL_SHRINK = 0.8;
 // 응시 게이지: 12시에서 시계 방향으로 차오르는 호. 반지름(px)·두께(px).
 const GAUGE_RADIUS = 32;
 const GAUGE_WIDTH = 2.5;
+// 시선 좌표를 바로 쓰지 않고 이 시간상수로 따라간다. 클수록 더 느리고 자석처럼 붙는다.
+const FOLLOW_TAU_MS = 160;
 /* ──────────────────────────────── */
 
 function smoothstep(from, to, value) {
@@ -199,6 +201,7 @@ export default function GazeReticle({
 }) {
   const elRef = useRef(null);
   const canvasRef = useRef(null);
+  const followRef = useRef(null);
   const dwellRef = useRef(dwellProgress);
   dwellRef.current = dwellProgress;
   const colorRef = useRef(color);
@@ -261,11 +264,22 @@ export default function GazeReticle({
         const gaze = gazeRef.current?.[viewerId];
         if (!gaze) {
           el.style.opacity = '0';
+          followRef.current = null;
           return;
         }
         el.style.opacity = '1';
-        el.style.left = `${gaze.x}px`;
-        el.style.top = `${gaze.y}px`;
+        const prev = followRef.current;
+        if (!prev) {
+          followRef.current = { x: gaze.x, y: gaze.y, t: now };
+        } else {
+          const dt = Math.min(48, Math.max(0, now - prev.t));
+          const k = 1 - Math.exp(-dt / FOLLOW_TAU_MS);
+          prev.x += (gaze.x - prev.x) * k;
+          prev.y += (gaze.y - prev.y) * k;
+          prev.t = now;
+        }
+        el.style.left = `${followRef.current.x}px`;
+        el.style.top = `${followRef.current.y}px`;
       }
 
       ctx.fillStyle = '#ffffff';
