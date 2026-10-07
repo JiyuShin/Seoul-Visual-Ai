@@ -1,0 +1,57 @@
+---
+description: 전시 맥의 라즈베리파이 연결 상태(마이크·눈 카메라 시선). 이 맥에서 서버·크롬·브랜치를 건드리기 전에 읽는다.
+alwaysApply: true
+---
+
+# 라즈베리파이 연결 (2026-10-07 작업)
+
+이 폴더(`~/Downloads/Seoul-Visual-Ai-main`)가 전시 맥에서 실제로 도는 전시다. 아래는 이 맥에 적용된 상태이고, 모르고 되돌리면 Pi 마이크가 조용히 꺼진다.
+
+## 지금 이 맥의 상태
+
+- 브랜치: **`pi-mic`** (PR #8, draft). `main` 으로 바꾸면 Pi 마이크 코드가 사라진다.
+- 크롬: **155** (`/Applications/Google Chrome.app`). 이전 127 은 `~/Downloads/Google Chrome 127 백업.app`.
+- `.env` (git 에 없음): `NEXT_PUBLIC_MIC_SOURCE=pi`, `PI_MIC_URL=http://192.168.86.226:8080`, `PI_MIC_MODE=always`
+- Pi(`eye-pi-1`, `192.168.86.226`): 8080 = 마이크·IMU 대시보드(`eye-pi-sensor-test`), 8000 = 눈 카메라(`EyeTracker-pi` 의 `pi.py`)
+- `README.md`, `전시 시작.command` 에 커밋되지 않은 로컬 변경이 있다 (실행 앱 설치). 다른 사람 작업이니 버리지 않는다. 백업: `git stash list` 의 "전시맥 로컬 변경".
+
+## Pi 마이크 (켜져 있음)
+
+`/2` 토론의 음성 입력이 Pi 마이크로 들어온다. 설명은 README 의 "라즈베리파이 마이크".
+
+```
+Pi server.py GET /api/audio (16kHz PCM)
+→ 맥 server.js: src/shared/piMic/piMicHub.js → 웹소켓 /ws/pi-mic
+→ 브라우저: src/shared/piMic/piMicStream.js → src/f2/useSpeechInput.js 가 recognition.start(track) 에 넣음
+```
+
+- **크롬 135 이상이 필요하다.** `recognition.start(audioTrack)` 이 그 버전부터 있다. 크롬을 내리면 경고만 남기고 맥 마이크로 동작한다.
+- Pi 가 없거나 도중에 끊기면 맥 마이크로 자동 전환된다. 전시는 멈추지 않는다.
+- 끄려면 `.env` 의 `NEXT_PUBLIC_MIC_SOURCE` 줄을 지우고 서버를 다시 켠다. 그러면 예전과 완전히 같은 경로다.
+- 점검 페이지: `http://localhost:3000/pi_mic_test` (음량 막대, 인식된 문장). 서버 로그에 `[pi-mic] 연결됨` 이 찍힌다.
+- Pi IP 가 바뀌면 `.env` 의 `PI_MIC_URL` 을 고친다. `eye-pi-1.local` 은 이 맥에서 엉뚱한 주소로 풀려서 IP 로 적었다.
+- Pi 쪽 코드는 영채 레포에 아직 머지되지 않았다. Pi 안에서는 `pi-mic-audio-stream` 브랜치로 돌고, 같은 변경이 이 맥의 `~/Documents/GitHub/eye-pi-sensor-test`(로컬 커밋)와 `~/Downloads/pi-mic-deploy/eye-pi-mic-audio-stream.patch` 에 있다. Pi 에서 `main` 을 다시 받으면 `/api/audio` 가 없어진다.
+
+## 전체화면 감시 (`scripts/launch-kiosk.sh`)
+
+크롬 135+ 는 kiosk 창 위에 숨은 보조 창(탭·툴바 띠, `AXUnknown`)을 따로 둔다. 감시는 `AXStandardWindow` 만 본다. `windows[0]` 으로 되돌리면 0.4초마다 전체화면을 다시 걸어 화면이 흔들린다.
+
+로그의 "전시 창이 없습니다" 는 다른 데스크톱(Ctrl+←)을 보고 있을 때도 찍힌다. 창이 닫힌 게 아니다.
+
+## Pi 눈 카메라 시선 (아직 꺼져 있음)
+
+브랜치 **`pi-gaze`** (PR #9, draft, `pi-mic` 위에 쌓음). 작업 사본은 `~/Documents/GitHub/Seoul-Visual-Ai-pi-gaze`. 이 전시 폴더에는 들어 있지 않다.
+
+- `NEXT_PUBLIC_GAZE_SOURCE=pi` 일 때만 `src/shared/computeGaze/useComputeGaze.js` 가 `useGazeEngine` 자리에 들어간다. 값이 없으면 웹캠(MediaPipe) 그대로.
+- 맥 처리 서버는 `~/Documents/GitHub/EyeTracker-pi` (`.venv` 설치됨). `bash scripts/start-eye-compute.sh` 로 처리 서버(맥 8080/8081)와 브리지(5174)를 켠다.
+- 시뮬레이션으로만 확인했다. 실제 Pi 카메라로는 `/2` 보정을 돌려 보지 않았다. Pi 두 대에 맥 주소와 토큰을 넣는 일이 남아 있다.
+
+## 되돌리기
+
+`bash ~/Downloads/pi-mic-deploy/mac-rollback.sh` — 크롬 127, `main`, 맥 마이크로 돌아간다.
+
+## 하지 말 것
+
+- 이유 없이 `main` 으로 체크아웃하거나 크롬을 내리지 않는다.
+- `.env` 의 Pi 줄을 지우지 않는다 (끄는 게 목적이면 위 절차대로).
+- `src/shared/piMic/**`, `src/shared/computeGaze/**`, `pages/pi_mic_test.jsx` 는 Pi 연결 전용이다. 다른 작업 중에 정리 대상으로 지우지 않는다.
