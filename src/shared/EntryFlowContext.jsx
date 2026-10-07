@@ -1,3 +1,4 @@
+import * as React from 'react';
 import {
   createContext,
   useCallback,
@@ -14,6 +15,13 @@ import { VIEWER_BY_CAM } from './gaze/participants';
 import GazeCameraFeeds from './gaze/GazeCameraFeeds';
 import GazeDebugHud from './gaze/GazeDebugHud';
 import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
+import { createComputeIntegration } from './computeGaze/useComputeGaze';
+
+// NEXT_PUBLIC_GAZE_SOURCE=pi 이면 브라우저 웹캠(MediaPipe) 대신 Pi 눈 카메라 → 맥 처리 서버의 시선을 쓴다.
+// 빌드할 때 정해지는 값이라 렌더마다 같은 훅이 불린다.
+const PI_GAZE = process.env.NEXT_PUBLIC_GAZE_SOURCE === 'pi';
+const { useComputeGaze, ComputeCalibrationFeed } = createComputeIntegration(React);
+const useEngine = PI_GAZE ? useComputeGaze : useGazeEngine;
 
 const EntryFlowContext = createContext(null);
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -142,7 +150,7 @@ export function EntryFlowProvider({ children }) {
   }, []);
 
   const gazeEnabled = router.pathname !== '/mobile';
-  const engine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
+  const engine = useEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
   gazeRefHolder.current = engine.gazeRef;
 
   // ?dev=1 이면 카메라 없이 마우스를 시선으로 쓴다(/2 뿐 아니라 /5 등 커서가 뜨는 화면 확인용).
@@ -301,8 +309,9 @@ export function EntryFlowProvider({ children }) {
 
   return (
     <EntryFlowContext.Provider value={value}>
-      {gazeEnabled ? <GazeCameraFeeds videoRefs={engine.videoRefs} /> : null}
+      {gazeEnabled && !PI_GAZE ? <GazeCameraFeeds videoRefs={engine.videoRefs} /> : null}
       {children}
+      {gazeEnabled && PI_GAZE ? <ComputeCalibrationFeed engine={engine} /> : null}
       {gazeEnabled ? <GazeDebugHud diagRef={engine.diagRef} gazeRef={engine.gazeRef} /> : null}
     </EntryFlowContext.Provider>
   );

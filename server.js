@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const { attachMobileLinkClient } = require('./src/shared/mobileLink/mobileSessionHub.js');
 const { attachPresenceClient, WS_PATH: PRESENCE_WS_PATH } = require('./src/shared/gaze/presenceHub.js');
 const { attachPiMicClient, startPiMic, WS_PATH: PI_MIC_WS_PATH } = require('./src/shared/piMic/piMicHub.js');
+const { createComputeProxy } = require('./src/shared/computeGaze/proxy.cjs');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0';
@@ -15,7 +16,13 @@ const handle = app.getRequestHandler();
 const handleUpgrade = app.getUpgradeHandler();
 
 app.prepare().then(() => {
+  // NEXT_PUBLIC_GAZE_SOURCE=pi 일 때만 Pi 눈 카메라 시선(/gaze, /api/players/*)을 맥 처리 서버로 중계한다.
+  // .env 는 Next 가 준비되면서 읽히므로 여기서 확인한다.
+  const computeProxy = process.env.NEXT_PUBLIC_GAZE_SOURCE === 'pi' ? createComputeProxy(require('ws')) : null;
+  if (computeProxy) console.log(`[pi-gaze] 맥 처리 서버 브리지로 중계: 127.0.0.1:${process.env.EYE_BRIDGE_PORT || 5174}`);
+
   const server = createServer((req, res) => {
+    if (computeProxy && computeProxy.http(req, res)) return;
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   });
@@ -23,6 +30,7 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (req, socket, head) => {
+    if (computeProxy && computeProxy.upgrade(req, socket, head)) return;
     const { pathname } = parse(req.url || '', true);
     if (pathname === '/ws/mobile') {
       wss.handleUpgrade(req, socket, head, (ws) => {
