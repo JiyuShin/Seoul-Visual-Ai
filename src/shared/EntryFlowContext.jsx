@@ -18,10 +18,21 @@ import { loadGazeSession, saveGazeSession } from './gaze/gazeSession';
 import { createComputeIntegration } from './computeGaze/useComputeGaze';
 
 // NEXT_PUBLIC_GAZE_SOURCE=pi 이면 브라우저 웹캠(MediaPipe) 대신 Pi 눈 카메라 → 맥 처리 서버의 시선을 쓴다.
-// 빌드할 때 정해지는 값이라 렌더마다 같은 훅이 불린다.
+// 단, 두 사람의 Pi 영상이 모두 들어올 때만이다. 하나라도 없으면 웹캠 시선으로 돌아가 전시가 멈추지 않게 한다.
 const PI_GAZE = process.env.NEXT_PUBLIC_GAZE_SOURCE === 'pi';
 const { useComputeGaze, ComputeCalibrationFeed } = createComputeIntegration(React);
-const useEngine = PI_GAZE ? useComputeGaze : useGazeEngine;
+
+async function piCamerasConnected() {
+  try {
+    const states = await Promise.all([1, 2].map(async (user) => {
+      const response = await fetch(`/api/players/${user}/status`, { cache: 'no-store' });
+      return response.ok && (await response.json()).camera_connected === true;
+    }));
+    return states.every(Boolean);
+  } catch {
+    return false;
+  }
+}
 
 const EntryFlowContext = createContext(null);
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -150,7 +161,30 @@ export function EntryFlowProvider({ children }) {
   }, []);
 
   const gazeEnabled = router.pathname !== '/mobile';
-  const engine = useEngine({ onSample: registerGazeSample, enabled: gazeEnabled });
+  // null 은 Pi 영상이 들어오는지 아직 확인하는 중. 그동안은 어느 엔진도 켜지 않는다.
+  const [gazeSource, setGazeSource] = useState(PI_GAZE ? null : 'webcam');
+  // 처음 열릴 때와, 사람이 바뀌어 /pre_opening 으로 돌아올 때마다 다시 고른다. 체험 도중에는 바꾸지 않는다.
+  useEffect(() => {
+    if (!PI_GAZE || !gazeEnabled) return undefined;
+    if (gazeSource !== null && router.pathname !== '/pre_opening') return undefined;
+    let cancelled = false;
+    piCamerasConnected().then((connected) => {
+      if (!cancelled) setGazeSource(connected ? 'pi' : 'webcam');
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gazeEnabled, router.pathname]);
+
+  const webcamEngine = useGazeEngine({ onSample: registerGazeSample, enabled: gazeEnabled && gazeSource === 'webcam' });
+  const piEngine = useComputeGaze({ onSample: registerGazeSample, enabled: gazeEnabled && gazeSource === 'pi' });
+  const engine = gazeSource === 'pi' ? piEngine : webcamEngine;
+
+  // 맥 처리 서버의 보정은 실패할 수 있다. /2 를 떠날 때 끝나지 않은 보정이 남아 있으면 정리한다.
+  const cancelPiCalibration = piEngine.cancelCalibration;
+  const piCalibrating = Boolean(piEngine.calibUi);
+  useEffect(() => {
+    if (router.pathname !== '/2' && piCalibrating) cancelPiCalibration();
+  }, [router.pathname, piCalibrating, cancelPiCalibration]);
   gazeRefHolder.current = engine.gazeRef;
 
   // ?dev=1 이면 카메라 없이 마우스를 시선으로 쓴다(/2 뿐 아니라 /5 등 커서가 뜨는 화면 확인용).
@@ -309,9 +343,9 @@ export function EntryFlowProvider({ children }) {
 
   return (
     <EntryFlowContext.Provider value={value}>
-      {gazeEnabled && !PI_GAZE ? <GazeCameraFeeds videoRefs={engine.videoRefs} /> : null}
+      {gazeEnabled ? <GazeCameraFeeds videoRefs={webcamEngine.videoRefs} /> : null}
       {children}
-      {gazeEnabled && PI_GAZE ? <ComputeCalibrationFeed engine={engine} /> : null}
+      {gazeEnabled && gazeSource === 'pi' ? <ComputeCalibrationFeed engine={piEngine} /> : null}
       {gazeEnabled ? <GazeDebugHud diagRef={engine.diagRef} gazeRef={engine.gazeRef} /> : null}
     </EntryFlowContext.Provider>
   );

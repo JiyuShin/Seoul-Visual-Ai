@@ -4,6 +4,7 @@
 // chanulee/EyeTracker-pi 의 exhibition/frontend-integration/useComputeGaze.js 를 가져와 지금의 /2 보정 흐름에 맞췄다.
 //  - calibUi 에 cam, summary 를 넣는다 (DiscussionStep 이 사람이 바뀌는 시점을 이 값으로 안다)
 //  - streams 는 Pi 영상이 들어오는 쪽만 값이 있다 (DiscussionStep 이 둘 다 준비되면 보정을 시작한다)
+//  - enabled 가 나중에 켜져도 바로 구독을 시작한다 (전시가 Pi 영상 유무를 보고 엔진을 고른다)
 //  - 관람객이 혼자 진행하므로 눈 모델 준비를 기다리고, 한 점이 실패하면 몇 번 다시 시도한다
 import { CAM_KEYS, VIEWER_BY_CAM, PERSON_LABEL, CAM_COLOR } from '../gaze/participants';
 import { OneEuroPoint } from './oneEuro';
@@ -15,6 +16,9 @@ const viewport = () => ({ width: window.innerWidth, height: window.innerHeight }
 // 눈 모델이 준비될 때까지 기다리는 최대 시간, 한 점을 다시 시도하는 횟수.
 const READY_WAIT_MS = 30000;
 const POINT_RETRIES = 3;
+// 한 사람의 보정 단계가 실패했을 때 스스로 다시 시작하는 횟수와 간격.
+const STAGE_RETRIES = 2;
+const STAGE_RETRY_MS = 1500;
 // 실제 MediaStream 은 없다. 기존 엔진의 streams 처럼 "이 카메라가 준비됐다"는 표시로만 쓴다.
 const PI_STREAM = Object.freeze({ pi: true });
 import { pointFromPacket } from './coordinates.mjs';
@@ -47,6 +51,7 @@ function useComputeGaze({ onSample, enabled = true } = {}) {
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
   const [running, setRunning] = useState(enabled);
+  useEffect(() => { if (enabled) setRunning(true); }, [enabled]);
   const [deviceIds, setDeviceIds] = useState({ A: 'pi-1', B: 'pi-2' });
   const selected = useRef(deviceIds); selected.current = deviceIds;
   const [stats, setStats] = useState({ A: { fps: 0, face: false }, B: { fps: 0, face: false } });
@@ -140,7 +145,7 @@ function useComputeGaze({ onSample, enabled = true } = {}) {
     collectMs: 1000, cam: s.stages[s.stage], personLabel: PERSON_LABEL[s.stages[s.stage]], color: CAM_COLOR[s.stages[s.stage]], summary: s.summary || null,
     stageIndex: s.stage, stageTotal: s.stages.length, ...patch }), []);
   const cancelCalibration = useCallback(async () => {
-    const s = session.current; session.current = null; abort.current?.abort(); setCalibUi(null);
+    const s = session.current; session.current = null; abort.current?.abort(); setCalibUi(null); setError(null);
     if (s?.id) await api(s.stages[s.stage], 'calibration', { action: 'cancel', session_id: s.id }).catch(() => {});
   }, []);
   useEffect(() => () => { abort.current?.abort(); const s = session.current; if (s?.id) api(s.stages[s.stage], 'calibration', { action: 'cancel', session_id: s.id }).catch(() => {}); }, []);
@@ -152,6 +157,7 @@ function useComputeGaze({ onSample, enabled = true } = {}) {
     setError(null); setResult(null); setCalibUi(ui(s));
     setStatus(mode === 'validate' ? 'Mac 서버의 9점 보정과 독립 3점 검증을 다시 진행합니다.' : '착용 후 정면을 보세요. 눈을 여러 방향으로 움직여 모델을 준비하세요.');
   }, [ui]);
+  const startStageRef = useRef(null);
   const startStage = useCallback(async () => {
     const s = session.current; if (!s || s.busy) return; s.busy = true;
     const key = s.stages[s.stage];
@@ -205,7 +211,7 @@ function useComputeGaze({ onSample, enabled = true } = {}) {
         if (response.calibrated) s.rows.push({ key, cam: key, value: response.validation_error * Math.hypot(s.size.width, s.size.height), max: response.validation_error * Math.hypot(s.size.width, s.size.height), covered: 3, total: 3 });
       }
       s.summary = { personLabel: PERSON_LABEL[key], rows: s.rows.filter(row => row.cam === key) };
-      s.stage++; s.id = null;
+      s.stage++; s.id = null; s.retries = 0;
       if (s.stage < s.stages.length) { setCalibUi(ui(s)); setStatus('다음 참가자가 정면을 보고 준비한 뒤 시작하세요.'); }
       else { setResult({ kind: 'validation', rows: s.rows }); setCalibUi(null); session.current = null; setStatus('보정과 독립 3점 검증 완료 · 참여 시작을 누르세요.'); }
       setError(null);
@@ -213,9 +219,13 @@ function useComputeGaze({ onSample, enabled = true } = {}) {
       if (err.name !== 'AbortError' && session.current === s) {
         if (err.message.includes('세션이 만료')) { s.id = null; s.index = 0; }
         setError(err.message); setCalibUi(ui(s));
+        // /2 는 단계를 한 번만 시작시키므로, 실패하면 여기서 같은 단계를 다시 시작한다.
+        s.retries = (s.retries || 0) + 1;
+        if (s.retries <= STAGE_RETRIES) setTimeout(() => { if (session.current === s) startStageRef.current?.(); }, STAGE_RETRY_MS);
       }
     } finally { s.busy = false; }
   }, [ui]);
+  startStageRef.current = startStage;
   const resetCalibration = useCallback(async () => {
     try {
       await cancelCalibration(); await Promise.all(CAM_KEYS.map(key => api(key, 'calibration', { action: 'reset' })));

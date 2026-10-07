@@ -16,19 +16,33 @@ if [ ! -d "$EYE_REPO/exhibition" ]; then
 fi
 cd "$EYE_REPO"
 
+up() { curl -fs -o /dev/null --max-time 1 "http://127.0.0.1:$1$2"; }
+
 bridge=
-EYE_FRONTEND_URL="$FRONTEND_URL" bash start-mac.sh --no-open "$@" &
-workers=$!
-trap 'kill "$workers" $bridge 2>/dev/null || true' EXIT
+workers=
+trap 'kill $workers $bridge 2>/dev/null || true' EXIT
+trap 'exit 143' TERM INT HUP
+
+# 이미 떠 있으면(전시 서버만 다시 켠 경우 등) 그대로 쓴다.
+if up 8080 /api/status && up 8081 /api/status; then
+  echo "처리 서버가 이미 켜져 있습니다 (8080/8081)."
+else
+  EYE_FRONTEND_URL="$FRONTEND_URL" bash start-mac.sh --no-open "$@" &
+  workers=$!
+  # 처음 실행이면 start-mac.sh 가 .venv 를 만들고 라이브러리를 받느라 몇 분 걸릴 수 있다.
+  for _ in $(seq 1 600); do
+    if [ -x .venv/bin/python ] && up 8080 /api/status; then break; fi
+    kill -0 "$workers" 2>/dev/null || { echo "처리 서버가 켜지지 않았습니다." >&2; exit 1; }
+    sleep 1
+  done
+fi
 
 # 작품 주소를 따로 주면 start-mac.sh 는 브리지(5174)를 띄우지 않으므로 여기서 띄운다.
-# 처음 실행이면 start-mac.sh 가 .venv 를 만들고 라이브러리를 받느라 몇 분 걸릴 수 있다.
-for _ in $(seq 1 600); do
-  if [ -x .venv/bin/python ] && curl -fs -o /dev/null --max-time 1 http://127.0.0.1:8080/api/status; then break; fi
-  kill -0 "$workers" 2>/dev/null || { echo "처리 서버가 켜지지 않았습니다." >&2; exit 1; }
-  sleep 1
-done
-.venv/bin/python -m exhibition.frontend &
-bridge=$!
+if up "${EYE_BRIDGE_PORT:-5174}" /; then
+  echo "브리지가 이미 켜져 있습니다."
+else
+  .venv/bin/python -m exhibition.frontend &
+  bridge=$!
+fi
 echo "브리지 준비: 127.0.0.1:${EYE_BRIDGE_PORT:-5174} → 전시 서버 $FRONTEND_URL"
-wait "$workers"
+if [ -n "$workers" ]; then wait "$workers"; elif [ -n "$bridge" ]; then wait "$bridge"; fi
