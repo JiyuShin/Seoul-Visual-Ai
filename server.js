@@ -4,6 +4,7 @@ const next = require('next');
 const { WebSocketServer } = require('ws');
 const { attachMobileLinkClient } = require('./src/shared/mobileLink/mobileSessionHub.js');
 const { attachPresenceClient, WS_PATH: PRESENCE_WS_PATH } = require('./src/shared/gaze/presenceHub.js');
+const { attachPiMicClient, startPiMic, WS_PATH: PI_MIC_WS_PATH } = require('./src/shared/piMic/piMicHub.js');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0';
@@ -45,6 +46,12 @@ app.prepare().then(() => {
           }
           attachPresenceClient(ws, { role: msg.role });
         });
+      });
+      return;
+    }
+    if (pathname === PI_MIC_WS_PATH) {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        attachPiMicClient(ws);
       });
       return;
     }
@@ -93,5 +100,6 @@ app.prepare().then(() => {
   server.listen(port, hostname, () => {
     // eslint-disable-next-line no-console
     console.log(`> Ready on http://${hostname === '0.0.0.0' ? 'localhost' : hostname}:${port} (WebSocket ${'/ws/mobile'})`);
+    startPiMic();
   });
 });

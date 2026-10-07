@@ -79,7 +79,10 @@ function run(argv) {
         return;
       }
       try {
-        const attr = procs[0].windows[0].attributes.byName('AXFullScreen');
+        // Chrome 135+ 는 전체화면 창 위에 숨은 보조 창(탭·툴바 띠)을 따로 두므로, 첫 창이 아니라 일반 창을 고른다.
+        const wins = procs[0].windows.whose({ subrole: 'AXStandardWindow' });
+        if (wins.length === 0) throw new Error('전시 창이 없습니다');
+        const attr = wins[0].attributes.byName('AXFullScreen');
         const full = attr.value();
         lastError = '';
         if (full) {
