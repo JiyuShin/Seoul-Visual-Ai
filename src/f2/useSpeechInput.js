@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MIC_SOURCE, acquirePiMic, piMicSupported } from '../shared/piMic/piMicStream';
 
 export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
   const [transcript, setTranscript] = useState('');
@@ -16,7 +17,34 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
   const levelRef = useRef(0);
   const meterRef = useRef(null);
   const meterGenRef = useRef(0);
+  // NEXT_PUBLIC_MIC_SOURCE=pi 일 때 라즈베리파이 마이크 스트림. 못 받으면 null 인 채로 맥 마이크를 쓴다.
+  const piRef = useRef(null);
+  const piGenRef = useRef(0);
 
+  const releasePi = useCallback(() => {
+    piGenRef.current += 1;
+    const pi = piRef.current;
+    piRef.current = null;
+    pi?.release();
+  }, []);
+
+  // Pi 스트림이 있으면 그 소리로, 없으면 지금까지처럼 기본 마이크로 인식한다.
+  const startRecognition = useCallback((recognition) => {
+    const track = piRef.current?.stream.getAudioTracks()[0];
+    if (!track) {
+      recognition.start();
+      return;
+    }
+    try {
+      recognition.start(track);
+    } catch (err) {
+      if (err?.name !== 'InvalidStateError' || track.readyState === 'live') throw err;
+      // Pi 연결이 끊겨 트랙이 죽었다. 맥 마이크로 넘어간다.
+      console.warn('[mic] Pi 마이크가 끊겨 맥 마이크로 전환');
+      releasePi();
+      recognition.start();
+    }
+  }, [releasePi]);
   const stopMeter = useCallback(() => {
     meterGenRef.current += 1;
     const meter = meterRef.current;
@@ -24,7 +52,7 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     levelRef.current = 0;
     if (!meter) return;
     window.cancelAnimationFrame(meter.frame);
-    meter.stream.getTracks().forEach((track) => track.stop());
+    if (meter.ownsStream) meter.stream.getTracks().forEach((track) => track.stop());
     meter.ctx.close();
   }, []);
 
@@ -33,12 +61,15 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     const gen = meterGenRef.current + 1;
     meterGenRef.current = gen;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: false,
-      });
+      const piStream = piRef.current?.stream;
+      const stream =
+        piStream ||
+        (await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false,
+        }));
       if (meterGenRef.current !== gen || !shouldListenRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
+        if (!piStream) stream.getTracks().forEach((track) => track.stop());
         return;
       }
       const ctx = new AudioContext();
@@ -47,7 +78,7 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
       ctx.createMediaStreamSource(stream).connect(analyser);
       void ctx.resume();
       const data = new Uint8Array(analyser.fftSize);
-      const meter = { stream, ctx, frame: 0 };
+      const meter = { stream, ctx, frame: 0, ownsStream: !piStream };
       meterRef.current = meter;
       const tick = () => {
         if (meterRef.current !== meter) return;
@@ -133,7 +164,7 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
         window.setTimeout(() => {
           if (!shouldListenRef.current || !recognitionRef.current) return;
           try {
-            recognitionRef.current.start();
+            startRecognition(recognitionRef.current);
             isListeningRef.current = true;
             setIsListening(true);
           } catch {
@@ -153,8 +184,9 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
       shouldListenRef.current = false;
       recognition.stop();
       stopMeter();
+      releasePi();
     };
-  }, [emitTranscriptUpdate, stopMeter]);
+  }, [emitTranscriptUpdate, releasePi, startRecognition, stopMeter]);
 
   const stopListening = useCallback(() => {
     shouldListenRef.current = false;
@@ -162,7 +194,8 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
     isListeningRef.current = false;
     setIsListening(false);
     stopMeter();
-  }, [stopMeter]);
+    releasePi();
+  }, [releasePi, stopMeter]);
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
@@ -172,7 +205,7 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
 
     const tryStart = (attempt = 0) => {
       try {
-        recognition.start();
+        startRecognition(recognition);
         isListeningRef.current = true;
         setIsListening(true);
         return true;
@@ -187,9 +220,36 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
       }
     };
 
+    if (MIC_SOURCE === 'pi' && !piRef.current) {
+      if (!piMicSupported()) {
+        console.warn('[mic] 이 Chrome 은 Pi 마이크 인식(135 이상 필요)을 못 해서 맥 마이크를 씁니다');
+      } else {
+        // Pi 소리가 들어오는 것을 확인한 뒤 인식을 시작한다. 못 받으면 맥 마이크로 그대로 진행한다.
+        const gen = piGenRef.current + 1;
+        piGenRef.current = gen;
+        acquirePiMic()
+          .then((pi) => {
+            if (piGenRef.current !== gen || !shouldListenRef.current) {
+              pi.release();
+              return;
+            }
+            piRef.current = pi;
+          })
+          .catch((err) => {
+            if (piGenRef.current === gen) console.warn(`[mic] Pi 마이크를 못 써서 맥 마이크로 전환: ${err.message}`);
+          })
+          .finally(() => {
+            if (piGenRef.current !== gen || !shouldListenRef.current) return;
+            startMeter();
+            tryStart();
+          });
+        return true;
+      }
+    }
+
     startMeter();
     return tryStart();
-  }, [startMeter]);
+  }, [releasePi, startMeter, startRecognition]);
 
   const getIsListening = useCallback(() => isListeningRef.current, []);
 

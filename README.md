@@ -43,6 +43,32 @@ yarn dev
   오른쪽 아래에는 무활동 복귀 상태(마지막 활동 시각과 원인)가 떠서, 30초 복귀가 왜 안 서는지 볼 수 있습니다.
 - 다른 주소/크기는 `KIOSK_URL`, `PRESENCE_SIZE`, `PRESENCE_POS` 환경 변수로 바꿉니다. (스크립트 머리말 참고)
 
+## 라즈베리파이 마이크 (선택)
+
+`/2` 토론 화면의 음성 입력을 맥 마이크 대신 라즈베리파이에 달린 마이크로 받을 수 있습니다.
+Pi 에서는 [eye-pi-sensor-test](https://github.com/youngchae407/eye-pi-sensor-test) 의 `server.py` 가 떠 있어야 합니다.
+
+```
+Pi  server.py  GET /api/audio (16비트 16kHz 모노 PCM)
+맥  server.js  → 받아서 웹소켓 /ws/pi-mic 로 중계   (src/shared/piMic/piMicHub.js)
+브라우저       → MediaStream 으로 바꿔 음량 측정 + Web Speech 인식에 사용 (src/shared/piMic/piMicStream.js)
+```
+
+`.env` 에 아래 값을 넣고 서버를 다시 켭니다. 값을 넣지 않으면 지금까지처럼 맥 마이크만 씁니다.
+
+```bash
+NEXT_PUBLIC_MIC_SOURCE=pi                 # pi 가 아니면 맥 마이크
+PI_MIC_URL=http://eye-pi-1.local:8080     # Pi 대시보드 주소 (.local 이 안 풀리면 IP 로)
+PI_MIC_MODE=always                        # always: 항상 연결 / ondemand: 말하는 차례에만 연결
+```
+
+- **Chrome 135 이상**이 필요합니다(`SpeechRecognition.start(audioTrack)`). 그보다 낮으면 맥 마이크로 대체됩니다.
+- Pi 가 꺼져 있거나 소리가 1.5초 안에 오지 않으면 그 차례는 **맥 마이크로 자동 전환**되고, 콘솔에 `[mic]` 경고가 남습니다.
+- `PI_MIC_MODE=ondemand` 는 Pi 를 `python server.py --mic-idle stop` 으로 켰을 때 짝이 맞습니다. 말하는 차례에만 Pi 마이크가
+  열리고 끝나면 닫힙니다. 마이크가 열리는 동안 첫마디가 잘릴 수 있어 기본값은 `always` 입니다.
+- 점검: `http://localhost:3000/pi_mic_test` 에서 음량 막대와 인식된 문장을 바로 볼 수 있습니다.
+- 소리가 작아 인식이 잘 안 되면 Pi 쪽 `--audio-gain`(dB)을 올립니다.
+
 ## 두 사람이 함께 고르기 (웹캠 2대)
 
 1단계 투표는 두 사람이 같은 카드를 바라봐야 선택됩니다. 웹캠 두 대를 한 창에서 동시에 다루므로
