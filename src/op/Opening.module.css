@@ -22,7 +22,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: #dce8f0;
 }
 
 .fit {
@@ -39,7 +39,7 @@
   transform-origin: top left;
   transform-style: preserve-3d;
   overflow: hidden;
-  background: #fff;
+  background: #dce8f0;
   font-family: Pretendard, system-ui, sans-serif;
 }
 

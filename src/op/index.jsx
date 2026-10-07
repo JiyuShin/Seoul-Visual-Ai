@@ -123,7 +123,7 @@ function holdFor(frame) {
   if (frame === 2) return 760;
   if (frame === 3) return 1750;
   if (frame === 4) return 2400;
-  if (frame === 5) return 1800;
+  if (frame === 5) return 2800;
   if (frame === 16) return 2200;
   if (frame === 11 || frame === 12) return 1800;
   if (frame === 18) return 1700;
@@ -141,9 +141,9 @@ export default function Opening() {
   const viewportRef = useRef(null);
   const speechOutput = useSpeechOutput();
   const speechOutputRef = useRef(speechOutput);
-  const [scale, setScale] = useState(0);
+  const [scale, setScale] = useState(1);
   const [poseReady, setPoseReady] = useState(false);
-  const [frame, setFrame] = useState(1);
+  const [frame, setFrame] = useState(5);
   speechOutputRef.current = speechOutput;
 
   useLayoutEffect(() => {
@@ -170,6 +170,7 @@ export default function Opening() {
   }, [router]);
 
   useEffect(() => {
+    if (OPENING_SPEECH[frame]) speechOutputRef.current.warm(OPENING_SPEECH[frame]);
     const upcomingFrame = OPENING_SPEECH_FRAMES.find((speechFrame) => (
       speechFrame >= frame + (OPENING_SPEECH[frame] ? 1 : 0)
     ));
@@ -226,22 +227,6 @@ export default function Opening() {
           </div>
           <div className={styles.cityBloom} style={{ opacity: bloomOpacity(frame) }}>
             <img src={frame >= 8 ? '/op/title-bg-blur.png' : '/op/title-bg.png'} alt="" />
-          </div>
-          <div className={`${styles.titleBoard} ${frame >= 3 ? styles.titleBoardOut : ''}`}>
-            <img className={styles.titleBg} src="/op/title-bg-blur.png" alt="" />
-            <div className={`${styles.flowersLeft} ${frame >= 3 ? styles.flowersLeftOut : ''}`}>
-              <img className={styles.plantSpin} src="/op/plant-spin.png" alt="" />
-              <img className={styles.plantLean} src="/op/plant-lean.png" alt="" />
-              <img className={styles.sprout} src="/op/sprout.png" alt="" />
-            </div>
-            <div className={`${styles.flowersRight} ${frame >= 3 ? styles.flowersRightOut : ''}`}>
-              <img className={styles.plantRight} src="/op/plant-right.png" alt="" />
-              <img className={styles.plantFlip} src="/op/plant-flip.png" alt="" />
-            </div>
-          </div>
-          <div className={styles.titleCopy}>
-            <p className={styles.wordmark} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">ONSI</p>
-            <p className={styles.tagline} style={{ opacity: frame === 1 ? 1 : 0 }} aria-hidden="true">A Green City Cultivated by a Warm Gaze</p>
           </div>
           <div className={`${styles.agentMove} ${poseReady ? styles.agentMoveOn : ''}`} style={agentStyle(frame)}>
             <div className={`${styles.agentFloat} ${agentSpeaking(frame) ? styles.agentSpeaking : ''}`}>

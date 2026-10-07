@@ -1,8 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import OpeningStill from '../src/op/OpeningStill';
+import SequenceSlot from '../src/op/SequenceSlot';
+import { PRE_OPENING_CLIP, SEQUENCE_CLIP } from '../src/op/attractClips';
 import usePresenceLink from '../src/shared/gaze/usePresenceLink';
+
+const ONE_WARM = ['/op/city-sharp.png', '/op/title-bg.png'];
 
 const DEBUG_STYLE = {
   position: 'fixed',
@@ -19,27 +23,87 @@ const DEBUG_STYLE = {
 };
 
 /**
- * 인원 인식은 /presence_test(센서)가 한다. 이 화면은 카메라를 열지 않고,
- * 센서가 보낸 통과 신호를 받으면 /1 로 넘어간다.
+ * 0·1명: 기존 3초 영상 → 시퀀스 22초 영상 → 반복.
+ * 2인 착용(통과 신호): 같은 3초+22초를 끝까지 본 뒤 /1 로 간다. 통과가 중간에 와도 영상을 끊지 않는다.
  */
 export default function PreOpeningPage() {
   const router = useRouter();
   const debug = router.query.presenceDebug === '1';
   const [sensorState, setSensorState] = useState(null);
-  const passedRef = useRef(false);
+  const [clipId, setClipId] = useState(PRE_OPENING_CLIP.id);
+  const [cycle, setCycle] = useState(0);
+  const [armed, setArmed] = useState(false);
+  const [cueEnd, setCueEnd] = useState(false);
+  const armedRef = useRef(false);
+  const leftRef = useRef(false);
 
   const goNext = useCallback(() => {
-    if (passedRef.current) return;
-    passedRef.current = true;
-    router.replace('/1');
+    if (leftRef.current) return;
+    leftRef.current = true;
+    if (typeof document === 'undefined' || !document.startViewTransition) {
+      router.replace('/1');
+      return;
+    }
+    document.documentElement.classList.add('pre-opening-one-transition');
+    const transition = document.startViewTransition(() => router.replace('/1'));
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove('pre-opening-one-transition');
+    });
   }, [router]);
+
+  useEffect(() => {
+    router.prefetch('/1');
+    ONE_WARM.forEach((src) => {
+      const image = new Image();
+      image.src = src;
+    });
+  }, [router]);
+
+  const arm = useCallback(() => {
+    if (armedRef.current) return;
+    armedRef.current = true;
+    setArmed(true);
+  }, []);
+
+  const previewHandoff = useCallback(() => {
+    arm();
+    setCueEnd(true);
+    setClipId(SEQUENCE_CLIP.id);
+  }, [arm]);
+
+  useEffect(() => {
+    if (!router.isReady || router.query.preview !== '1') return;
+    previewHandoff();
+  }, [router.isReady, router.query.preview, previewHandoff]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== '1') return;
+      previewHandoff();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewHandoff]);
+
+  const onPreEnded = useCallback(() => {
+    setClipId(SEQUENCE_CLIP.id);
+  }, []);
+
+  const onSequenceEnded = useCallback(() => {
+    if (armedRef.current) {
+      goNext();
+      return;
+    }
+    setClipId(PRE_OPENING_CLIP.id);
+    setCycle((current) => current + 1);
+  }, [goNext]);
 
   const onMessage = useCallback(
     (msg) => {
-      if (msg.type === 'pass' || (msg.type === 'joined' && msg.passAt)) goNext();
+      if (msg.type === 'pass' || (msg.type === 'joined' && msg.passAt)) arm();
       if (msg.type === 'state' || (msg.type === 'joined' && msg.state)) setSensorState(msg.state || msg);
     },
-    [goNext]
+    [arm]
   );
 
   const link = usePresenceLink('display', onMessage);
@@ -49,6 +113,7 @@ export default function PreOpeningPage() {
     sensorState
       ? `얼굴 ${sensorState.faces}명 · 통과 ${sensorState.kept}명 · ${Math.round((sensorState.progress || 0) * 100)}%`
       : '센서 신호 없음',
+    `클립 ${clipId === SEQUENCE_CLIP.id ? '시퀀스 22초' : '기존 3초'} · ${armed ? '착용됨 → 시퀀스 후 /1' : '루프'}`,
   ].join('\n');
 
   return (
@@ -62,7 +127,19 @@ export default function PreOpeningPage() {
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
         />
       </Head>
-      <OpeningStill />
+      <video src={SEQUENCE_CLIP.src} preload="auto" muted playsInline hidden aria-hidden="true" />
+      <div data-attract-clip={clipId} data-attract-armed={armed ? '1' : '0'}>
+        {clipId === PRE_OPENING_CLIP.id ? (
+          <OpeningStill key={cycle} onEnded={onPreEnded} />
+        ) : (
+          <SequenceSlot
+            src={SEQUENCE_CLIP.src}
+            durationMs={SEQUENCE_CLIP.durationMs}
+            onEnded={onSequenceEnded}
+            cueEnd={cueEnd}
+          />
+        )}
+      </div>
       {debug && <div style={DEBUG_STYLE}>{debugText}</div>}
     </>
   );

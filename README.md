@@ -29,6 +29,9 @@ yarn dev
 
 - `/pre_opening` 은 `--kiosk` 전체화면(탭·주소창 없음, 페이지 이동·오류 복구 중에도 전체화면 유지),
   `/presence_test` 인원 인식 창은 바탕화면 데스크톱의 작은 앱 창으로 뜹니다. 두 창은 별도 Chrome 인스턴스입니다.
+- `/pre_opening` 은 기존 3초 영상(`/still/opening-sequence.mp4`) 뒤에 시퀀스 22초 자리를 이어 붙인다.
+  0·1명이면 이 25초를 반복하고, 2인 착용(통과)이면 시퀀스가 끝난 뒤 `/1` 로 간다.
+  시퀀스 파일은 `public/still/opening-follow.mp4` 에 넣으면 된다.
 - `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`
   플래그로 실행되므로, 인원 인식 창이 다른 데스크톱에 있어도 얼굴 인식이 느려지지 않습니다.
 - 카메라·마이크 권한은 자동 허용(`--use-fake-ui-for-media-stream`)됩니다.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import OpeningAgent from './OpeningAgent';
+import { PRE_OPENING_CLIP } from './attractClips';
 import stageStyles from './Opening.module.css';
 import styles from './OpeningStill.module.css';
 
@@ -9,7 +10,6 @@ const SX = STAGE.width / FIGMA.width;
 const SY = STAGE.height / FIGMA.height;
 const AGENT_SOURCE = 960;
 const ORB_RADIUS = 0.72;
-const VIDEO_SRC = '/still/opening-sequence.mp4';
 
 function agentStyle() {
   const diameter = 2567;
@@ -26,76 +26,37 @@ function agentStyle() {
   };
 }
 
-function SeamlessVideo({ src }) {
-  const firstRef = useRef(null);
-  const secondRef = useRef(null);
-  const activeRef = useRef(0);
+function OnceVideo({ src, durationMs, onEnded }) {
+  const videoRef = useRef(null);
+  const doneRef = useRef(false);
 
   useEffect(() => {
-    const videos = [firstRef.current, secondRef.current];
-    let frame = 0;
-    let alive = true;
+    const video = videoRef.current;
+    if (!video) return undefined;
+    doneRef.current = false;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    const pending = video.play();
+    if (pending) pending.catch(() => {});
 
-    const play = (video) => {
-      const pending = video.play();
-      if (pending) pending.catch(() => {});
+    const finish = () => {
+      if (doneRef.current) return;
+      doneRef.current = true;
+      onEnded?.();
     };
-
-    const warm = (video) => {
-      video.muted = true;
-      video.defaultMuted = true;
-      video.playsInline = true;
-      video.preload = 'auto';
-      video.currentTime = 0;
-      const pending = video.play();
-      if (!pending) {
-        video.pause();
-        return;
-      }
-      pending.then(() => {
-        if (video !== videos[activeRef.current]) {
-          video.pause();
-          video.currentTime = 0;
-        }
-      }).catch(() => {});
-    };
-
-    videos.forEach(warm);
-    play(videos[0]);
-
-    const tick = () => {
-      if (!alive) return;
-      const current = videos[activeRef.current];
-      const next = videos[1 - activeRef.current];
-      const duration = current.duration;
-      if (duration && Number.isFinite(duration) && duration - current.currentTime <= 1 / 24) {
-        next.currentTime = 0;
-        next.style.opacity = '1';
-        play(next);
-        current.style.opacity = '0';
-        current.pause();
-        current.currentTime = 0;
-        activeRef.current = 1 - activeRef.current;
-      }
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
+    const watchdog = window.setTimeout(finish, durationMs + 400);
+    video.addEventListener('ended', finish);
     return () => {
-      alive = false;
-      cancelAnimationFrame(frame);
+      window.clearTimeout(watchdog);
+      video.removeEventListener('ended', finish);
     };
-  }, [src]);
+  }, [src, durationMs, onEnded]);
 
-  return (
-    <>
-      <video ref={firstRef} className={styles.video} src={src} muted playsInline />
-      <video ref={secondRef} className={`${styles.video} ${styles.videoNext}`} src={src} muted playsInline />
-    </>
-  );
+  return <video ref={videoRef} className={styles.video} src={src} muted playsInline preload="auto" />;
 }
 
-export default function OpeningStill() {
+export default function OpeningStill({ onEnded }) {
   const viewportRef = useRef(null);
   const [scale, setScale] = useState(1);
 
@@ -116,7 +77,7 @@ export default function OpeningStill() {
     <div className={stageStyles.viewport} ref={viewportRef} data-opening-still style={{ background: '#000' }}>
       <div className={stageStyles.fit} style={{ width: STAGE.width * scale, height: STAGE.height * scale }}>
         <div role="application" aria-label="Opening still" className={stageStyles.stage} style={{ transform: `scale(${scale})` }}>
-          <SeamlessVideo src={VIDEO_SRC} />
+          <OnceVideo src={PRE_OPENING_CLIP.src} durationMs={PRE_OPENING_CLIP.durationMs} onEnded={onEnded} />
           <div className={stageStyles.agentMove} style={agentStyle()}>
             <div className={`${stageStyles.agentFloat} ${stageStyles.agentSpeaking}`}>
               <OpeningAgent speaking />
