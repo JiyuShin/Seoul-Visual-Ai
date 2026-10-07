@@ -35,6 +35,7 @@ function closeSession() {
   session = null;
   if (!current) return;
   current.closed = true;
+  current.onLost();
   current.socket.close();
   current.stream.getTracks().forEach((track) => track.stop());
   void current.ctx.close();
@@ -68,6 +69,10 @@ function openSession() {
         if (!msg.configured) {
           window.clearTimeout(timer);
           fail('서버에 PI_MIC_URL 이 없음');
+        } else if (current.mode === 'always' && !msg.connected) {
+          // 서버가 Pi 에 붙어 있지 않다. 기다리지 않고 바로 맥 마이크로 넘어가게 한다.
+          window.clearTimeout(timer);
+          fail('서버가 Pi 에 연결되어 있지 않음');
         } else if (current.mode === 'ondemand' && !current.lastAt) {
           window.clearTimeout(timer);
           timer = window.setTimeout(onTimeout, FIRST_AUDIO_TIMEOUT_ONDEMAND_MS);
@@ -97,6 +102,9 @@ function openSession() {
       fail('Pi 마이크 연결이 닫힘');
     });
   });
+  current.lost = new Promise((resolve) => {
+    current.onLost = resolve;
+  });
   // 실패는 acquirePiMic 에서 받는다. 받는 쪽이 없을 때 경고가 뜨지 않게 한다.
   current.ready.catch(() => {});
   void ctx.resume();
@@ -106,7 +114,8 @@ function openSession() {
 /**
  * Pi 마이크 스트림을 빌린다. 소리가 실제로 들어오기 시작하면 resolve, 못 받으면 reject.
  * 다 쓰면 release() 를 부른다. 서버가 ondemand 모드면 마지막 사용자가 놓을 때 연결을 닫아 Pi 마이크가 꺼진다.
- * @returns {Promise<{ stream: MediaStream, release: () => void }>}
+ * lost 는 쓰는 도중 Pi 연결이 끊기면 resolve 된다.
+ * @returns {Promise<{ stream: MediaStream, release: () => void, lost: Promise<void> }>}
  */
 export async function acquirePiMic() {
   if (session && session.lastAt && performance.now() - session.lastAt > STALE_MS) closeSession();
@@ -130,5 +139,5 @@ export async function acquirePiMic() {
     release();
     throw new Error('Pi 마이크 연결이 닫힘');
   }
-  return { stream: current.stream, release };
+  return { stream: current.stream, release, lost: current.lost };
 }

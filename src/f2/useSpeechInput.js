@@ -234,6 +234,16 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
               return;
             }
             piRef.current = pi;
+            void pi.lost.then(() => {
+              if (piRef.current !== pi) return;
+              // 듣는 도중 Pi 가 끊겼다. 남은 시간은 맥 마이크로 이어 듣는다.
+              console.warn('[mic] Pi 마이크가 끊겨 맥 마이크로 전환');
+              releasePi();
+              stopMeter();
+              if (!shouldListenRef.current) return;
+              startMeter();
+              recognitionRef.current?.stop();
+            });
           })
           .catch((err) => {
             if (piGenRef.current === gen) console.warn(`[mic] Pi 마이크를 못 써서 맥 마이크로 전환: ${err.message}`);
@@ -249,7 +259,7 @@ export function useSpeechInput({ onFinalTranscript, onTranscriptUpdate } = {}) {
 
     startMeter();
     return tryStart();
-  }, [releasePi, startMeter, startRecognition]);
+  }, [releasePi, startMeter, startRecognition, stopMeter]);
 
   const getIsListening = useCallback(() => isListeningRef.current, []);
 
