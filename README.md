@@ -69,6 +69,35 @@ PI_MIC_MODE=always                        # always: 항상 연결 / ondemand: �
 - 점검: `http://localhost:3000/pi_mic_test` 에서 음량 막대와 인식된 문장을 바로 볼 수 있습니다.
 - 소리가 작아 인식이 잘 안 되면 Pi 쪽 `--audio-gain`(dB)을 올립니다.
 
+## 라즈베리파이 눈 카메라 시선 (선택)
+
+브라우저 웹캠(MediaPipe) 대신, Pi 눈 카메라 영상을 맥에서 처리한 시선 좌표를 쓸 수 있습니다.
+처리 서버는 [chanulee/EyeTracker-pi](https://github.com/chanulee/EyeTracker-pi) 이고, 이 프로젝트는 그 결과를 받아 쓰기만 합니다.
+
+```
+Pi  pi.py      → 눈 카메라 JPEG 를 맥으로 전송
+맥  EyeTracker-pi 처리 서버(8080 = NABI, 8081 = SORA) → 브리지(5174)
+맥  server.js  → /gaze, /api/players/* 를 브리지로 중계   (src/shared/computeGaze/proxy.cjs)
+브라우저       → 기존 시선 엔진 자리에 끼워 넣음           (src/shared/computeGaze/useComputeGaze.js)
+```
+
+`.env` 에 아래를 넣고 서버를 다시 켭니다. 값이 없으면 지금처럼 웹캠 시선으로 동작합니다.
+
+```bash
+NEXT_PUBLIC_GAZE_SOURCE=pi
+```
+
+- **두 사람(NABI·SORA)의 Pi 영상이 모두 들어올 때만** Pi 시선을 씁니다. 하나라도 없으면 웹캠 시선으로 돌아갑니다.
+  처음 열릴 때와 `/pre_opening` 으로 돌아올 때마다 다시 확인하고, 체험 도중에는 바꾸지 않습니다.
+- 전시 서버가 켜질 때 처리 서버와 브리지도 함께 켜고(`scripts/start-eye-compute.sh`), 꺼질 때 같이 끕니다.
+  EyeTracker-pi 는 `~/Documents/GitHub/EyeTracker-pi` 에 있어야 합니다 (`EYE_REPO` 로 변경). 따로 켜려면 `.env` 에 `EYE_COMPUTE_AUTOSTART=0`.
+- 처리 서버의 `.venv` 는 **Python 3.10 이상**이어야 합니다. 맥 기본 3.9 로 만들면 보정 요청이 500 오류를 냅니다.
+
+- Pi 두 대에 각각 맥 주소(`ws://맥IP:8080/camera`, `ws://맥IP:8081/camera`)와 영상 전송 토큰을 넣어야 합니다. 주소와 토큰은 `http://localhost:8080/admin` 에 나옵니다.
+- `/2` 의 보정은 맥 처리 서버의 9점 보정 + 3점 검증을 씁니다. 한 사람의 단계가 실패하면 두 번까지 스스로 다시 시작하고, 그래도 안 되면 그 단계에서 멈춥니다.
+- 보정한 화면 크기와 다른 크기에서는 커서가 숨겨집니다. 처리 서버나 Pi 를 다시 켜면 보정도 다시 해야 합니다.
+- 인원 인식 창(`/presence_test`)은 그대로 맥 카메라를 씁니다.
+
 ## 두 사람이 함께 고르기 (웹캠 2대)
 
 1단계 투표는 두 사람이 같은 카드를 바라봐야 선택됩니다. 웹캠 두 대를 한 창에서 동시에 다루므로
